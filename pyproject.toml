@@ -15,7 +15,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "mtlearn"
-version = "1.0.6"
+version = "1.0.7"
 description = "Morphological tree learning utilities with a stable morphology facade"
 readme = "README.md"
 authors = [{ name = "Wonder Alexandre Luz Alves", email = "worderalexandre@gmail.com" }]
