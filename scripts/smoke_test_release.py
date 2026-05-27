@@ -45,10 +45,15 @@ def main() -> int:
 
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
-        attributes_spec=[(morphology.AttributeType.AREA,)],
-        tree_type="max-tree",
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
         device="cpu",
         scale_mode="none",
+        clamp=None,
     )
     output = layer(torch.tensor([[[[1, 2], [3, 4]]]], dtype=torch.float32))
     assert output.shape == (1, 1, 2, 2)
