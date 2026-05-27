@@ -14,21 +14,23 @@ produce the node-wise sigmoid filtering criterion.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
+import numbers
+import re
+from typing import Any, Mapping
 import torch
 import numpy as np
 from .. import morphology
 import mtlearn
 from ._helpers import (
-    group_name,
     to_numpy_u8,
     build_tree,
     update_ds_stats,
     normalize_with_ds_stats,
-    maybe_refresh_norm_for_key,
-    make_stats_payload,
-    load_stats_payload,
-    IndexedDatasetWrapper
+    IndexedDatasetWrapper,
+    normalize_attributes_spec,
+    validate_attributes_for_tree_type,
 )
 
 
@@ -104,7 +106,7 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         return grad_nodes
 
     @staticmethod
-    def forward(ctx, weight, bias, residues, tpre, tpost, parent, node_of_pixel, attrs2d, numRows: int, numCols: int, beta_f: float = 1.0, clamp_logits: bool = False, order_forward=None, order_backward=None):
+    def forward(ctx, weight, bias, residues, tpre, tpost, parent, node_of_pixel, attrs2d, numRows: int, numCols: int, beta_f: float = 1.0, clamp_min=None, clamp_max=None, order_forward=None, order_backward=None):
         """Apply the connected filter using implicit reconstruction metadata.
 
         Args:
@@ -117,7 +119,8 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
             attrs2d: normalized attributes with shape ``(num_nodes, K)``.
             numRows, numCols: output image dimensions.
             beta_f: sigmoid gain used in the forward pass.
-            clamp_logits: whether to clamp ``beta_f * logits`` before sigmoid.
+            clamp_min, clamp_max: optional clamp bounds for ``beta_f * logits``
+                before sigmoid.
             order_forward: optional cached order for forward reconstruction.
             order_backward: optional cached order for gradient propagation.
 
@@ -127,8 +130,17 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         # Node-wise sigmoid criterion.
         logits = attrs2d @ weight.view(-1) + bias
         s = beta_f * logits
-        if clamp_logits:
-            s = torch.clamp(s, -12.0, 12.0)
+        if isinstance(clamp_min, bool) and clamp_max is None:
+            clamp_min, clamp_max = (-12.0, 12.0) if clamp_min else (None, None)
+        if (clamp_min is None) != (clamp_max is None):
+            raise ValueError("clamp_min and clamp_max must be provided together.")
+        if clamp_min is not None and clamp_max is not None:
+            if clamp_min >= clamp_max:
+                raise ValueError("clamp_min must be smaller than clamp_max.")
+            clamp_mask = (s >= clamp_min) & (s <= clamp_max)
+            s = torch.clamp(s, clamp_min, clamp_max)
+        else:
+            clamp_mask = torch.ones_like(s, dtype=torch.bool)
         sigmoid = torch.sigmoid(s)
 
         # Implicit reconstruction from filtered node residues to pixels.
@@ -137,7 +149,7 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         y_2d = y.reshape(numRows, numCols)
 
         # Backward context: only tensors needed to compute dW and dB are saved.
-        ctx.save_for_backward(attrs2d, residues, sigmoid, tpre, tpost, parent, node_of_pixel)
+        ctx.save_for_backward(attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, parent, node_of_pixel)
         ctx.beta_f = beta_f
         ctx.order_backward = order_backward
         return y_2d
@@ -150,8 +162,8 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         residues, and image dimensions are treated as fixed preprocessing data.
         """
         # Recover the tensors needed by the implicit Jacobian computation.
-        attrs2d, residues, sigmoid, tpre, tpost, parent, node_of_pixel = ctx.saved_tensors
-        #beta_f = ctx.beta_f
+        attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, parent, node_of_pixel = ctx.saved_tensors
+        beta_f = ctx.beta_f
         order_backward = ctx.order_backward
         grad_output_flat = grad_output.flatten()
 
@@ -162,7 +174,8 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
 
         # Chain rule through the sigmoid criterion.
         d_sigmoid = sigmoid * (1 - sigmoid)
-        grad_s = grad_nodes * residues * d_sigmoid
+        grad_s = grad_nodes * residues * d_sigmoid * beta_f
+        grad_s = torch.where(clamp_mask, grad_s, torch.zeros_like(grad_s))
 
         # Final gradients for the group weight vector and scalar bias.
         dW = attrs2d.T @ grad_s
@@ -181,7 +194,8 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
             None,        # numRows
             None,        # numCols
             None,        # beta_f
-            None,        # clamp_logits
+            None,        # clamp_min
+            None,        # clamp_max
             None,        # order_forward
             None         # order_backward
         )
@@ -189,140 +203,332 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
 
 
 
-class ConnectedFilterPreprocessingLayer(torch.nn.Module):
-    """Main learnable Connected Filter Preprocessing (CFP) layer.
+@dataclass(frozen=True)
+class CFPValuation:
+    """Signal reconstructed by one CFP filter.
 
-    For each attribute group ``g`` with ``K`` normalized attributes
-    ``A_g in R[num_nodes, K]``, the layer computes
-    ``sigmoid(beta_f * (A_g @ w_g + b_g))`` as a node-wise filtering criterion.
-    The criterion is applied to the tree residues and reconstructed to pixels
-    through the implicit-Jacobian autograd function.
-
-    This is the preferred implementation for training. It can run tensor
-    operations on CUDA when ``device="cuda"`` while still building morphology
-    trees through the CPU backend.
-
-    Args:
-        in_channels: Number of input channels.
-        attributes_spec: Attribute groups. Each item is one group and must
-            contain at least one morphology attribute enum.
-        tree_type: ``"max-tree"``, ``"min-tree"``, or any other value accepted
-            by the facade as a tree of shapes.
-        device: Torch device used for parameters, cached tensors, and outputs.
-        scale_mode: ``"minmax01"``, ``"zscore_tree"``, ``"hybrid"``, or
-            ``"none"``.
-        eps: Numerical floor for normalization denominators.
-        beta_f: Forward sigmoid gain.
-        top_hat: If true, output the tree-type-specific top-hat residual.
-        clamp_logits: If true, clamp ``beta_f * logits`` to ``[-12, 12]``.
-        hybrid_k: Number of standard deviations used for hybrid clipping.
-        hybrid_floor_a: Lower bound used when remapping hybrid-normalized
-            attributes to ``[a, 1]``.
+    ``ALTITUDE`` reconstructs the filtered image altitude, ``ALTITUDE_TOPHAT``
+    reconstructs the tree-type-specific altitude top-hat, and
+    ``node_attribute`` reconstructs a scalar node attribute.
     """
-    def __init__(self,
-                 in_channels,
-                 attributes_spec,
-                 tree_type="max-tree",
-                 device="cpu",
-                 scale_mode: str = "hybrid",
-                 eps: float = 1e-6,
-                 beta_f: float = 1.0,
-                 top_hat: bool = False,
-                 clamp_logits: bool = False,
-                 hybrid_k: float = 3.0,
-                 hybrid_floor_a: float = 0.05,
-                 ):
-        """Initialize CFP configuration, caches, and learnable parameters.
 
-        The constructor normalizes the attribute specification into immutable
-        groups, builds the flat attribute set used for cache construction, and
-        creates one weight vector plus one scalar bias per group.
+    kind: str
+    attribute: Any = None
+
+    @classmethod
+    def node_attribute(cls, attribute: Any) -> "CFPValuation":
+        """Use a scalar node attribute as the valuation to be filtered."""
+        return cls("node_attribute", attribute)
+
+
+CFPValuation.ALTITUDE = CFPValuation("altitude")
+CFPValuation.ALTITUDE_TOPHAT = CFPValuation("altitude_tophat")
+
+
+@dataclass(frozen=True)
+class _NormalizedFilterSpec:
+    index: int
+    key: str
+    tree_type: str
+    tree_key: str
+    attributes: tuple[Any, ...]
+    valuation: CFPValuation
+    valuation_key: str
+    tos_interpolation: Any
+    tos_infinity_seed_row: int
+    tos_infinity_seed_col: int
+
+
+def _enum_name(value: Any) -> str:
+    return getattr(value, "name", str(value))
+
+
+def _is_altitude_attribute(value: Any) -> bool:
+    return _enum_name(value) in {"ALTITUDE", "LEVEL"}
+
+
+def _normalize_valuation(value: Any) -> CFPValuation:
+    if value is None:
+        return CFPValuation.ALTITUDE
+    if isinstance(value, CFPValuation):
+        if value.kind == "node_attribute" and _is_altitude_attribute(value.attribute):
+            return CFPValuation.ALTITUDE
+        return value
+    if _is_altitude_attribute(value):
+        return CFPValuation.ALTITUDE
+    return CFPValuation.node_attribute(value)
+
+
+def _valuation_key(valuation: CFPValuation) -> str:
+    if valuation.kind == "node_attribute":
+        return f"node_attribute:{_enum_name(valuation.attribute)}"
+    return valuation.kind
+
+
+def _uses_altitude_signal(valuation: CFPValuation) -> bool:
+    return valuation.kind in {"altitude", "altitude_tophat"}
+
+
+def _is_altitude_tophat_valuation(valuation: CFPValuation) -> bool:
+    return valuation.kind == "altitude_tophat"
+
+
+def _normalize_clamp(value: Any) -> tuple[float, float] | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise TypeError("clamp must be None, a positive scalar, or a (min, max) pair.")
+    if isinstance(value, numbers.Real):
+        bound = float(value)
+        if not math.isfinite(bound) or bound <= 0.0:
+            raise ValueError("scalar clamp must be finite and positive.")
+        return (-bound, bound)
+    if isinstance(value, (tuple, list)) and len(value) == 2:
+        clamp_min = float(value[0])
+        clamp_max = float(value[1])
+        if not math.isfinite(clamp_min) or not math.isfinite(clamp_max):
+            raise ValueError("clamp bounds must be finite.")
+        if clamp_min >= clamp_max:
+            raise ValueError("clamp bounds must satisfy min < max.")
+        return (clamp_min, clamp_max)
+    raise TypeError("clamp must be None, a positive scalar, or a (min, max) pair.")
+
+
+_FILTER_SPEC_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _normalize_filter_spec_name(value: Any, index: int, seen_names: set[str]) -> str:
+    if value is None:
+        name = f"spec_{index:03d}"
+    else:
+        if not isinstance(value, str):
+            raise TypeError("filter spec name must be a string.")
+        name = value.strip()
+        if not name:
+            raise ValueError("filter spec name must be non-empty.")
+        if _FILTER_SPEC_NAME_RE.fullmatch(name) is None:
+            raise ValueError(
+                "filter spec name must start with a letter or underscore and contain only letters, digits, and underscores."
+            )
+
+    if name in seen_names:
+        raise ValueError(f"duplicate filter spec name: {name!r}")
+    seen_names.add(name)
+    return name
+
+
+class ConnectedFilterPreprocessingLayer(torch.nn.Module):
+    """Learnable CFP layer defined by per-output filter specifications.
+
+    Each item in ``filter_specs`` defines one output per input channel:
+    morphology tree, scoring attributes, and reconstructed valuation. The
+    default valuation is ``CFPValuation.ALTITUDE``. Top-hat output is selected
+    with ``CFPValuation.ALTITUDE_TOPHAT``. ``clamp`` optionally bounds
+    ``beta_f * logits`` before the sigmoid.
+
+    Tree construction and attribute computation happen outside autograd. The
+    trainable parameters are the per-filter weight vectors and scalar biases
+    that produce node-wise sigmoid gates from normalized attributes.
+    """
+
+    def __init__(
+        self,
+        in_channels,
+        filter_specs,
+        *,
+        device="cpu",
+        scale_mode: str = "hybrid",
+        eps: float = 1e-6,
+        beta_f: float = 1.0,
+        clamp=None,
+        hybrid_k: float = 3.0,
+        hybrid_floor_a: float = 0.05,
+        tos_interpolation=None,
+        tos_infinity_seed_row: int = 0,
+        tos_infinity_seed_col: int = 0,
+    ):
+        """Initialize CFP filters, caches, and learnable spec parameters.
+
+        Args:
+            in_channels: Number of input image channels expected by ``forward``.
+            filter_specs: Iterable of mappings. Each mapping must define
+                ``tree_type`` and ``attributes`` and may define ``name``,
+                ``valuation``, ``tos_interpolation``,
+                ``tos_infinity_seed_row``, and ``tos_infinity_seed_col``.
+                One output channel is produced for each input channel and each
+                filter spec.
+            device: Device used for CFP tensors and trainable parameters.
+                Morphology-tree construction itself runs in the native CPU
+                backend.
+            scale_mode: Attribute normalization mode. ``"hybrid"`` uses
+                dataset-level z-score statistics followed by clipping/rescaling;
+                ``"minmax01"``, ``"zscore_tree"``, and ``"none"`` are also
+                supported by the shared normalization helpers.
+            eps: Numerical floor used by normalization.
+            beta_f: Sigmoid gain used during ``forward``.
+            clamp: Optional bound applied to ``beta_f * logits`` before the
+                sigmoid. Use ``None`` for no clamp, a positive scalar for
+                symmetric bounds, or ``(min, max)`` for explicit bounds.
+            hybrid_k: Clipping radius used by ``scale_mode="hybrid"``.
+            hybrid_floor_a: Lower endpoint used by hybrid rescaling.
+            tos_interpolation: Default tree-of-shapes interpolation for specs
+                that do not override it.
+            tos_infinity_seed_row: Default tree-of-shapes infinity seed row.
+            tos_infinity_seed_col: Default tree-of-shapes infinity seed column.
+
+        Raises:
+            ValueError: If ``filter_specs`` is empty or a spec is invalid.
+            TypeError: If a spec or clamp value has an unsupported type.
         """
         super().__init__()
 
-        # Hybrid normalization configuration.
         self.hybrid_k = float(hybrid_k)
         self.hybrid_floor_a = float(hybrid_floor_a)
-
         self.in_channels = int(in_channels)
-        self.tree_type   = str(tree_type)
-        self.device      = torch.device(device)
-        self.scale_mode  = str(scale_mode)
-        self.eps         = float(eps)
-        self.beta_f      = float(beta_f)
-        self.top_hat     = bool(top_hat)
-        self.clamp_logits = bool(clamp_logits)
+        self.device = torch.device(device)
+        self.scale_mode = str(scale_mode)
+        self.eps = float(eps)
+        self.beta_f = float(beta_f)
+        self.clamp = _normalize_clamp(clamp)
 
+        self.filter_specs = self._normalize_filter_specs(
+            filter_specs,
+            default_tos_interpolation=tos_interpolation,
+            default_tos_infinity_seed_row=int(tos_infinity_seed_row),
+            default_tos_infinity_seed_col=int(tos_infinity_seed_col),
+        )
+        self.num_specs = len(self.filter_specs)
+        self.out_channels = self.in_channels * self.num_specs
 
-        # Attribute groups and the flat set of attribute types used by them.
-        self.group_defs = []
-        all_attr_types_set = set()
-        for item in attributes_spec:
-            group = tuple(item) if isinstance(item, (list, tuple)) else (item,)
-            if len(group) < 1:
-                raise ValueError("Each attribute group must contain at least one attribute.")
-            self.group_defs.append(group)
-            for at in group:
-                all_attr_types_set.add(at)
-        self._all_attr_types = list(all_attr_types_set)
+        self._spec_by_key = {spec.key: spec for spec in self.filter_specs}
+        self._tree_spec_by_key = {}
+        self._scoring_attrs_by_tree_key = {}
+        self._valuations_by_tree_key = {}
+        for spec in self.filter_specs:
+            self._tree_spec_by_key.setdefault(spec.tree_key, spec)
+            self._scoring_attrs_by_tree_key.setdefault(spec.tree_key, set()).update(spec.attributes)
+            self._valuations_by_tree_key.setdefault(spec.tree_key, set()).add(spec.valuation)
 
-        self.num_groups   = len(self.group_defs)
-        self.out_channels = self.in_channels * self.num_groups
-
-        # Attribute, normalization, and implicit-Jacobian cache state.
+        self._tree_info = {}
         self._base_attrs = {}
         self._norm_attrs = {}
+        self._valuation_increments = {}
         self._stats_epoch = 0
         self._norm_epoch_by_key = {}
         self._ds_stats = {}
         self._stats_frozen = False
-        self._info_jacobian = {}
 
-        # Learnable parameters: one weight vector and one bias per group.
         self._weights = torch.nn.ParameterDict()
-        self._biases  = torch.nn.ParameterDict()
-        for g, group in enumerate(self.group_defs):
-            k = len(group)
-            gname = "+".join([t.name for t in group])
+        self._biases = torch.nn.ParameterDict()
+        for spec in self.filter_specs:
+            k = len(spec.attributes)
             w = torch.empty(k, dtype=torch.float32, device=self.device)
             b = torch.empty(1, dtype=torch.float32, device=self.device)
-            # Xavier-like initialization for a one-dimensional parameter vector.
             fan_in, fan_out = k, 1
-            gain = 1.0
-            std = gain * math.sqrt(2.0 / float(fan_in + fan_out))
-            a = math.sqrt(3.0) * std
-            torch.nn.init.uniform_(w, -a, a)
+            std = math.sqrt(2.0 / float(fan_in + fan_out))
+            torch.nn.init.uniform_(w, -math.sqrt(3.0) * std, math.sqrt(3.0) * std)
             torch.nn.init.constant_(b, 0.0)
-            self._weights[gname] = torch.nn.Parameter(w, requires_grad=True)
-            self._biases[gname]  = torch.nn.Parameter(b, requires_grad=True)
+            self._weights[spec.key] = torch.nn.Parameter(w, requires_grad=True)
+            self._biases[spec.key] = torch.nn.Parameter(b, requires_grad=True)
 
-    # ---------- helpers ----------
-    def _group_name(self, group):
-        """Return the stable parameter/cache name for an attribute group."""
-        return group_name(group)
+    @staticmethod
+    def _tree_key(tree_type, tos_interpolation, tos_infinity_seed_row, tos_infinity_seed_col) -> str:
+        interpolation_name = _enum_name(tos_interpolation) if tos_interpolation is not None else "None"
+        return f"{tree_type}|{interpolation_name}|{tos_infinity_seed_row}|{tos_infinity_seed_col}"
+
+    def _normalize_filter_specs(
+        self,
+        filter_specs,
+        *,
+        default_tos_interpolation,
+        default_tos_infinity_seed_row: int,
+        default_tos_infinity_seed_col: int,
+    ):
+        if filter_specs is None:
+            raise ValueError("filter_specs must contain at least one filter specification.")
+
+        normalized = []
+        seen_names = set()
+        for index, raw_spec in enumerate(filter_specs):
+            if not isinstance(raw_spec, Mapping):
+                raise TypeError("Each filter spec must be a mapping.")
+            if "tree_type" not in raw_spec:
+                raise ValueError("Each filter spec must define tree_type.")
+            if "attributes" not in raw_spec:
+                raise ValueError("Each filter spec must define attributes.")
+            if "output_mode" in raw_spec:
+                raise ValueError("output_mode was removed; use CFPValuation.ALTITUDE_TOPHAT for top-hat output.")
+
+            spec_name = _normalize_filter_spec_name(raw_spec.get("name", None), index, seen_names)
+            tree_type = morphology.normalize_tree_type(raw_spec["tree_type"])
+            raw_attributes = raw_spec["attributes"]
+            raw_group = tuple(raw_attributes) if isinstance(raw_attributes, (list, tuple)) else (raw_attributes,)
+            if len(raw_group) < 1:
+                raise ValueError("Each filter spec must contain at least one attribute.")
+
+            attributes = normalize_attributes_spec([raw_group], tree_type)[0][0]
+            validate_attributes_for_tree_type(attributes, tree_type)
+
+            valuation = _normalize_valuation(raw_spec.get("valuation", None))
+            self._validate_valuation_for_tree_type(valuation, tree_type)
+
+            spec_tos_interpolation = raw_spec.get("tos_interpolation", default_tos_interpolation)
+            if tree_type == morphology.TreeType.TREE_OF_SHAPES.value:
+                spec_tos_interpolation = morphology.normalize_tos_interpolation(spec_tos_interpolation)
+            spec_tos_infinity_seed_row = int(raw_spec.get("tos_infinity_seed_row", default_tos_infinity_seed_row))
+            spec_tos_infinity_seed_col = int(raw_spec.get("tos_infinity_seed_col", default_tos_infinity_seed_col))
+            tree_key = self._tree_key(
+                tree_type,
+                spec_tos_interpolation,
+                spec_tos_infinity_seed_row,
+                spec_tos_infinity_seed_col,
+            )
+
+            normalized.append(
+                _NormalizedFilterSpec(
+                    index=index,
+                    key=spec_name,
+                    tree_type=tree_type,
+                    tree_key=tree_key,
+                    attributes=tuple(attributes),
+                    valuation=valuation,
+                    valuation_key=_valuation_key(valuation),
+                    tos_interpolation=spec_tos_interpolation,
+                    tos_infinity_seed_row=spec_tos_infinity_seed_row,
+                    tos_infinity_seed_col=spec_tos_infinity_seed_col,
+                )
+            )
+
+        if not normalized:
+            raise ValueError("filter_specs must contain at least one filter specification.")
+        return tuple(normalized)
+
+    @staticmethod
+    def _validate_valuation_for_tree_type(valuation: CFPValuation, tree_type: str) -> None:
+        if valuation.kind in {"altitude", "altitude_tophat"}:
+            return
+        if valuation.kind != "node_attribute":
+            raise ValueError(f"unknown CFP valuation kind: {valuation.kind!r}")
+        if isinstance(valuation.attribute, morphology.AttributeGroup):
+            raise ValueError("CFPValuation.node_attribute expects one scalar attribute, not an AttributeGroup.")
+        validate_attributes_for_tree_type([valuation.attribute], tree_type)
+
+    def _stat_key(self, tree_key: str, attr_type: Any) -> str:
+        return f"{tree_key}::{_enum_name(attr_type)}"
 
     def _to_numpy_u8(self, img2d_t: torch.Tensor) -> np.ndarray:
-        """Convert one image channel to the backend's ``np.uint8`` format."""
         return to_numpy_u8(img2d_t)
 
-    def _compute_tree_info_for_jacobian(self, img_np: np.ndarray):
-        """Build the morphology tree and implicit-Jacobian metadata.
+    def _build_tree(self, img_np: np.ndarray, spec: _NormalizedFilterSpec):
+        return build_tree(
+            img_np,
+            spec.tree_type,
+            tos_interpolation=spec.tos_interpolation,
+            tos_infinity_seed_row=spec.tos_infinity_seed_row,
+            tos_infinity_seed_col=spec.tos_infinity_seed_col,
+        )
 
-        Returned metadata contains:
-
-        - ``residues``: node residues;
-        - ``tpre`` / ``tpost``: entry and exit times for each node;
-        - ``parent``: parent index for each node;
-        - ``node_of_pixel``: flattened-pixel to node mapping;
-        - ``numRows`` / ``numCols``: image dimensions;
-        - ``tree_type``: tree type used to build the structure;
-        - ``order_forward`` / ``order_backward``: cached orders kept for API
-          compatibility with the autograd function.
-
-        No explicit mask is needed because the backend uses ``parent[root] =
-        root``.
-        """
-        tree = build_tree(img_np, self.tree_type)
+    def _compute_tree_info(self, tree, spec: _NormalizedFilterSpec):
         residues, tpre, tpost, parent, node_of_pixel = (
             mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
         )
@@ -334,150 +540,248 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             "node_of_pixel": node_of_pixel.to(self.device),
             "numRows": tree.numRows,
             "numCols": tree.numCols,
-            "tree_type": self.tree_type,
+            "tree_type": spec.tree_type,
+            "order_forward": torch.argsort(tpre, descending=False).to(self.device),
+            "order_backward": torch.argsort(tpre).to(self.device),
         }
-        # Cached forward order.
-        info["order_forward"] = torch.argsort(tpre, descending=False).to(self.device)
-        # Cached backward order.
-        info["order_backward"] = torch.argsort(tpre).to(self.device)
-        return tree, info
+        return info
 
-    # ---------- normalization with hybrid support ----------
-    def _update_ds_stats(self, attr_type, a_raw_1d: torch.Tensor):
-        """Update dataset statistics for one raw attribute vector."""
+    def _update_ds_stats(self, stat_key, a_raw_1d: torch.Tensor):
         if getattr(self, "_stats_frozen", False):
             return
-        smode = self.scale_mode
-        if smode == "hybrid":
-            smode = "zscore_tree"
-        changed = update_ds_stats(self._ds_stats, smode, attr_type, a_raw_1d)
+        smode = "zscore_tree" if self.scale_mode == "hybrid" else self.scale_mode
+        changed = update_ds_stats(self._ds_stats, smode, stat_key, a_raw_1d)
         if changed:
             self._stats_epoch += 1
 
-    def _normalize_with_ds_stats(self, attr_type, a_raw_1d: torch.Tensor) -> torch.Tensor:
-        """Normalize a raw attribute vector according to ``scale_mode``.
-
-        Hybrid mode applies three steps:
-
-        1. z-score using dataset-level mean and standard deviation;
-        2. clipping to ``[-hybrid_k, hybrid_k]``;
-        3. remapping to ``[hybrid_floor_a, 1]``.
-        """
+    def _normalize_with_ds_stats(self, stat_key, a_raw_1d: torch.Tensor) -> torch.Tensor:
         if self.scale_mode != "hybrid":
-            return normalize_with_ds_stats(self._ds_stats, self.scale_mode, self.eps, attr_type, a_raw_1d)
+            return normalize_with_ds_stats(self._ds_stats, self.scale_mode, self.eps, stat_key, a_raw_1d)
 
-        # Hybrid mode.
-        st = self._ds_stats.get(attr_type, None)
+        st = self._ds_stats.get(stat_key, None)
         if st is None:
-            # Before stats exist, preserve the raw values so early calls do not fail.
-            return a_raw_1d
-
-        # Dataset-level z-score statistics.
+            raise RuntimeError(
+                "scale_mode='hybrid' requires dataset statistics. "
+                "Call build_dataloader_cached(...) or load_stats(...) before forward/inspection."
+            )
         count = st["count"].to(torch.float32)
-        mean  = (st["sum"] / torch.clamp(count, min=1.0)) if count.item() > 0 else torch.tensor(0.0, device=a_raw_1d.device)
-        var   = (st["sumsq"] / torch.clamp(count, min=1.0) - mean * mean) if count.item() > 0 else torch.tensor(0.0, device=a_raw_1d.device)
-        std   = torch.sqrt(torch.clamp(var, min=self.eps))
-
-        # 1) z-score
+        mean = st["sum"] / torch.clamp(count, min=1.0)
+        var = st["sumsq"] / torch.clamp(count, min=1.0) - mean * mean
+        std = torch.sqrt(torch.clamp(var, min=self.eps))
         x = (a_raw_1d - mean) / std
-        # 2) clip em [-k, +k]
         k = torch.tensor(self.hybrid_k, dtype=x.dtype, device=x.device)
         x = torch.clamp(x, -k, k)
-        # 3) rescale to [a, 1].
         a = torch.tensor(self.hybrid_floor_a, dtype=x.dtype, device=x.device)
-        x01 = a + (1.0 - a) * ((x + k) / (2.0 * k))
-        return x01
+        return a + (1.0 - a) * ((x + k) / (2.0 * k))
 
-    def _maybe_refresh_norm_for_key(self, key: str):
-        """Refresh normalized cached attributes if dataset stats changed."""
-        # Nothing to refresh until raw attributes are cached.
-        if key not in self._base_attrs:
-            return
+    def _compute_valuation_increment(self, tree, info, valuation: CFPValuation) -> torch.Tensor:
+        if _uses_altitude_signal(valuation):
+            return info["residues"]
 
-        # Cache is already current for this stats epoch.
-        if self._norm_epoch_by_key.get(key, -1) == self._stats_epoch:
-            return
+        attr_type = valuation.attribute
+        attr_np = morphology.compute_attributes(tree, [attr_type])[1]
+        values = torch.as_tensor(attr_np, device=self.device).squeeze(1).to(torch.float32)
+        parent = info["parent"]
+        parent_values = values[parent.clamp_min(0)]
+        increments = values - parent_values
+        root_or_self = parent == torch.arange(parent.numel(), device=parent.device)
+        increments = torch.where(root_or_self, values, increments)
+        alive = info["tpost"] > info["tpre"]
+        return torch.where(alive, increments, torch.zeros_like(increments))
 
-        if self.scale_mode == "hybrid":
-            # Reapply hybrid normalization attribute by attribute.
-            per_attr_raw = self._base_attrs[key]           # dict[attr_type] -> (numNodes,1)
-            per_attr_norm = {}
-            for attr_type, a_raw_2d in per_attr_raw.items():
-                a_raw_1d = a_raw_2d.view(-1)              # (numNodes,)
-                a_norm   = self._normalize_with_ds_stats(attr_type, a_raw_1d)
-                per_attr_norm[attr_type] = a_norm
-            self._norm_attrs[key] = per_attr_norm
-            self._norm_epoch_by_key[key] = self._stats_epoch
-        else:
-            # Non-hybrid modes are shared across CFP implementations.
-            maybe_refresh_norm_for_key(
-                key,
-                self._base_attrs,
-                self._norm_attrs,
-                self._all_attr_types,
-                self._ds_stats,
-                self.scale_mode,
-                self.eps,
-                self._norm_epoch_by_key,
-                self._stats_epoch
-            )
+    def _compute_tree_payload(self, img_np: np.ndarray, tree_key: str, *, update_stats: bool):
+        spec = self._tree_spec_by_key[tree_key]
+        tree = self._build_tree(img_np, spec)
+        info = self._compute_tree_info(tree, spec)
 
-    def freeze_ds_stats(self):
-        """Stop collecting dataset statistics for future samples."""
-        self._stats_frozen = True
+        base_attrs = {}
+        norm_attrs = {}
+        for attr_type in self._scoring_attrs_by_tree_key.get(tree_key, ()):
+            attr_np = morphology.compute_attributes(tree, [attr_type])[1]
+            a_raw_1d = torch.as_tensor(attr_np, device=self.device).squeeze(1)
+            stat_key = self._stat_key(tree_key, attr_type)
+            if update_stats:
+                self._update_ds_stats(stat_key, a_raw_1d)
+            a_norm = self._normalize_with_ds_stats(stat_key, a_raw_1d)
+            base_attrs[attr_type] = a_raw_1d.unsqueeze(1)
+            norm_attrs[attr_type] = a_norm
 
-    def unfreeze_ds_stats(self):
-        """Resume collecting dataset statistics for future samples."""
-        self._stats_frozen = False
+        valuation_increments = {}
+        for valuation in self._valuations_by_tree_key.get(tree_key, ()):
+            valuation_increments[_valuation_key(valuation)] = self._compute_valuation_increment(tree, info, valuation)
 
-    def save_stats(self, path: str):
-        """Save normalization statistics and scale mode for reproducibility."""
-        payload = make_stats_payload(self._ds_stats, self.scale_mode)
-        torch.save(payload, path)
-        print(f"[ConnectedLinearUnit] stats saved to {path}")
+        return {
+            "info": info,
+            "base_attrs": base_attrs,
+            "norm_attrs": norm_attrs,
+            "valuation_increments": valuation_increments,
+        }
 
-    def load_stats(self, path: str, refresh_cache: bool = True, *, trusted_legacy_format: bool = False):
-        """Load normalization statistics and optionally refresh cached attrs."""
-        payload = load_stats_payload(path, self.device, trusted_legacy_format=trusted_legacy_format)
-        self._ds_stats = payload.get("ds_stats", {})
-        # Invalidate normalized values derived from older statistics.
-        self._stats_epoch += 1
-        if refresh_cache:
-            self.refresh_cached_normalization()
-
-    # ---------- tree and attribute construction ----------
-    def _ensure_tree_info_and_attributes_cached(self, key: str, img_t: torch.Tensor):
-        """Ensure tree metadata and raw/normalized attributes exist in cache."""
-        if key in self._info_jacobian:
+    def _ensure_tree_payload_cached(self, base_key: str, img_t: torch.Tensor, tree_key: str) -> None:
+        if base_key in self._tree_info and tree_key in self._tree_info[base_key]:
             return
 
         img_np = self._to_numpy_u8(img_t.detach())
-        tree, info = self._compute_tree_info_for_jacobian(img_np)
-        # The tree itself is not cached by the implicit implementation.
-        self._info_jacobian[key] = info
+        payload = self._compute_tree_payload(img_np, tree_key, update_stats=True)
+        self._tree_info.setdefault(base_key, {})[tree_key] = payload["info"]
+        self._base_attrs.setdefault(base_key, {})[tree_key] = payload["base_attrs"]
+        self._norm_attrs.setdefault(base_key, {})[tree_key] = payload["norm_attrs"]
+        self._valuation_increments.setdefault(base_key, {})[tree_key] = payload["valuation_increments"]
+        self._norm_epoch_by_key[base_key] = self._stats_epoch
 
-        per_attr_raw, per_attr_norm = {}, {}
-        for attr_type in self._all_attr_types:
-            attr_np  = morphology.compute_attributes(tree, [attr_type])[1]
-            a_raw_1d = torch.as_tensor(attr_np, device=self.device).squeeze(1)
-            self._update_ds_stats(attr_type, a_raw_1d)
-            a_norm = self._normalize_with_ds_stats(attr_type, a_raw_1d)
-            per_attr_raw[attr_type]  = a_raw_1d.unsqueeze(1)
-            per_attr_norm[attr_type] = a_norm
+    def _maybe_refresh_norm_for_key(self, base_key: str) -> None:
+        if base_key not in self._base_attrs:
+            return
+        if self._norm_epoch_by_key.get(base_key, -1) == self._stats_epoch:
+            return
 
-        self._base_attrs[key] = per_attr_raw
-        self._norm_attrs[key] = per_attr_norm
-        self._norm_epoch_by_key[key] = self._stats_epoch
+        refreshed = {}
+        for tree_key, per_attr_raw in self._base_attrs[base_key].items():
+            refreshed[tree_key] = {}
+            for attr_type, a_raw_2d in per_attr_raw.items():
+                stat_key = self._stat_key(tree_key, attr_type)
+                refreshed[tree_key][attr_type] = self._normalize_with_ds_stats(stat_key, a_raw_2d.view(-1))
+        self._norm_attrs[base_key] = refreshed
+        self._norm_epoch_by_key[base_key] = self._stats_epoch
 
-    # ---------- inspection ----------
-    def inspect_training_sample(self, img: torch.Tensor, channel: int = 0, idx: int | None = None, build_if_missing: bool = True):
-        """Return cached or on-the-fly inspection data for one sample.
+    def _apply_spec(self, spec: _NormalizedFilterSpec, info, norm_attrs, valuation_increments, beta_f):
+        weight = self._weights[spec.key]
+        bias = self._biases[spec.key]
+        dtype = weight.dtype
+        clamp_min, clamp_max = self.clamp if self.clamp is not None else (None, None)
 
-        When ``idx`` is provided, the method inspects cached data under
-        ``f"{idx}_{channel}"``. Without an index, the tree and attributes are
-        computed on the fly and are not persisted.
+        cols = [norm_attrs[attr_type].view(-1, 1).to(dtype=dtype, device=self.device) for attr_type in spec.attributes]
+        A_norm = torch.cat(cols, dim=1)
+        increments = valuation_increments[spec.valuation_key].to(dtype=dtype, device=self.device)
+        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
+            weight,
+            bias,
+            increments,
+            info["tpre"],
+            info["tpost"],
+            info["parent"],
+            info["node_of_pixel"],
+            A_norm,
+            info["numRows"],
+            info["numCols"],
+            beta_f,
+            clamp_min,
+            clamp_max,
+            info["order_forward"],
+            info["order_backward"],
+        )
+
+        if not _is_altitude_tophat_valuation(spec.valuation):
+            return y_ch
+
+        base = ConnectedFilterPreprocessingImplicitJacobianFunction.forward_from_info(
+            increments,
+            info["tpre"],
+            info["tpost"],
+            info["node_of_pixel"],
+            info["parent"],
+            info["order_forward"],
+        ).reshape(info["numRows"], info["numCols"])
+        if spec.tree_type == morphology.TreeType.MAX_TREE.value:
+            return base - y_ch
+        if spec.tree_type == morphology.TreeType.MIN_TREE.value:
+            return y_ch - base
+        return torch.abs(y_ch - base)
+
+    def _batch_input(self, x):
+        if isinstance(x, tuple) and len(x) == 2:
+            return x[0], x[1], True
+        if isinstance(x, list) and len(x) == 2 and isinstance(x[1], torch.Tensor) and x[1].dim() == 1:
+            return x[0], x[1], True
+        if isinstance(x, list):
+            x = torch.stack(x, dim=0)
+        return x, torch.arange(x.size(0), device=x.device), False
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply all filter specs and return ``(B, C * specs, H, W)``.
+
+        Args:
+            x: Input tensor shaped ``(B, C, H, W)`` or the cached-loader form
+                ``(x, idx)`` produced by ``build_dataloader_cached``.
+
+        Returns:
+            Tensor with one output channel per input channel and filter spec.
         """
-        # Normalize image layout to (C, H, W).
+        x, idx, use_cache = self._batch_input(x)
+        assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
+        B, C, H, W = x.shape
+        assert C == self.in_channels, f"in_channels={self.in_channels}, input C={C}"
+
+        out_dtype = next(self.parameters()).dtype
+        out = torch.empty((B, self.out_channels, H, W), dtype=out_dtype, device=self.device)
+        for b in range(B):
+            for c in range(C):
+                base_key = f"{int(idx[b])}_{c}"
+                direct_payloads = {}
+                for spec in self.filter_specs:
+                    if use_cache:
+                        self._ensure_tree_payload_cached(base_key, x[b, c], spec.tree_key)
+                        self._maybe_refresh_norm_for_key(base_key)
+                        info = self._tree_info[base_key][spec.tree_key]
+                        norm_attrs = self._norm_attrs[base_key][spec.tree_key]
+                        valuation_increments = self._valuation_increments[base_key][spec.tree_key]
+                    else:
+                        if spec.tree_key not in direct_payloads:
+                            img_np = self._to_numpy_u8(x[b, c].detach())
+                            direct_payloads[spec.tree_key] = self._compute_tree_payload(
+                                img_np,
+                                spec.tree_key,
+                                update_stats=False,
+                            )
+                        payload = direct_payloads[spec.tree_key]
+                        info = payload["info"]
+                        norm_attrs = payload["norm_attrs"]
+                        valuation_increments = payload["valuation_increments"]
+
+                    y_out = self._apply_spec(
+                        spec,
+                        info,
+                        norm_attrs,
+                        valuation_increments,
+                        self.beta_f,
+                    )
+                    out[b, c * self.num_specs + spec.index].copy_(y_out, non_blocking=True)
+        return out
+
+    def predict(self, x: torch.Tensor, beta_f: float = 1000.0) -> torch.Tensor:
+        """Run inference with a caller-provided sigmoid gain.
+
+        The method temporarily switches the module to evaluation mode, runs
+        ``forward`` under ``torch.no_grad()``, restores ``beta_f``, and restores
+        the previous training/eval state.
+        """
+        was_training = self.training
+        self.eval()
+        old_beta = self.beta_f
+        self.beta_f = float(beta_f)
+        try:
+            with torch.no_grad():
+                result = self.forward(x)
+        finally:
+            self.beta_f = old_beta
+            self.train(was_training)
+        return result
+
+    def inspect_training_sample(self, img: torch.Tensor, channel: int = 0, idx: int | None = None, build_if_missing: bool = True):
+        """Return cached or direct attributes, valuations, and parameters per spec.
+
+        Args:
+            img: Image tensor shaped ``(H, W)`` or ``(C, H, W)``.
+            channel: Channel to inspect when ``img`` has multiple channels.
+            idx: Optional stable dataset index used to look up cached payloads.
+            build_if_missing: Build a temporary tree payload when no cache entry
+                exists for ``idx``.
+
+        Returns:
+            Dictionary keyed by filter-spec name. Each entry contains raw and
+            normalized attributes, valuation increments, and current trainable
+            parameters.
+        """
         if img.dim() == 2:
             imgCHW = img.unsqueeze(0)
         elif img.dim() == 3:
@@ -485,374 +789,390 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         else:
             raise ValueError(f"img must be (H, W) or (C, H, W); got {tuple(img.shape)}")
 
-        C, H, W = imgCHW.shape
-        if C != self.in_channels:
-            if C != 1:
-                raise AssertionError(f"in_channels={self.in_channels}, input C={C}")
-
+        C, _, _ = imgCHW.shape
+        if C != self.in_channels and C != 1:
+            raise AssertionError(f"in_channels={self.in_channels}, input C={C}")
         c = channel if C > 1 else 0
 
+        payloads = {}
         if idx is not None:
-            key = f"{idx}_{c}"
-            use_cache = True
+            base_key = f"{idx}_{c}"
+            for spec in self.filter_specs:
+                if build_if_missing:
+                    self._ensure_tree_payload_cached(base_key, imgCHW[c], spec.tree_key)
+                elif base_key not in self._tree_info or spec.tree_key not in self._tree_info[base_key]:
+                    raise KeyError("Tree/attributes not found in cache. Use build_if_missing=True.")
+            self._maybe_refresh_norm_for_key(base_key)
+            for tree_key in self._tree_info.get(base_key, {}):
+                payloads[tree_key] = {
+                    "info": self._tree_info[base_key][tree_key],
+                    "base_attrs": self._base_attrs[base_key][tree_key],
+                    "norm_attrs": self._norm_attrs[base_key][tree_key],
+                    "valuation_increments": self._valuation_increments[base_key][tree_key],
+                }
         else:
-            use_cache = False
-
-        if use_cache:
-            if (key not in self._info_jacobian) and build_if_missing:
-                self._ensure_tree_info_and_attributes_cached(key, imgCHW[c])
-            elif key not in self._info_jacobian:
-                raise KeyError("Tree/attributes not found in cache. Use build_if_missing=True.")
-            self._maybe_refresh_norm_for_key(key)
-            # The implicit implementation does not store the tree object itself.
-            tree = None
-            base_attrs_by_group = {}
-            norm_attrs_by_group = {}
-            weights_by_group    = {}
-            bias_by_group       = {}
-            for group in self.group_defs:
-                gname = self._group_name(group)
-                cols_raw  = [self._base_attrs[key][attr_type].view(-1, 1) for attr_type in group]
-                cols_norm = [self._norm_attrs[key][attr_type].view(-1, 1) for attr_type in group]
-                A_raw  = torch.cat(cols_raw,  dim=1)
-                A_norm = torch.cat(cols_norm, dim=1)
-                base_attrs_by_group[gname] = A_raw
-                norm_attrs_by_group[gname] = A_norm
-                weights_by_group[gname]    = self._weights[gname]
-                bias_by_group[gname]       = self._biases[gname]
-        else:
-            print("[inspect_training_sample] Running without cache; computing tree and attributes directly.")
             img_np = self._to_numpy_u8(imgCHW[c].detach())
-            tree, info = self._compute_tree_info_for_jacobian(img_np)
-            residues = info["residues"]
-            base_attrs_by_group = {}
-            norm_attrs_by_group = {}
-            weights_by_group    = {}
-            bias_by_group       = {}
-            for group in self.group_defs:
-                gname = self._group_name(group)
-                cols_raw, cols_norm = [], []
-                for attr_type in group:
-                    attr_np = morphology.compute_attributes(tree, [attr_type])[1]
-                    a_raw_1d = torch.as_tensor(attr_np, device=self.device).squeeze(1)
-                    a_norm = self._normalize_with_ds_stats(attr_type, a_raw_1d)
-                    cols_raw.append(a_raw_1d.unsqueeze(1))
-                    cols_norm.append(a_norm.view(-1, 1))
-                A_raw = torch.cat(cols_raw, dim=1)
-                A_norm = torch.cat(cols_norm, dim=1)
-                base_attrs_by_group[gname] = A_raw
-                norm_attrs_by_group[gname] = A_norm
-                weights_by_group[gname]    = self._weights[gname]
-                bias_by_group[gname]       = self._biases[gname]
+            for tree_key in self._tree_spec_by_key:
+                payloads[tree_key] = self._compute_tree_payload(img_np, tree_key, update_stats=False)
 
-        return {
-            "tree": tree,
-            "base_attrs_by_group": base_attrs_by_group,
-            "norm_attrs_by_group": norm_attrs_by_group,
-            "weights_by_group": weights_by_group,
-            "bias_by_group": bias_by_group,
-        }
+        specs = {}
+        for spec in self.filter_specs:
+            payload = payloads[spec.tree_key]
+            cols_raw = [payload["base_attrs"][attr_type].view(-1, 1) for attr_type in spec.attributes]
+            cols_norm = [payload["norm_attrs"][attr_type].view(-1, 1) for attr_type in spec.attributes]
+            specs[spec.key] = {
+                "tree_type": spec.tree_type,
+                "attributes": spec.attributes,
+                "valuation": spec.valuation,
+                "base_attrs": torch.cat(cols_raw, dim=1),
+                "norm_attrs": torch.cat(cols_norm, dim=1),
+                "valuation_increments": payload["valuation_increments"][spec.valuation_key],
+                "weight": self._weights[spec.key],
+                "bias": self._biases[spec.key],
+            }
+        return {"specs": specs}
 
-    # ---------- forward ----------
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply CFP to a batch and return ``(B, C * groups, H, W)`` output.
+    def freeze_ds_stats(self):
+        """Stop updating dataset-level normalization statistics."""
+        self._stats_frozen = True
 
-        The input can be a tensor, ``(x, idx)``, or ``[x, idx]`` from a
-        DataLoader. Indexed inputs use persistent caches keyed by sample index
-        and channel; plain tensor inputs build trees and attributes on demand.
+    def unfreeze_ds_stats(self):
+        """Resume updating dataset-level normalization statistics."""
+        self._stats_frozen = False
+
+    def refresh_cached_normalization(self):
+        """Recompute normalized attributes for all cached samples."""
+        for base_key in list(self._base_attrs.keys()):
+            self._norm_epoch_by_key[base_key] = -1
+            self._maybe_refresh_norm_for_key(base_key)
+
+    def save_stats(self, path: str):
+        """Save dataset-level normalization statistics.
+
+        The payload is a torch-safe dictionary containing a format version,
+        ``scale_mode``, and serialized dataset statistics. Per-sample caches are
+        not saved.
         """
-        # Match the input conventions used by the CFP reference layers.
-        if isinstance(x, tuple) and len(x) == 2:
-            x, idx = x
-            use_cache = True
-        elif isinstance(x, list) and len(x) == 2 and isinstance(x[1], torch.Tensor) and x[1].dim() == 1:
-            x, idx = x[0], x[1]
-            use_cache = True
-        else:
-            if isinstance(x, list):
-                x = torch.stack(x, dim=0)
-            idx = torch.arange(x.size(0), device=x.device)
-            use_cache = False
-
-        assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
-        B, C, H, W = x.shape
-        assert C == self.in_channels, f"in_channels={self.in_channels}, input C={C}"
-
-        out = torch.empty((B, self.out_channels, H, W), dtype=torch.float32, device=self.device)
-
-        for b in range(B):
-            for c in range(C):
-                if use_cache:
-                    # Use idx as part of the persistent per-channel cache key.
-                    key = f"{int(idx[b])}_{c}"
-                    self._ensure_tree_info_and_attributes_cached(key, x[b, c])
-                    self._maybe_refresh_norm_for_key(key)
-                    info = self._info_jacobian[key]
-                    for g, group in enumerate(self.group_defs):
-                        gname = self._group_name(group)
-                        # Build A_norm by stacking one normalized column per group attribute.
-                        cols = [self._norm_attrs[key][attr_type].view(-1, 1) for attr_type in group]
-                        A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
-                            self._weights[gname],
-                            self._biases[gname],
-                            info["residues"],
-                            info["tpre"],
-                            info["tpost"],
-                            info["parent"],
-                            info["node_of_pixel"],
-                            A_norm,
-                            info["numRows"],
-                            info["numCols"],
-                            self.beta_f,
-                            self.clamp_logits,
-                            info["order_forward"],
-                            info["order_backward"]
-                        )
-                        if self.top_hat:
-                            x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
-                            tt = self.tree_type
-                            if tt == "max-tree":
-                                y_out = x_bc - y_ch
-                            elif tt == "min-tree":
-                                y_out = y_ch - x_bc
-                            else:
-                                y_out = torch.abs(y_ch - x_bc)
-                        else:
-                            y_out = y_ch
-                        out[b, c * self.num_groups + g].copy_(y_out, non_blocking=True)
-                else:
-                    # No persistent key was provided; build tree and attributes directly.
-                    img_np = self._to_numpy_u8(x[b, c].detach())
-                    tree, info = self._compute_tree_info_for_jacobian(img_np)
-                    residues = info["residues"]
-                    per_attr_norm = {}
-                    for attr_type in self._all_attr_types:
-                        attr_np = morphology.compute_attributes(tree, [attr_type])[1]
-                        a_raw_1d = torch.as_tensor(attr_np, device=self.device).squeeze(1)
-                        a_norm = self._normalize_with_ds_stats(attr_type, a_raw_1d)
-                        per_attr_norm[attr_type] = a_norm
-                    for g, group in enumerate(self.group_defs):
-                        gname = self._group_name(group)
-                        cols = [per_attr_norm[attr_type].view(-1, 1) for attr_type in group]
-                        A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
-                            self._weights[gname],
-                            self._biases[gname],
-                            info["residues"],
-                            info["tpre"],
-                            info["tpost"],
-                            info["parent"],
-                            info["node_of_pixel"],
-                            A_norm,
-                            info["numRows"],
-                            info["numCols"],
-                            self.beta_f,
-                            self.clamp_logits,
-                            info["order_forward"],
-                            info["order_backward"]
-                        )
-                        if self.top_hat:
-                            x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
-                            tt = self.tree_type
-                            if tt == "max-tree":
-                                y_out = x_bc - y_ch
-                            elif tt == "min-tree":
-                                y_out = y_ch - x_bc
-                            else:
-                                y_out = torch.abs(y_ch - x_bc)
-                        else:
-                            y_out = y_ch
-                        out[b, c * self.num_groups + g].copy_(y_out, non_blocking=True)
-
-        return out
-
-    # ---------- prediction / inference ----------
-    def predict(self, x: torch.Tensor, beta_f: float = 1000.0) -> torch.Tensor:
-        """Run inference with a caller-provided forward sigmoid gain."""
-        was_training = self.training
-        self.eval()
-        with torch.no_grad():
-            # Same input handling as forward.
-            if isinstance(x, tuple) and len(x) == 2:
-                x, idx = x
-                use_cache = True
-            elif isinstance(x, list) and len(x) == 2 and isinstance(x[1], torch.Tensor) and x[1].dim() == 1:
-                x, idx = x[0], x[1]
-                use_cache = True
-            else:
-                if isinstance(x, list):
-                    x = torch.stack(x, dim=0)
-                idx = torch.arange(x.size(0), device=x.device)
-                use_cache = False
-
-            B, C, H, W = x.shape
-            out = torch.empty((B, self.out_channels, H, W), dtype=torch.float32, device=self.device)
-            for b in range(B):
-                for c in range(C):
-                    if use_cache:
-                        key = f"{int(idx[b])}_{c}"
-                        self._ensure_tree_info_and_attributes_cached(key, x[b, c])
-                        self._maybe_refresh_norm_for_key(key)
-                        info = self._info_jacobian[key]
-                        for g, group in enumerate(self.group_defs):
-                            gname = self._group_name(group)
-                            cols = [self._norm_attrs[key][attr_type].view(-1, 1) for attr_type in group]
-                            A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
-                            self._weights[gname],
-                            self._biases[gname],
-                            info["residues"],
-                            info["tpre"],
-                            info["tpost"],
-                            info["parent"],
-                            info["node_of_pixel"],
-                            A_norm,
-                            info["numRows"],
-                            info["numCols"],
-                            beta_f,  # caller-provided beta_f
-                            self.clamp_logits,
-                            info["order_forward"],
-                            info["order_backward"]
-                        )
-                        if self.top_hat:
-                            x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
-                            tt = self.tree_type
-                            if tt == "max-tree":
-                                y_out = x_bc - y_ch
-                            elif tt == "min-tree":
-                                y_out = y_ch - x_bc
-                            else:
-                                y_out = torch.abs(y_ch - x_bc)
-                        else:
-                            y_out = y_ch
-                        out[b, c * self.num_groups + g].copy_(y_out, non_blocking=True)
-                    else:
-                        img_np = self._to_numpy_u8(x[b, c].detach())
-                        tree, info = self._compute_tree_info_for_jacobian(img_np)
-                        per_attr_norm = {}
-                        for attr_type in self._all_attr_types:
-                            attr_np = morphology.compute_attributes(tree, [attr_type])[1]
-                            a_raw_1d = torch.as_tensor(attr_np, device=self.device).squeeze(1)
-                            a_norm = self._normalize_with_ds_stats(attr_type, a_raw_1d)
-                            per_attr_norm[attr_type] = a_norm
-                        for g, group in enumerate(self.group_defs):
-                            gname = self._group_name(group)
-                            cols = [per_attr_norm[attr_type].view(-1, 1) for attr_type in group]
-                            A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
-                            self._weights[gname],
-                            self._biases[gname],
-                            info["residues"],
-                            info["tpre"],
-                            info["tpost"],
-                            info["parent"],
-                            info["node_of_pixel"],
-                            A_norm,
-                            info["numRows"],
-                            info["numCols"],
-                            beta_f,  # caller-provided beta_f
-                            self.clamp_logits,
-                            info["order_forward"],
-                            info["order_backward"]
-                        )
-                        if self.top_hat:
-                            x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
-                            tt = self.tree_type
-                            if tt == "max-tree":
-                                y_out = x_bc - y_ch
-                            elif tt == "min-tree":
-                                y_out = y_ch - x_bc
-                            else:
-                                y_out = torch.abs(y_ch - x_bc)
-                        else:
-                            y_out = y_ch
-                        out[b, c * self.num_groups + g].copy_(y_out, non_blocking=True)
-        if was_training:
-            self.train()
-        else:
-            self.eval()
-        return out
-
-    # ---------- save / load ----------
-    def save_params(self, path: str):
-        """Save all group weights and biases."""
         payload = {
-            "weights": { name: p.detach().cpu() for name, p in self._weights.items() },
-            "biases":  { name: p.detach().cpu() for name, p in self._biases.items()  },
+            "format_version": 3,
             "scale_mode": self.scale_mode,
+            "ds_stats": self._serialize_ds_stats(),
         }
         torch.save(payload, path)
-        print(f"[ConnectedLinearUnit] weights and biases saved to {path}")
 
-    def get_params(self):
-        """Return CPU clones of group weights and biases."""
-        return (
-            { name: p.detach().cpu().clone() for name, p in self._weights.items() },
-            { name: p.detach().cpu().clone() for name, p in self._biases.items()  },
+    def load_stats(self, path: str, refresh_cache: bool = True):
+        """Load dataset-level normalization statistics.
+
+        Args:
+            path: File previously written by ``save_stats``.
+            refresh_cache: Whether to recompute normalized cached attributes
+                immediately after loading.
+        """
+        payload = torch.load(path, map_location=self.device, weights_only=True)
+        self._ds_stats = self._deserialize_ds_stats(payload.get("ds_stats", {}))
+        self._stats_epoch += 1
+        if refresh_cache:
+            self.refresh_cached_normalization()
+
+    def get_config(self) -> dict[str, Any]:
+        """Return the architecture/configuration needed to reconstruct the layer.
+
+        The returned dictionary is serializable and accepted by
+        ``from_config``. It describes layer structure, filter specs, valuation
+        choices, normalization mode, sigmoid gain, clamp bounds, and hybrid
+        normalization constants. It does not include trainable weights or
+        dataset statistics.
+        """
+        return {
+            "in_channels": self.in_channels,
+            "filter_specs": [self._serialize_filter_spec_config(spec) for spec in self.filter_specs],
+            "scale_mode": self.scale_mode,
+            "eps": self.eps,
+            "beta_f": self.beta_f,
+            "clamp": None if self.clamp is None else list(self.clamp),
+            "hybrid_k": self.hybrid_k,
+            "hybrid_floor_a": self.hybrid_floor_a,
+        }
+
+    def get_weight_contract(self) -> dict[str, Any]:
+        """Return the CFP contract that defines parameter names and semantics.
+
+        Checkpoints use this contract to reject incompatible layer
+        architectures before loading state into differently shaped CFP
+        parameters.
+        """
+        return {
+            "in_channels": self.in_channels,
+            "filter_specs": [self._serialize_filter_spec_config(spec) for spec in self.filter_specs],
+            "scale_mode": self.scale_mode,
+            "eps": self.eps,
+            "beta_f": self.beta_f,
+            "clamp": None if self.clamp is None else list(self.clamp),
+            "hybrid_k": self.hybrid_k,
+            "hybrid_floor_a": self.hybrid_floor_a,
+        }
+
+    @classmethod
+    def from_config(cls, config: Mapping[str, Any], *, device=None) -> "ConnectedFilterPreprocessingLayer":
+        """Reconstruct a layer from ``get_config()`` output."""
+        kwargs = cls._deserialize_config(config)
+        if device is not None:
+            kwargs["device"] = device
+        return cls(**kwargs)
+
+    def get_extra_state(self) -> dict[str, Any]:
+        """Embed persistent CFP state in PyTorch checkpoints.
+
+        This includes the weight contract and dataset normalization statistics.
+        Per-sample tree/attribute caches are intentionally not persisted.
+        """
+        return {
+            "weight_contract": self.get_weight_contract(),
+            "ds_stats": self._serialize_ds_stats(),
+            "stats_epoch": int(self._stats_epoch),
+            "stats_frozen": bool(self._stats_frozen),
+        }
+
+    def set_extra_state(self, state: Any) -> None:
+        """Restore persistent CFP state from ``state_dict`` and validate compatibility."""
+        if state is None:
+            return
+        if not isinstance(state, Mapping):
+            raise TypeError("ConnectedFilterPreprocessingLayer extra state must be a mapping.")
+
+        saved_contract = state.get("weight_contract", None)
+        if saved_contract is None and "config" in state:
+            saved_contract = state["config"]
+        if saved_contract is not None and self._canonical_contract(saved_contract) != self.get_weight_contract():
+            raise RuntimeError(
+                "ConnectedFilterPreprocessingLayer checkpoint weight contract is incompatible "
+                "with the current layer. Recreate the layer with ConnectedFilterPreprocessingLayer.from_config(...)."
+            )
+
+        self._ds_stats = self._deserialize_ds_stats(state.get("ds_stats", {}))
+        self._stats_epoch = int(state.get("stats_epoch", self._stats_epoch + 1))
+        self._stats_frozen = bool(state.get("stats_frozen", self._stats_frozen))
+        self.refresh_cached_normalization()
+
+    def export_params(self, path: str):
+        """Export CFP parameters and metadata for inspection.
+
+        This is not the recommended training checkpoint API. Use
+        ``mtlearn.layers.save_checkpoint`` for full PyTorch models.
+        """
+        torch.save(
+            {
+                "weights": {name: p.detach().cpu() for name, p in self._weights.items()},
+                "biases": {name: p.detach().cpu() for name, p in self._biases.items()},
+                "scale_mode": self.scale_mode,
+                "clamp": None if self.clamp is None else list(self.clamp),
+                "config": self.get_config(),
+                "weight_contract": self.get_weight_contract(),
+                "filter_specs": [self._serialize_filter_spec(spec) for spec in self.filter_specs],
+            },
+            path,
         )
 
+    def save_params(self, path: str):
+        """Compatibility alias for ``export_params``."""
+        self.export_params(path)
 
-    # ---------- cached-normalization utilities ----------
-    def refresh_cached_normalization(self):
-        """Recompute normalized attributes for every cached sample."""
-        for key, per_attr_raw in self._base_attrs.items():
-            per_attr_norm = {}
-            for attr_type, a_raw_2d in per_attr_raw.items():
-                a_raw_1d = a_raw_2d.view(-1)
-                a_norm = self._normalize_with_ds_stats(attr_type, a_raw_1d)
-                per_attr_norm[attr_type] = a_norm
-            self._norm_attrs[key] = per_attr_norm
-            self._norm_epoch_by_key[key] = self._stats_epoch
+    @staticmethod
+    def _attribute_from_name(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        for enum_type in (morphology.AttributeType, morphology.AttributeGroup):
+            try:
+                return getattr(enum_type, value)
+            except AttributeError:
+                pass
+        raise ValueError(f"unknown CFP attribute or group name: {value}")
 
-    # ---------- initialization helpers ----------
+    @staticmethod
+    def _tos_interpolation_from_name(value: Any) -> Any:
+        if value is None or not isinstance(value, str):
+            return value
+        try:
+            return getattr(morphology.ToSInterpolation, value)
+        except AttributeError as exc:
+            raise ValueError(f"unknown tree-of-shapes interpolation name: {value}") from exc
+
+    @classmethod
+    def _valuation_from_config(cls, value: Any) -> CFPValuation:
+        if value is None:
+            return CFPValuation.ALTITUDE
+        if isinstance(value, CFPValuation):
+            return value
+        if isinstance(value, str):
+            if value == "altitude":
+                return CFPValuation.ALTITUDE
+            if value == "altitude_tophat":
+                return CFPValuation.ALTITUDE_TOPHAT
+            return CFPValuation.node_attribute(cls._attribute_from_name(value))
+        if not isinstance(value, Mapping):
+            return CFPValuation.node_attribute(cls._attribute_from_name(value))
+
+        kind = value.get("kind", "altitude")
+        if kind == "altitude":
+            return CFPValuation.ALTITUDE
+        if kind == "altitude_tophat":
+            return CFPValuation.ALTITUDE_TOPHAT
+        if kind == "node_attribute":
+            return CFPValuation.node_attribute(cls._attribute_from_name(value.get("attribute")))
+        raise ValueError(f"unknown CFP valuation kind in config: {kind!r}")
+
+    @classmethod
+    def _deserialize_filter_spec_config(cls, spec: Mapping[str, Any]) -> dict[str, Any]:
+        if "tree_type" not in spec:
+            raise ValueError("serialized filter spec is missing tree_type.")
+        if "attributes" not in spec:
+            raise ValueError("serialized filter spec is missing attributes.")
+
+        restored = {
+            "tree_type": spec["tree_type"],
+            "attributes": tuple(cls._attribute_from_name(attr) for attr in spec["attributes"]),
+        }
+        if "name" in spec:
+            restored["name"] = spec["name"]
+        if "valuation" in spec:
+            restored["valuation"] = cls._valuation_from_config(spec["valuation"])
+        tos_interpolation = spec.get("tos_interpolation", None)
+        if tos_interpolation is not None:
+            restored["tos_interpolation"] = cls._tos_interpolation_from_name(tos_interpolation)
+        if "tos_infinity_seed_row" in spec:
+            restored["tos_infinity_seed_row"] = int(spec["tos_infinity_seed_row"])
+        if "tos_infinity_seed_col" in spec:
+            restored["tos_infinity_seed_col"] = int(spec["tos_infinity_seed_col"])
+        return restored
+
+    @classmethod
+    def _deserialize_config(cls, config: Mapping[str, Any]) -> dict[str, Any]:
+        if not isinstance(config, Mapping):
+            raise TypeError("ConnectedFilterPreprocessingLayer config must be a mapping.")
+        if "config" in config and "filter_specs" not in config:
+            config = config["config"]
+
+        return {
+            "in_channels": int(config["in_channels"]),
+            "filter_specs": [
+                cls._deserialize_filter_spec_config(spec)
+                for spec in config["filter_specs"]
+            ],
+            "scale_mode": config.get("scale_mode", "hybrid"),
+            "eps": float(config.get("eps", 1e-6)),
+            "beta_f": float(config.get("beta_f", 1.0)),
+            "clamp": config.get("clamp", None),
+            "hybrid_k": float(config.get("hybrid_k", 3.0)),
+            "hybrid_floor_a": float(config.get("hybrid_floor_a", 0.05)),
+        }
+
+    @classmethod
+    def _canonical_contract(cls, config: Mapping[str, Any]) -> dict[str, Any]:
+        return cls(**cls._deserialize_config(config)).get_weight_contract()
+
+    def _serialize_ds_stats(self) -> dict[str, dict[str, Any]]:
+        return {
+            str(key): {
+                name: value.detach().cpu() if torch.is_tensor(value) else value
+                for name, value in stats.items()
+            }
+            for key, stats in self._ds_stats.items()
+        }
+
+    def _deserialize_ds_stats(self, serialized: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+        return {
+            str(key): {
+                name: value.to(self.device) if torch.is_tensor(value) else value
+                for name, value in stats.items()
+            }
+            for key, stats in serialized.items()
+        }
+
+    @staticmethod
+    def _serialize_filter_spec_config(spec: _NormalizedFilterSpec) -> dict[str, Any]:
+        tos_interpolation = None if spec.tos_interpolation is None else _enum_name(spec.tos_interpolation)
+        spec_config = {
+            "name": spec.key,
+            "tree_type": spec.tree_type,
+            "attributes": [_enum_name(attr) for attr in spec.attributes],
+            "valuation": {
+                "kind": spec.valuation.kind,
+                "attribute": None if _uses_altitude_signal(spec.valuation) else _enum_name(spec.valuation.attribute),
+            },
+            "tos_interpolation": tos_interpolation,
+            "tos_infinity_seed_row": spec.tos_infinity_seed_row,
+            "tos_infinity_seed_col": spec.tos_infinity_seed_col,
+        }
+        return spec_config
+
+    @staticmethod
+    def _serialize_filter_spec(spec: _NormalizedFilterSpec) -> dict[str, Any]:
+        tos_interpolation = None if spec.tos_interpolation is None else _enum_name(spec.tos_interpolation)
+        valuation_attribute = "ALTITUDE" if _uses_altitude_signal(spec.valuation) else _enum_name(spec.valuation.attribute)
+        return {
+            "index": spec.index,
+            "key": spec.key,
+            "name": spec.key,
+            "tree_type": spec.tree_type,
+            "tree_key": spec.tree_key,
+            "attributes": [_enum_name(attr) for attr in spec.attributes],
+            "valuation": {
+                "kind": spec.valuation.kind,
+                "attribute": valuation_attribute,
+            },
+            "valuation_key": spec.valuation_key,
+            "tos_interpolation": tos_interpolation,
+            "tos_infinity_seed_row": spec.tos_infinity_seed_row,
+            "tos_infinity_seed_col": spec.tos_infinity_seed_col,
+        }
+
+    def get_params(self):
+        """Return CPU clones of the per-spec weight and bias tensors."""
+        return (
+            {name: p.detach().cpu().clone() for name, p in self._weights.items()},
+            {name: p.detach().cpu().clone() for name, p in self._biases.items()},
+        )
+
     @staticmethod
     def _logit(p: float) -> float:
-        """Return a numerically clipped logit for probability ``p``."""
         p = max(min(float(p), 1.0 - 1e-6), 1e-6)
         return math.log(p / (1.0 - p))
 
     @torch.no_grad()
     def init_identity_with_bias(self, p0: float = 0.995):
-        """Initialize near identity by using only a positive bias.
+        """Initialize filters close to identity using only positive bias.
 
-        For each group, weights are set to zero and bias is set to
-        ``logit(p0) / beta_f``. This keeps the initial filtering probability
-        near ``p0`` while leaving trainable parameters free to move.
+        Weights are set to zero and each bias is chosen so the initial sigmoid
+        value is approximately ``p0``.
         """
         L = self._logit(p0) / float(self.beta_f)
-        for group in self.group_defs:
-            gname = self._group_name(group)
-            self._weights[gname].zero_()
-            self._biases[gname].fill_(L)
+        for spec in self.filter_specs:
+            self._weights[spec.key].zero_()
+            self._biases[spec.key].fill_(L)
 
     @torch.no_grad()
     def init_identity_bias_zero(self, p0: float = 0.99):
-        """Initialize near identity with zero bias under hybrid normalization.
+        """Initialize filters close to identity with zero bias.
 
-        This assumes normalized attributes live in ``[a, 1]`` where
-        ``a = hybrid_floor_a``. Each group receives constant weights
-        ``c = logit(p0) / (beta_f * K * a)`` and zero bias, so the lower bound
-        on the group logits keeps the initial probability near ``p0``.
+        This initialization assumes hybrid-normalized attributes with a
+        positive floor. Each weight receives the same positive value and biases
+        are set to zero.
         """
-        if self.scale_mode != "hybrid":
-            print("[init_identity_bias_zero] Warning: this initializer assumes scale_mode == 'hybrid'.")
         a = max(min(self.hybrid_floor_a, 1.0), 1e-6)
         L = self._logit(p0) / float(self.beta_f)
-        for group in self.group_defs:
-            gname = self._group_name(group)
-            K = len(group)
-            c = L / (K * a)
-            self._weights[gname].fill_(c)
-            self._biases[gname].zero_()
+        for spec in self.filter_specs:
+            c = L / (len(spec.attributes) * a)
+            self._weights[spec.key].fill_(c)
+            self._biases[spec.key].zero_()
 
     def build_dataloader_cached(self, dataloader):
-        """Precompute tree metadata and attributes for a DataLoader.
+        """Wrap a DataLoader and precompute CFP caches/statistics.
 
-        The returned DataLoader wraps the original dataset and emits
-        ``((x, idx), y)`` batches, where ``idx`` is the original dataset index.
-        The layer uses those indexes to reuse cached preprocessing during
-        training.
+        The returned DataLoader yields ``((x, idx), y)`` batches with stable
+        dataset indices. During the prepass, this layer builds tree payloads and
+        updates dataset-level statistics for every sample/channel/tree key.
+        Statistics are frozen and cached normalizations are refreshed before
+        the wrapped loader is returned.
         """
         from torch.utils.data import DataLoader
 
@@ -868,29 +1188,25 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             persistent_workers=getattr(dataloader, "persistent_workers", False),
         )
 
-        print(f"[ConnectedFilterPreprocessingLayer] Preprocessing dataset using mode '{self.scale_mode}'...")
         self._stats_frozen = False
-        total_batches = len(new_loader)
-
         with torch.no_grad():
-            for batch_i, ((x, idx), y) in enumerate(new_loader):
-                B, C, H, W = x.shape
+            for (x, idx), _ in new_loader:
+                B, C, _, _ = x.shape
                 for b in range(B):
                     for c in range(C):
-                        key = f"{int(idx[b])}_{c}"
-                        self._ensure_tree_info_and_attributes_cached(key, x[b, c])
-                if (batch_i + 1) % 10 == 0 or batch_i == total_batches - 1:
-                    print(f"  [{batch_i+1}/{total_batches}] batches processed.")
+                        base_key = f"{int(idx[b])}_{c}"
+                        for tree_key in self._tree_spec_by_key:
+                            self._ensure_tree_payload_cached(base_key, x[b, c], tree_key)
 
         self.freeze_ds_stats()
         self.refresh_cached_normalization()
-        print(f"[ConnectedFilterPreprocessingLayer] Full and normalized cache with '{self.scale_mode}'.")
         return new_loader
 
 
 CFPLayer = ConnectedFilterPreprocessingLayer
 
 __all__ = [
+    'CFPValuation',
     'ConnectedFilterPreprocessingImplicitJacobianFunction',
     'ConnectedFilterPreprocessingLayer',
     'CFPLayer',

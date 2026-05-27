@@ -44,8 +44,7 @@ if(MTLEARN_WITH_TORCH)
         ${PROJECT_SOURCE_DIR}/mtlearn/include
         ${PROJECT_SOURCE_DIR}/mtlearn/src
         ${CMAKE_SOURCE_DIR}/external/MorphologicalAttributeFilters
-        ${TORCH_INCLUDE_DIRS}
-        ${CMAKE_SOURCE_DIR}/external/MorphologicalAttributeFilters/pybinds)
+        ${TORCH_INCLUDE_DIRS})
     target_compile_definitions(_mtlearn PRIVATE MTLEARN_WITH_TORCH=1)
 endif()
 

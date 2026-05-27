@@ -115,31 +115,57 @@ private:
     }
 
     morphology::WeightedTreePtr tree_;
-    mmcfilters::AttributeFilters filter_;
+    mmcfilters::AttributeFilters<std::uint8_t> filter_;
 };
 
 inline void bindAttributeFilters(py::module& m)
 {
-    py::class_<AttributeFiltersPybind>(m, "AttributeFilters", py::module_local())
-        .def(py::init<morphology::WeightedTreePtr>())
+    py::class_<AttributeFiltersPybind>(
+        m,
+        "AttributeFilters",
+        py::module_local(),
+        R"pbdoc(Attribute-filter helper bound to one weighted morphology tree.
+
+Filtering methods consume node-slot-sized attribute arrays, boolean criteria,
+or node scores and return reconstructed NumPy images. Create instances through
+``mtlearn.morphology.create_attribute_filter(tree)`` when possible.
+)pbdoc")
+        .def(py::init<morphology::WeightedTreePtr>(), "tree"_a, "Create filters bound to ``tree``.")
         .def("filteringMin",
             py::overload_cast<FloatArray, float>(&AttributeFiltersPybind::filteringMin),
             "attr"_a,
-            "threshold"_a)
+            "threshold"_a,
+            "Prune by a minimum-threshold rule over one node attribute array.")
         .def("filteringMin",
             py::overload_cast<std::vector<bool>>(&AttributeFiltersPybind::filteringMin),
-            "criterion"_a)
+            "criterion"_a,
+            "Prune by a boolean minimum criterion with one value per node slot.")
         .def("filteringMax",
             py::overload_cast<FloatArray, float>(&AttributeFiltersPybind::filteringMax),
             "attr"_a,
-            "threshold"_a)
+            "threshold"_a,
+            "Prune by a maximum-threshold rule over one node attribute array.")
         .def("filteringMax",
             py::overload_cast<std::vector<bool>>(&AttributeFiltersPybind::filteringMax),
-            "criterion"_a)
-        .def("filteringDirectRule", &AttributeFiltersPybind::filteringDirectRule, "criterion"_a)
-        .def("filteringSubtractiveRule", &AttributeFiltersPybind::filteringSubtractiveRule, "criterion"_a)
-        .def("filteringSubtractiveScoreRule", &AttributeFiltersPybind::filteringSubtractiveScoreRule, "scores"_a)
-        .def("getAdaptiveCriterion", &AttributeFiltersPybind::getAdaptiveCriterion, "criterion"_a, "delta"_a);
+            "criterion"_a,
+            "Prune by a boolean maximum criterion with one value per node slot.")
+        .def("filteringDirectRule",
+            &AttributeFiltersPybind::filteringDirectRule,
+            "criterion"_a,
+            "Apply the backend direct-rule attribute filter.")
+        .def("filteringSubtractiveRule",
+            &AttributeFiltersPybind::filteringSubtractiveRule,
+            "criterion"_a,
+            "Apply the backend subtractive-rule attribute filter.")
+        .def("filteringSubtractiveScoreRule",
+            &AttributeFiltersPybind::filteringSubtractiveScoreRule,
+            "scores"_a,
+            "Apply the backend subtractive score rule and return a float image.")
+        .def("getAdaptiveCriterion",
+            &AttributeFiltersPybind::getAdaptiveCriterion,
+            "criterion"_a,
+            "delta"_a,
+            "Expand a node criterion with the backend adaptive-criterion rule.");
 }
 
 } // namespace morphology_pybind

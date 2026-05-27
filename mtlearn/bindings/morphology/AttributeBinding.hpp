@@ -9,7 +9,7 @@
 
 #include "BindingSupport.hpp"
 
-#include <mmcfilters/attributes/AttributeComputedIncrementally.hpp>
+#include <mmcfilters/attributes/AttributeComputation.hpp>
 #include <mmcfilters/attributes/AttributeNames.hpp>
 
 #include <algorithm>
@@ -90,6 +90,12 @@ inline const std::vector<morphology::Attribute>& allAttributes()
         morphology::Attribute::BALANCE_NODE,
         morphology::Attribute::MAX_DIST,
         morphology::Attribute::AVG_CHILD_HEIGHT_NODE,
+        morphology::Attribute::CONTOUR_PIXELS,
+        morphology::Attribute::CONTOUR_PERIMETER,
+        morphology::Attribute::CONTOUR_SIDE_NORTH,
+        morphology::Attribute::CONTOUR_SIDE_WEST,
+        morphology::Attribute::CONTOUR_SIDE_EAST,
+        morphology::Attribute::CONTOUR_SIDE_SOUTH,
     };
     return attributes;
 }
@@ -113,6 +119,23 @@ inline py::dict describeAllAttributes()
             py::str(mmcfilters::AttributeNames::describe(backendAttribute));
     }
     return descriptions;
+}
+
+inline std::vector<morphology::Attribute> expandAttributeGroup(morphology::AttributeGroup group)
+{
+    const auto backendGroup = toBackend(group);
+    const auto& backendGroups = mmcfilters::ATTRIBUTE_GROUPS;
+    const auto it = backendGroups.find(backendGroup);
+    if (it == backendGroups.end()) {
+        throw std::invalid_argument("unknown AttributeGroup");
+    }
+
+    std::vector<morphology::Attribute> attributes;
+    attributes.reserve(it->second.size());
+    for (const auto attribute : it->second) {
+        attributes.push_back(fromBackend(attribute));
+    }
+    return attributes;
 }
 
 // Attribute outputs may be indexed by morphological-tree node slots or by
@@ -165,10 +188,9 @@ inline std::pair<py::dict, py::array_t<float>> computeAttributes(
 
     const auto backendAttributes = toBackend(attributes);
     auto [attributeNames, buffer] =
-        mmcfilters::AttributeComputedIncrementally::computeAttributes(
+        mmcfilters::AttributeComputation::computeAttributes(
             morphology::detail::backend(*tree),
             backendAttributes,
-            {},
             toBackend(outputSpace));
 
     return {
@@ -188,10 +210,9 @@ inline py::array_t<float> computeSingleAttribute(
     }
 
     auto [attributeNames, buffer] =
-        mmcfilters::AttributeComputedIncrementally::computeSingleAttribute(
+        mmcfilters::AttributeComputation::computeSingleAttribute(
             morphology::detail::backend(*tree),
             toBackend(attribute),
-            {},
             toBackend(outputSpace));
     (void)attributeNames;
 
@@ -199,23 +220,39 @@ inline py::array_t<float> computeSingleAttribute(
 }
 
 // Register Attribute static methods plus nested Group and Type enums. The
-// nested shape mirrors the legacy Python API while the values themselves are
-// mtlearn facade enums.
+// nested shape keeps attribute operations grouped under one Python namespace.
 inline void bindAttribute(py::module& m)
 {
-    auto attribute = py::class_<AttributeApi>(m, "Attribute", py::module_local())
+    auto attribute = py::class_<AttributeApi>(
+        m,
+        "Attribute",
+        py::module_local(),
+        R"pbdoc(Namespace-style class for morphology attribute operations.
+
+Use ``Attribute.Type`` for scalar attributes and ``Attribute.Group`` for
+predefined groups. The high-level aliases in ``mtlearn.morphology`` expose the
+same objects as ``AttributeType`` and ``AttributeGroup``.
+)pbdoc")
         .def_static(
             "computeAttributes",
             &computeAttributes,
             "tree"_a,
             "attributes"_a,
-            "outputSpace"_a = morphology::NodeIdSpace::MORPHOLOGICAL_TREE)
+            "outputSpace"_a = morphology::NodeIdSpace::MORPHOLOGICAL_TREE,
+            R"pbdoc(Compute several attributes or attribute groups for a tree.
+
+Returns:
+    ``(attribute_index, values)`` where ``attribute_index`` maps attribute names
+    to columns and ``values`` is a float32 NumPy array. By default rows are
+    indexed by morphology-tree node slots.
+)pbdoc")
         .def_static(
             "computeSingleAttribute",
             &computeSingleAttribute,
             "tree"_a,
             "attribute"_a,
-            "outputSpace"_a = morphology::NodeIdSpace::MORPHOLOGICAL_TREE)
+            "outputSpace"_a = morphology::NodeIdSpace::MORPHOLOGICAL_TREE,
+            "Compute one scalar attribute and return a 1D float32 NumPy array.")
         .def_static(
             "describe",
             &describeAttribute,
@@ -224,25 +261,36 @@ inline void bindAttribute(py::module& m)
         .def_static(
             "describeAll",
             &describeAllAttributes,
-            "Return descriptions for all public attributes keyed by attribute name.");
+            "Return descriptions for all public attributes keyed by attribute name.")
+        .def_static(
+            "expandGroup",
+            &expandAttributeGroup,
+            "group"_a,
+            "Return the scalar attributes represented by an attribute group.");
 
-    py::enum_<morphology::AttributeGroup>(attribute, "Group", py::module_local())
+    py::enum_<morphology::AttributeGroup>(
+        attribute,
+        "Group",
+        py::module_local(),
+        "Predefined attribute groups accepted by attribute computation.")
         .value("ALL", morphology::AttributeGroup::ALL)
-        .value("GEOMETRIC", morphology::AttributeGroup::GEOMETRIC)
-        .value("BOUNDING_BOX", morphology::AttributeGroup::BOUNDING_BOX)
-        .value("CENTRAL_MOMENTS", morphology::AttributeGroup::CENTRAL_MOMENTS)
-        .value("HU_MOMENTS", morphology::AttributeGroup::HU_MOMENTS)
-        .value("MOMENT_BASED", morphology::AttributeGroup::MOMENT_BASED)
-        .value("TEXTURE", morphology::AttributeGroup::TEXTURE)
+        .value("GRAY_LEVEL", morphology::AttributeGroup::GRAY_LEVEL)
+        .value("SHAPE", morphology::AttributeGroup::SHAPE)
+        .value("MOMENTS", morphology::AttributeGroup::MOMENTS)
+        .value("BOUNDARY", morphology::AttributeGroup::BOUNDARY)
         .value("TREE_TOPOLOGY", morphology::AttributeGroup::TREE_TOPOLOGY)
-        .value("BITQUADS", morphology::AttributeGroup::BITQUADS)
         .export_values();
 
-    py::enum_<morphology::Attribute>(attribute, "Type", py::module_local())
+    py::enum_<morphology::Attribute>(
+        attribute,
+        "Type",
+        py::module_local(),
+        "Scalar morphology attributes supported by the current backend.")
         .value("AREA", morphology::Attribute::AREA)
         .value("VOLUME", morphology::Attribute::VOLUME)
         .value("RELATIVE_VOLUME", morphology::Attribute::RELATIVE_VOLUME)
         .value("LEVEL", morphology::Attribute::LEVEL)
+        .value("ALTITUDE", morphology::Attribute::LEVEL)
         .value("GRAY_HEIGHT", morphology::Attribute::GRAY_HEIGHT)
         .value("MEAN_LEVEL", morphology::Attribute::MEAN_LEVEL)
         .value("VARIANCE_LEVEL", morphology::Attribute::VARIANCE_LEVEL)
@@ -297,6 +345,12 @@ inline void bindAttribute(py::module& m)
         .value("BITQUADS_LENGTH_AVERAGE", morphology::Attribute::BITQUADS_LENGTH_AVERAGE)
         .value("BITQUADS_WIDTH_AVERAGE", morphology::Attribute::BITQUADS_WIDTH_AVERAGE)
         .value("MAX_DIST", morphology::Attribute::MAX_DIST)
+        .value("CONTOUR_PIXELS", morphology::Attribute::CONTOUR_PIXELS)
+        .value("CONTOUR_PERIMETER", morphology::Attribute::CONTOUR_PERIMETER)
+        .value("CONTOUR_SIDE_NORTH", morphology::Attribute::CONTOUR_SIDE_NORTH)
+        .value("CONTOUR_SIDE_WEST", morphology::Attribute::CONTOUR_SIDE_WEST)
+        .value("CONTOUR_SIDE_EAST", morphology::Attribute::CONTOUR_SIDE_EAST)
+        .value("CONTOUR_SIDE_SOUTH", morphology::Attribute::CONTOUR_SIDE_SOUTH)
         .export_values();
 }
 

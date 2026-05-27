@@ -10,17 +10,18 @@
 
 #include "mtlearn/morphology.hpp"
 
-#include <mmcfilters/attributes/AttributeComputedIncrementally.hpp>
 #include <mmcfilters/trees/MorphologicalTree.hpp>
+#include <mmcfilters/trees/detail/TreeTraversalDetail.hpp>
 #include <mmcfilters/trees/WeightedMorphologicalTree.hpp>
 #include <mmcfilters/utils/Common.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace mtlearn::morphology::detail {
 
 using TreeTopology = mmcfilters::MorphologicalTree;
-using BackendWeightedTree = mmcfilters::WeightedMorphologicalTree;
+using BackendWeightedTree = mmcfilters::WeightedMorphologicalTree<std::uint8_t>;
 
 // Friend-access gateway implemented in morphology.cpp. Public code should not
 // include this detail header; internal code uses it to unwrap WeightedTree only
@@ -59,7 +60,7 @@ inline void traversePostOrder(
     MergeProcessing&& mergeProcessing,
     PostProcessing&& postProcessing)
 {
-    mmcfilters::AttributeComputedIncrementally::traversePostOrder(
+    mmcfilters::detail::traversePostOrder(
         tree,
         rootNodeId,
         std::forward<PreProcessing>(preProcessing),

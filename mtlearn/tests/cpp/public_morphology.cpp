@@ -27,7 +27,7 @@ int main()
     morphology::AttributeOrGroup attribute = morphology::Attribute::AREA;
     assert(std::holds_alternative<morphology::Attribute>(attribute));
 
-    attribute = morphology::AttributeGroup::GEOMETRIC;
+    attribute = morphology::AttributeGroup::SHAPE;
     assert(std::holds_alternative<morphology::AttributeGroup>(attribute));
 
     const auto outputSpace = morphology::NodeIdSpace::MORPHOLOGICAL_TREE;

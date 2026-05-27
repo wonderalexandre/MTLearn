@@ -130,7 +130,7 @@ public:
         // nodeOfPixel is the final gather map used to reconstruct image pixels
         // from node-level filtered residues.
         for (int pixel = 0; pixel < numPixels; ++pixel) {
-            nodeOfPixelPtr[pixel] = static_cast<int64_t>(tree.getSmallestComponent(pixel));
+            nodeOfPixelPtr[pixel] = static_cast<int64_t>(tree.getProperPartOwner(pixel));
         }
 
         std::list<torch::Tensor> result;

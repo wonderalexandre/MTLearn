@@ -58,7 +58,19 @@ def _split_indices(
 # 1) AttributeFilterDataset
 # --------------------------
 class AttributeFilterDataset(torch.utils.data.Dataset, abc.ABC):
-    def __init__(self, root, tree_type, attributes: list, thresholds: dict, top_hat: bool = False, numRows: int = None, numCols: int = None):
+    def __init__(
+        self,
+        root,
+        tree_type,
+        attributes: list,
+        thresholds: dict,
+        top_hat: bool = False,
+        numRows: int = None,
+        numCols: int = None,
+        tos_interpolation=None,
+        tos_infinity_seed_row: int = 0,
+        tos_infinity_seed_col: int = 0,
+    ):
         super(torch.utils.data.Dataset, self).__init__()
 
         self.root = root
@@ -72,7 +84,13 @@ class AttributeFilterDataset(torch.utils.data.Dataset, abc.ABC):
         self.paths = paths
         self.thresholds = thresholds
         self.attributes = attributes
-        self.tree_type = tree_type
+        self.tree_type = morphology.normalize_tree_type(tree_type)
+        if self.tree_type == "tree-of-shapes":
+            self.tos_interpolation = morphology.normalize_tos_interpolation(tos_interpolation)
+        else:
+            self.tos_interpolation = tos_interpolation
+        self.tos_infinity_seed_row = int(tos_infinity_seed_row)
+        self.tos_infinity_seed_col = int(tos_infinity_seed_col)
         self.numRows=numRows
         self.numCols=numCols
         self.top_hat = top_hat
@@ -90,7 +108,13 @@ class AttributeFilterDataset(torch.utils.data.Dataset, abc.ABC):
 
 
         # ----- Filtragem -----
-        tree = morphology.build_tree(img_u8, self.tree_type)
+        tree = morphology.build_tree(
+            img_u8,
+            self.tree_type,
+            tos_interpolation=self.tos_interpolation,
+            tos_infinity_seed_row=self.tos_infinity_seed_row,
+            tos_infinity_seed_col=self.tos_infinity_seed_col,
+        )
 
         attr_idx, attr_values = morphology.compute_attributes(tree, self.attributes) # (numNodes, numAttributes)
         criterion = np.ones(attr_values.shape[0], dtype=bool)

@@ -182,22 +182,16 @@ inline mmcfilters::AttributeGroup toBackend(morphology::AttributeGroup group)
     switch (group) {
     case morphology::AttributeGroup::ALL:
         return mmcfilters::AttributeGroup::ALL;
-    case morphology::AttributeGroup::GEOMETRIC:
-        return mmcfilters::AttributeGroup::GEOMETRIC;
-    case morphology::AttributeGroup::MOMENT_BASED:
-        return mmcfilters::AttributeGroup::MOMENT_BASED;
-    case morphology::AttributeGroup::BOUNDING_BOX:
-        return mmcfilters::AttributeGroup::BOUNDING_BOX;
-    case morphology::AttributeGroup::CENTRAL_MOMENTS:
-        return mmcfilters::AttributeGroup::CENTRAL_MOMENTS;
-    case morphology::AttributeGroup::HU_MOMENTS:
-        return mmcfilters::AttributeGroup::HU_MOMENTS;
-    case morphology::AttributeGroup::TEXTURE:
-        return mmcfilters::AttributeGroup::TEXTURE;
+    case morphology::AttributeGroup::GRAY_LEVEL:
+        return mmcfilters::AttributeGroup::GRAY_LEVEL;
+    case morphology::AttributeGroup::SHAPE:
+        return mmcfilters::AttributeGroup::SHAPE;
+    case morphology::AttributeGroup::MOMENTS:
+        return mmcfilters::AttributeGroup::MOMENTS;
+    case morphology::AttributeGroup::BOUNDARY:
+        return mmcfilters::AttributeGroup::BOUNDARY;
     case morphology::AttributeGroup::TREE_TOPOLOGY:
         return mmcfilters::AttributeGroup::TREE_TOPOLOGY;
-    case morphology::AttributeGroup::BITQUADS:
-        return mmcfilters::AttributeGroup::BITQUADS;
     }
     throw std::invalid_argument("unknown AttributeGroup");
 }
@@ -321,8 +315,98 @@ inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
         return mmcfilters::Attribute::MAX_DIST;
     case morphology::Attribute::AVG_CHILD_HEIGHT_NODE:
         return mmcfilters::Attribute::AVG_CHILD_HEIGHT_NODE;
+    case morphology::Attribute::CONTOUR_PIXELS:
+        return mmcfilters::Attribute::CONTOUR_PIXELS;
+    case morphology::Attribute::CONTOUR_PERIMETER:
+        return mmcfilters::Attribute::CONTOUR_PERIMETER;
+    case morphology::Attribute::CONTOUR_SIDE_NORTH:
+        return mmcfilters::Attribute::CONTOUR_SIDE_NORTH;
+    case morphology::Attribute::CONTOUR_SIDE_WEST:
+        return mmcfilters::Attribute::CONTOUR_SIDE_WEST;
+    case morphology::Attribute::CONTOUR_SIDE_EAST:
+        return mmcfilters::Attribute::CONTOUR_SIDE_EAST;
+    case morphology::Attribute::CONTOUR_SIDE_SOUTH:
+        return mmcfilters::Attribute::CONTOUR_SIDE_SOUTH;
     }
     throw std::invalid_argument("unknown Attribute");
+}
+
+inline morphology::Attribute fromBackend(mmcfilters::Attribute attribute)
+{
+#define MTLEARN_FROM_BACKEND_ATTRIBUTE(name) \
+    case mmcfilters::Attribute::name:        \
+        return morphology::Attribute::name
+
+    switch (attribute) {
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(AREA);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(VOLUME);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(RELATIVE_VOLUME);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LEVEL);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(GRAY_HEIGHT);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(MEAN_LEVEL);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(VARIANCE_LEVEL);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_WIDTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_HEIGHT);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(DIAGONAL_LENGTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(RECTANGULARITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(RATIO_WH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_COL_MIN);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_COL_MAX);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_ROW_MIN);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_ROW_MAX);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_20);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_02);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_11);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_30);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_03);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_21);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_12);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_1);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_2);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_3);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_4);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_5);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_6);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_7);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(INERTIA);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(COMPACTNESS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ECCENTRICITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LENGTH_MAJOR_AXIS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LENGTH_MINOR_AXIS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(AXIS_ORIENTATION);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CIRCULARITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_AREA);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_NUMBER_EULER);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_NUMBER_HOLES);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_PERIMETER);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_PERIMETER_CONTINUOUS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_CIRCULARITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_PERIMETER_AVERAGE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_LENGTH_AVERAGE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_WIDTH_AVERAGE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HEIGHT_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(DEPTH_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(IS_LEAF_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(IS_ROOT_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_CHILDREN_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_SIBLINGS_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_DESCENDANTS_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_LEAF_DESCENDANTS_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LEAF_RATIO_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BALANCE_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(MAX_DIST);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(AVG_CHILD_HEIGHT_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_PIXELS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_PERIMETER);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_NORTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_WEST);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_EAST);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_SOUTH);
+    }
+
+#undef MTLEARN_FROM_BACKEND_ATTRIBUTE
+
+    throw std::invalid_argument("unknown backend Attribute");
 }
 
 inline mmcfilters::AttributeOrGroup toBackend(morphology::AttributeOrGroup attribute)

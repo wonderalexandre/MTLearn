@@ -19,7 +19,7 @@ dictionaries explicitly.
 from __future__ import annotations
 
 import pickle
-from typing import Dict, Any, Tuple, Iterable, Mapping
+from typing import Dict, Any, Tuple, Iterable, Mapping, Optional
 
 import numpy as np
 import torch
@@ -72,6 +72,54 @@ def group_name(group: Iterable[Any]) -> str:
     return "+".join([getattr(t, "name", str(t)) for t in group])
 
 
+def _attribute_name(attr_type: Any) -> str:
+    """Return the public enum name used in validation and filtering."""
+    return getattr(attr_type, "name", str(attr_type))
+
+
+def _is_tree_of_shapes(tree_type: Optional[str]) -> bool:
+    """Return whether a tree type name selects the tree-of-shapes backend."""
+    return tree_type is not None and morphology.normalize_tree_type(tree_type) == "tree-of-shapes"
+
+
+def _expand_attribute_spec_entry(attr_type: Any, tree_type: Optional[str] = None) -> Tuple[Any, ...]:
+    """Expand backend attribute groups into scalar attributes for CFP layers."""
+    if isinstance(attr_type, morphology.AttributeGroup):
+        expanded = tuple(morphology.expand_attribute_group(attr_type))
+        if _is_tree_of_shapes(tree_type) and _attribute_name(attr_type) in {"SHAPE", "ALL"}:
+            return tuple(attr for attr in expanded if _attribute_name(attr) != "MAX_DIST")
+        return expanded
+    return (attr_type,)
+
+
+def normalize_attributes_spec(
+    attributes_spec: Iterable[Any],
+    tree_type: Optional[str] = None,
+) -> Tuple[list[Tuple[Any, ...]], list[Any]]:
+    """Normalize CFP layer attribute groups into scalar backend attributes.
+
+    ``attributes_spec`` groups control learnable CFP projections. A public
+    ``morphology.AttributeGroup`` is therefore expanded in place to the scalar
+    attributes it represents before caching and weight construction. For
+    tree-of-shapes, group-provided ``MAX_DIST`` is omitted from ``SHAPE`` and
+    ``ALL`` because that scalar attribute is undefined on ToS.
+    """
+    group_defs = []
+    all_attr_types_set = set()
+    for item in attributes_spec:
+        raw_group = tuple(item) if isinstance(item, (list, tuple)) else (item,)
+        expanded_group = []
+        for attr_type in raw_group:
+            expanded_group.extend(_expand_attribute_spec_entry(attr_type, tree_type))
+        if len(expanded_group) < 1:
+            raise ValueError("Each attribute group must contain at least one attribute.")
+        group = tuple(expanded_group)
+        group_defs.append(group)
+        for attr_type in group:
+            all_attr_types_set.add(attr_type)
+    return group_defs, list(all_attr_types_set)
+
+
 def to_numpy_u8(img2d_t: torch.Tensor) -> np.ndarray:
     """Convert a 2D tensor to a contiguous ``np.uint8`` image.
 
@@ -97,15 +145,55 @@ def to_numpy_u8(img2d_t: torch.Tensor) -> np.ndarray:
 
 # ----------------------------- morphology trees ------------------------------
 
-def build_tree(img_np: np.ndarray, tree_type: str):
+def build_tree(
+    img_np: np.ndarray,
+    tree_type: str,
+    *,
+    tos_interpolation=None,
+    tos_infinity_seed_row: int = 0,
+    tos_infinity_seed_col: int = 0,
+):
     """Build the morphology tree requested by ``tree_type``.
 
     Args:
         img_np: 2D ``np.uint8`` image.
-        tree_type: ``"max-tree"``, ``"min-tree"``, or any other value accepted
-            by the facade as a tree of shapes.
+        tree_type: ``"max-tree"``, ``"min-tree"``, ``"tree-of-shapes"``, or
+            the legacy ``"tos"`` alias.
     """
-    return morphology.build_tree(img_np, tree_type)
+    return morphology.build_tree(
+        img_np,
+        tree_type,
+        tos_interpolation=tos_interpolation,
+        tos_infinity_seed_row=tos_infinity_seed_row,
+        tos_infinity_seed_col=tos_infinity_seed_col,
+    )
+
+
+def validate_attributes_for_tree_type(attributes: Iterable[Any], tree_type: str) -> None:
+    """Reject attribute requests that the selected tree type cannot compute."""
+    if morphology.normalize_tree_type(tree_type) != "tree-of-shapes":
+        return
+
+    unsupported = []
+    for attr_type in attributes:
+        name = _attribute_name(attr_type)
+        expanded = _expand_attribute_spec_entry(attr_type, tree_type)
+        unsupported_members = [
+            _attribute_name(scalar_attr)
+            for scalar_attr in expanded
+            if _attribute_name(scalar_attr) == "MAX_DIST"
+        ]
+        if unsupported_members and len(expanded) == 1:
+            unsupported.append(name)
+        elif unsupported_members:
+            unsupported.append(f"{name} contains {', '.join(sorted(set(unsupported_members)))}")
+
+    if unsupported:
+        names = ", ".join(sorted(set(unsupported)))
+        raise ValueError(
+            "tree-of-shapes CFP does not support attributes that are undefined "
+            f"for tree-of-shapes: {names}"
+        )
 
 
 # ---------------------- dataset-statistics normalization ----------------------
@@ -307,8 +395,10 @@ def load_stats_payload(path: str, device, *, trusted_legacy_format: bool = False
 
 __all__ = [
     "group_name",
+    "normalize_attributes_spec",
     "to_numpy_u8",
     "build_tree",
+    "validate_attributes_for_tree_type",
     "update_ds_stats",
     "normalize_with_ds_stats",
     "maybe_refresh_norm_for_key",

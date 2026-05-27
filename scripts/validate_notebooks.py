@@ -17,6 +17,7 @@ GRADCHECK_NOTEBOOKS = (
     "notebooks/gradchecks/GradCheck_Tree.ipynb",
     "notebooks/gradchecks/GradCheck_Jacobian.ipynb",
     "notebooks/gradchecks/GradCheck_Implicit_Jacobian.ipynb",
+    "notebooks/gradchecks/GradCheck_TreeOfShapes.ipynb",
 )
 
 SCREWS_EXAMPLE_NOTEBOOK = "notebooks/experiments/Example_screws_filtering.ipynb"
@@ -164,9 +165,14 @@ def facade_assertion_cell(label: str) -> nbformat.NotebookNode:
         "assert attrs.shape[0] == single.shape[0]\n"
         "layer = mtlearn.layers.ConnectedFilterPreprocessingLayer(\n"
         "    in_channels=1,\n"
-        "    attributes_spec=[(morphology.AttributeType.AREA,)],\n"
-        "    tree_type='max-tree',\n"
+        "    filter_specs=[\n"
+        "        {\n"
+        "            'tree_type': morphology.TreeType.MAX_TREE,\n"
+        "            'attributes': (morphology.AttributeType.AREA,),\n"
+        "        }\n"
+        "    ],\n"
         "    device='cpu',\n"
+        "    scale_mode='none',\n"
         ")\n"
         "x = torch.tensor([[[[1, 2], [3, 4]]]], dtype=torch.float32)\n"
         "y = layer(x)\n"

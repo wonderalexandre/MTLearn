@@ -37,6 +37,37 @@ def test_tree_constructors_return_public_facade_type():
         assert tree.numInternalNodeSlots >= tree.numNodes
 
 
+def test_tree_of_shapes_facade_accepts_interpolation_options():
+    image = _small_image()
+
+    tree = morphology.create_tree_of_shapes(
+        image,
+        interpolation="min4c-max8c",
+        infinity_seed_row=0,
+        infinity_seed_col=0,
+    )
+
+    assert tree.treeType == 2
+    assert tree.hasTreeOfShapesAdjacencyPolicy is True
+    assert tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.0
+    assert tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.5
+
+    enum_tree = morphology.build_tree(
+        image,
+        "tree-of-shapes",
+        tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
+    )
+
+    assert enum_tree.treeType == 2
+    assert enum_tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.5
+    assert enum_tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.0
+
+
+def test_build_tree_rejects_unknown_tree_type():
+    with pytest.raises(ValueError, match="unknown tree_type"):
+        morphology.build_tree(_small_image(), "not-a-tree")
+
+
 def test_tree_constructors_reject_non_2d_images():
     image = np.array([1, 2, 3], dtype=np.uint8)
 
@@ -79,6 +110,7 @@ def test_attribute_descriptions_are_exposed_through_facade():
     assert area_description.startswith("Area:")
     assert all_descriptions["AREA"] == area_description
     assert "MAX_DIST" in all_descriptions
+    assert "CONTOUR_PERIMETER" in all_descriptions
 
 
 def test_attribute_filter_validates_node_sized_inputs():
