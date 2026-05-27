@@ -1,8 +1,10 @@
 from .ConnectedFilterPreprocessingLayer import (
     CFPLayer,
+    CFPValuation,
     ConnectedFilterPreprocessingImplicitJacobianFunction,
     ConnectedFilterPreprocessingLayer,
 )
+from .ConnectedFilterPreprocessingLayerLegacy import ConnectedFilterPreprocessingLayerLegacy
 from .ConnectedFilterPreprocessingLayerWithCPUTreeTraversal import (
     CFPLayerWithCPUTreeTraversal,
     ConnectedFilterPreprocessingCPUTreeTraversalFunction,
@@ -14,9 +16,11 @@ from .ConnectedFilterPreprocessingLayerWithExplicitJacobian import (
     ConnectedFilterPreprocessingExplicitJacobianFunction,
     ConnectedFilterPreprocessingLayerWithExplicitJacobian,
 )
+from .checkpoint import collect_cfp_configs, load_checkpoint, save_checkpoint
 
 __all__ = [
     "CFPLayer",
+    "CFPValuation",
     "CFPLayerWithCPUTreeTraversal",
     "CFPLayerWithExplicitJacobian",
     "CFPExplicitJacobianFunction",
@@ -24,6 +28,10 @@ __all__ = [
     "ConnectedFilterPreprocessingExplicitJacobianFunction",
     "ConnectedFilterPreprocessingImplicitJacobianFunction",
     "ConnectedFilterPreprocessingLayer",
+    "ConnectedFilterPreprocessingLayerLegacy",
     "ConnectedFilterPreprocessingLayerWithCPUTreeTraversal",
     "ConnectedFilterPreprocessingLayerWithExplicitJacobian",
+    "collect_cfp_configs",
+    "load_checkpoint",
+    "save_checkpoint",
 ]

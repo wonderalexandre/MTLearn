@@ -56,16 +56,32 @@ def _area_attributes(tree, dtype=torch.float32):
 
 
 def _single_area_layer(layer_cls, *, in_channels=1, tree_type="max-tree", tos_interpolation=None):
-    layer = layer_cls(
-        in_channels=in_channels,
-        attributes_spec=[(morphology.AttributeType.AREA,)],
-        tree_type=tree_type,
-        device="cpu",
-        scale_mode="none",
-        beta_f=1.0,
-        clamp_logits=False,
-        tos_interpolation=tos_interpolation,
-    )
+    if layer_cls is ConnectedFilterPreprocessingLayer:
+        layer = layer_cls(
+            in_channels=in_channels,
+            filter_specs=[
+                {
+                    "tree_type": tree_type,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "tos_interpolation": tos_interpolation,
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+            beta_f=1.0,
+            clamp=None,
+        )
+    else:
+        layer = layer_cls(
+            in_channels=in_channels,
+            attributes_spec=[(morphology.AttributeType.AREA,)],
+            tree_type=tree_type,
+            device="cpu",
+            scale_mode="none",
+            beta_f=1.0,
+            clamp_logits=False,
+            tos_interpolation=tos_interpolation,
+        )
     with torch.no_grad():
         for weight in layer._weights.values():
             weight.fill_(0.2)
@@ -77,22 +93,28 @@ def _single_area_layer(layer_cls, *, in_channels=1, tree_type="max-tree", tos_in
 def _two_group_layer(*, tree_type="max-tree", tos_interpolation=None):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
-        attributes_spec=[
-            (morphology.AttributeType.AREA,),
-            (morphology.AttributeType.GRAY_HEIGHT,),
+        filter_specs=[
+            {
+                "tree_type": tree_type,
+                "attributes": (morphology.AttributeType.AREA,),
+                "tos_interpolation": tos_interpolation,
+            },
+            {
+                "tree_type": tree_type,
+                "attributes": (morphology.AttributeType.GRAY_HEIGHT,),
+                "tos_interpolation": tos_interpolation,
+            },
         ],
-        tree_type=tree_type,
         device="cpu",
         scale_mode="none",
         beta_f=1.0,
-        clamp_logits=False,
-        tos_interpolation=tos_interpolation,
+        clamp=None,
     )
     with torch.no_grad():
-        layer._weights["AREA"].fill_(0.2)
-        layer._biases["AREA"].fill_(-0.1)
-        layer._weights["GRAY_HEIGHT"].fill_(-0.15)
-        layer._biases["GRAY_HEIGHT"].fill_(0.05)
+        layer._weights["spec_000"].fill_(0.2)
+        layer._biases["spec_000"].fill_(-0.1)
+        layer._weights["spec_001"].fill_(-0.15)
+        layer._biases["spec_001"].fill_(0.05)
     return layer
 
 

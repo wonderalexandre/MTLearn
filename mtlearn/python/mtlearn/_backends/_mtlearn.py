@@ -50,6 +50,8 @@ _TOS_INTERPOLATION_ALIASES = {
 
 
 def normalize_tree_type(tree_type: str) -> str:
+    if hasattr(tree_type, "value"):
+        tree_type = tree_type.value
     key = str(tree_type).strip().lower()
     try:
         return _TREE_TYPE_ALIASES[key]
@@ -128,6 +130,10 @@ def describe_attribute(attribute):
 
 def describe_all_attributes():
     return Attribute.describeAll()
+
+
+def expand_attribute_group(group):
+    return Attribute.expandGroup(group)
 
 
 def create_attribute_filter(tree):

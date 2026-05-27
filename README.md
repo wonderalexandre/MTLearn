@@ -80,12 +80,17 @@ from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
 cfp_layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
-    attributes_spec=[(
-        morphology.AttributeType.AREA,
-        morphology.AttributeType.CIRCULARITY,
-    )],
-    tree_type="max-tree",
+    filter_specs=[
+        {
+            "tree_type": morphology.TreeType.MAX_TREE,
+            "attributes": (
+                morphology.AttributeType.AREA,
+                morphology.AttributeType.CIRCULARITY,
+            ),
+        }
+    ],
     device="cpu",
+    scale_mode="none",
 )
 
 x = torch.tensor([[[[1, 2], [3, 4]]]], dtype=torch.float32)
@@ -99,11 +104,55 @@ For self-dual preprocessing, use the tree-of-shapes backend explicitly:
 ```python
 cfp_tos = ConnectedFilterPreprocessingLayer(
     in_channels=1,
-    attributes_spec=[(morphology.AttributeType.AREA,)],
-    tree_type="tree-of-shapes",
-    tos_interpolation="self-dual",
+    filter_specs=[
+        {
+            "tree_type": morphology.TreeType.TREE_OF_SHAPES,
+            "attributes": (morphology.AttributeGroup.SHAPE,),
+            "tos_interpolation": "self-dual",
+        }
+    ],
 )
 ```
+
+## CFP Filter Specs
+
+`ConnectedFilterPreprocessingLayer` is configured with `filter_specs`. Each
+specification creates one output channel per input channel and owns the
+morphology tree and scoring attributes:
+
+```python
+from mtlearn import morphology
+
+filter_specs = [
+    {
+        "name": "max_area_gray",
+        "tree_type": morphology.TreeType.MAX_TREE,
+        "attributes": (
+            morphology.AttributeType.AREA,
+            morphology.AttributeType.GRAY_HEIGHT,
+        ),
+    },
+    {
+        "name": "tos_boundary",
+        "tree_type": morphology.TreeType.TREE_OF_SHAPES,
+        "attributes": (morphology.AttributeGroup.BOUNDARY,),
+        "tos_interpolation": "self-dual",
+    },
+    {
+        "name": "min_area",
+        "tree_type": morphology.TreeType.MIN_TREE,
+        "attributes": (morphology.AttributeType.AREA,),
+    },
+]
+```
+
+`name` is optional. When provided, it becomes the stable parameter key for that
+filter spec; when omitted, the layer uses `spec_000`, `spec_001`, and so on.
+
+The sigmoid logits are unclamped by default. Pass `clamp=12` to clamp
+`beta_f * logits` to `[-12, 12]`, or pass an explicit pair such as
+`clamp=(-8, 10)`.
+
 
 ## Examples and Notebooks
 
@@ -128,6 +177,47 @@ Representative ICPR 2026 experiment notebooks are available in
 
 `ConnectedFilterPreprocessingLayer` is the recommended implementation for new
 CFP experiments.
+
+`ConnectedFilterPreprocessingLayerLegacy` remains available for loading or
+reproducing experiments that used the former global tree/output contract.
+
+For PyTorch checkpoints, use the helper functions in `mtlearn.layers`. CFP
+trainable weights are regular PyTorch parameters, and the primary layer stores
+its serializable config and dataset normalization statistics in PyTorch extra
+state:
+
+```python
+from mtlearn.layers import (
+    ConnectedFilterPreprocessingLayer,
+    load_checkpoint,
+    save_checkpoint,
+)
+
+save_checkpoint("model.pt", model)
+
+def build_model():
+    return Model(
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=filter_specs,
+        ),
+        build_backbone(),
+    )
+
+model, checkpoint = load_checkpoint("model.pt", build_model, device=device)
+```
+
+The helpers discover CFP layers by module name, save their configs next to the
+normal model `state_dict`, and let the CFP extra state validate compatibility
+and restore dataset normalization statistics during `load_state_dict`. When the
+model constructor cannot hard-code the CFP configuration, the load factory may
+instead accept one `cfp_configs` argument and call
+`ConnectedFilterPreprocessingLayer.from_config(...)`.
+
+Checkpoints do not persist per-sample tree, attribute, or normalization caches;
+those are rebuilt from input data. `export_params()`/`save_params()` are manual
+inspection helpers for CFP weights and metadata, not the recommended full-model
+checkpoint API.
 
 Tensor operations, trainable parameters, and cached attributes can live on CUDA
 when `device="cuda"`. Morphology-tree construction is still performed by the
@@ -155,10 +245,10 @@ as a runtime dependency of `mtlearn`.
 
 **MTLearn** is a research-oriented library. CFP is the first validated member of
 a broader planned family of trainable connected-operator layers. The current
-implementation supports max-tree, min-tree, and tree-of-shapes CFP workflows
-for adjacency-independent attributes, multi-attribute
-dataset-level attribute normalization, cached preprocessing, and
-PyTorch forward/backward for CFP parameters on CPU or CUDA tensors.
+implementation supports max-tree, min-tree, and tree-of-shapes CFP workflows,
+mixed tree types in the same layer,
+multi-attribute dataset-level attribute normalization, cached preprocessing,
+and PyTorch forward/backward for CFP parameters on CPU or CUDA tensors.
 
 ## Citation
 

@@ -1,129 +1,53 @@
-"""Reference CFP implementation that materializes the dense Jacobian.
+"""Legacy connected-filter preprocessing layer.
 
-This module is kept as a readable baseline for validating the primary implicit
-implementation. It computes the same node-wise CFP criterion as
-``ConnectedFilterPreprocessingLayer`` but reconstructs pixels through an
-explicit dense tree-to-pixel Jacobian. This makes the math easier to inspect
-and gradcheck, at the cost of much higher memory use.
+This module preserves the former CFP constructor where ``attributes_spec``,
+``tree_type``, and ``top_hat`` are global layer options. New experiments should
+use ``ConnectedFilterPreprocessingLayer`` with per-output ``filter_specs``.
 """
 
 from __future__ import annotations
 
 import math
-import torch
+
 import numpy as np
-from .. import morphology
+import torch
+
 import mtlearn
+from .. import morphology
+from .ConnectedFilterPreprocessingLayer import ConnectedFilterPreprocessingImplicitJacobianFunction
 from ._helpers import (
-    group_name,
-    to_numpy_u8,
-    build_tree,
-    update_ds_stats,
-    normalize_with_ds_stats,
-    maybe_refresh_norm_for_key,
-    make_stats_payload,
-    load_stats_payload,
     IndexedDatasetWrapper,
+    build_tree,
+    group_name,
+    load_stats_payload,
+    make_stats_payload,
+    maybe_refresh_norm_for_key,
     normalize_attributes_spec,
+    normalize_with_ds_stats,
+    to_numpy_u8,
+    update_ds_stats,
     validate_attributes_for_tree_type,
 )
 
-class ConnectedFilterPreprocessingExplicitJacobianFunction(torch.autograd.Function):
-    """Autograd function using a materialized tree-to-pixel Jacobian."""
 
-    @staticmethod
-    def forward(
-        ctx,
-        jacobian: torch.Tensor,
-        residues: torch.Tensor,
-        numRows: int,
-        numCols: int,
-        attrs2d: torch.Tensor,
-        weight: torch.Tensor,
-        bias: torch.Tensor,
-        beta_f: float = 1.0,
-        clamp_logits: bool = False
-    ):
-        """Apply CFP with a materialized tree-to-pixel Jacobian.
-
-        Args:
-            ctx: PyTorch autograd context.
-            jacobian: Dense node-to-pixel Jacobian with shape
-                ``(num_nodes, num_pixels)``.
-            residues: Tree residues, one value per node.
-            numRows: Number of rows in the reconstructed image.
-            numCols: Number of columns in the reconstructed image.
-            attrs2d: Normalized attributes with shape ``(num_nodes, K)``.
-            weight: Learnable group weight vector with shape ``(K,)``.
-            bias: Learnable scalar bias.
-            beta_f: Forward sigmoid gain.
-            clamp_logits: Whether to clamp ``beta_f * logits`` before sigmoid.
-
-        Returns:
-            Filtered image with shape ``(numRows, numCols)``.
-        """
-        assert attrs2d.dim() == 2, "attrs2d must have shape (num_nodes, K)"
-        assert weight.dim() == 1, "weight must have shape (K,)"
-
-        logits = attrs2d @ weight.view(-1) + bias.view(())
-        s = beta_f * logits
-        if clamp_logits:
-            s = torch.clamp(s, -12.0, 12.0)
-
-        sigmoid = torch.sigmoid(s)
-
-        y_pred = (jacobian.T @ (residues * sigmoid)).reshape(numRows, numCols)
-
-        ctx.jacobian = jacobian
-        ctx.residues = residues
-        ctx.beta_f = beta_f
-
-        ctx.save_for_backward(attrs2d, sigmoid)
-        return y_pred
-
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        """Return gradients for the explicit-Jacobian forward inputs.
-
-        Only ``weight`` and ``bias`` receive gradients. The dense Jacobian,
-        residues, dimensions, attributes, and inference options are fixed
-        preprocessing data for this autograd function.
-        """
-        attrs2d, sigmoid = ctx.saved_tensors
-
-        jacobian = ctx.jacobian
-        residues = ctx.residues
-        beta_f = ctx.beta_f
-
-        grad_output = grad_output.flatten()
-
-        d_sigmoid = sigmoid * (1 - sigmoid)
-
-        d_rec_W = jacobian.T @ (residues.unsqueeze(1) * beta_f * d_sigmoid.unsqueeze(1) * attrs2d)
-        d_rec_B = jacobian.T @ (residues.unsqueeze(1) * beta_f * d_sigmoid.unsqueeze(1))
-
-        dW = (grad_output @ d_rec_W)
-        dB = (grad_output @ d_rec_B)
-
-        return None, None, None, None, None, dW, dB, None, None
-
-
-class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
-    """Reference CFP layer with an explicit dense Jacobian.
+class ConnectedFilterPreprocessingLayerLegacy(torch.nn.Module):
+    """Main learnable Connected Filter Preprocessing (CFP) layer.
 
     For each attribute group ``g`` with ``K`` normalized attributes
     ``A_g in R[num_nodes, K]``, the layer computes
-    ``sigmoid(beta_f * (A_g @ w_g + b_g))`` and reconstructs the filtered image
-    with ``jacobian.T @ (residues * sigmoid)``.
+    ``sigmoid(beta_f * (A_g @ w_g + b_g))`` as a node-wise filtering criterion.
+    The criterion is applied to the tree residues and reconstructed to pixels
+    through the implicit-Jacobian autograd function.
 
-    Use this implementation for debugging and mathematical comparison with the
-    implicit layer, not for memory-sensitive training on larger images.
+    This legacy implementation is kept for reproducing experiments that used
+    the former global tree/output contract. It can run tensor operations on
+    CUDA when ``device="cuda"`` while still building morphology trees through
+    the CPU backend.
 
     Args:
         in_channels: Number of input channels.
-        attributes_spec: Attribute groups. Each group must contain at least one
-            morphology attribute enum.
+        attributes_spec: Attribute groups. Each item is one group and must
+            contain at least one morphology attribute enum.
         tree_type: ``"max-tree"``, ``"min-tree"``, ``"tree-of-shapes"``, or
             the legacy ``"tos"`` alias.
         device: Torch device used for parameters, cached tensors, and outputs.
@@ -158,11 +82,11 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                  tos_infinity_seed_row: int = 0,
                  tos_infinity_seed_col: int = 0,
                  ):
-        """Initialize dense-Jacobian CFP caches and learnable parameters.
+        """Initialize CFP configuration, caches, and learnable parameters.
 
-        This constructor mirrors the primary CFP layer but stores full tree
-        handles, dense Jacobians, and residues in its cache so that forward and
-        backward can use the explicit formulation.
+        The constructor normalizes the attribute specification into immutable
+        groups, builds the flat attribute set used for cache construction, and
+        creates one weight vector plus one scalar bias per group.
         """
         super().__init__()
 
@@ -185,6 +109,7 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         self.tos_infinity_seed_row = int(tos_infinity_seed_row)
         self.tos_infinity_seed_col = int(tos_infinity_seed_col)
 
+
         # Attribute groups and the flat set of scalar attribute types used by them.
         self.group_defs, self._all_attr_types = normalize_attributes_spec(attributes_spec, self.tree_type)
         validate_attributes_for_tree_type(self._all_attr_types, self.tree_type)
@@ -192,16 +117,14 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         self.num_groups   = len(self.group_defs)
         self.out_channels = self.in_channels * self.num_groups
 
-        # Tree, Jacobian, residue, attribute, and normalization cache state.
-        self._trees      = {}
-        self._jacobians  = {}
-        self._residues   = {}
+        # Attribute, normalization, and implicit-Jacobian cache state.
         self._base_attrs = {}
         self._norm_attrs = {}
         self._stats_epoch = 0
         self._norm_epoch_by_key = {}
         self._ds_stats = {}
         self._stats_frozen = False
+        self._info_jacobian = {}
 
         # Learnable parameters: one weight vector and one bias per group.
         self._weights = torch.nn.ParameterDict()
@@ -226,12 +149,32 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         """Return the stable parameter/cache name for an attribute group."""
         return group_name(group)
 
+    def _clamp_bounds(self):
+        if self.clamp_logits:
+            return -12.0, 12.0
+        return None, None
+
     def _to_numpy_u8(self, img2d_t: torch.Tensor) -> np.ndarray:
         """Convert one image channel to the backend's ``np.uint8`` format."""
         return to_numpy_u8(img2d_t)
 
-    def _build_tree_jacobian_and_residues(self, img_np: np.ndarray):
-        """Build a tree and extract the dense Jacobian plus node residues."""
+    def _compute_tree_info_for_jacobian(self, img_np: np.ndarray):
+        """Build the morphology tree and implicit-Jacobian metadata.
+
+        Returned metadata contains:
+
+        - ``residues``: node residues;
+        - ``tpre`` / ``tpost``: entry and exit times for each node;
+        - ``parent``: parent index for each node;
+        - ``node_of_pixel``: flattened-pixel to node mapping;
+        - ``numRows`` / ``numCols``: image dimensions;
+        - ``tree_type``: tree type used to build the structure;
+        - ``order_forward`` / ``order_backward``: cached orders kept for API
+          compatibility with the autograd function.
+
+        No explicit mask is needed because the backend uses ``parent[root] =
+        root``.
+        """
         tree = build_tree(
             img_np,
             self.tree_type,
@@ -239,13 +182,24 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
             tos_infinity_seed_row=self.tos_infinity_seed_row,
             tos_infinity_seed_col=self.tos_infinity_seed_col,
         )
-        jacobian = mtlearn.ConnectedFilterPreprocessingTreeTensors.get_jacobian(
-            tree
-        ).to(self.device)
-        residues = mtlearn.ConnectedFilterPreprocessingTreeTensors.get_residues(
-            tree
-        ).to(self.device)
-        return tree, jacobian, residues
+        residues, tpre, tpost, parent, node_of_pixel = (
+            mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+        )
+        info = {
+            "residues": residues.to(self.device),
+            "tpre": tpre.to(self.device),
+            "tpost": tpost.to(self.device),
+            "parent": parent.to(self.device),
+            "node_of_pixel": node_of_pixel.to(self.device),
+            "numRows": tree.numRows,
+            "numCols": tree.numCols,
+            "tree_type": self.tree_type,
+        }
+        # Cached forward order.
+        info["order_forward"] = torch.argsort(tpre, descending=False).to(self.device)
+        # Cached backward order.
+        info["order_backward"] = torch.argsort(tpre).to(self.device)
+        return tree, info
 
     # ---------- normalization with hybrid support ----------
     def _update_ds_stats(self, attr_type, a_raw_1d: torch.Tensor):
@@ -262,8 +216,11 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
     def _normalize_with_ds_stats(self, attr_type, a_raw_1d: torch.Tensor) -> torch.Tensor:
         """Normalize a raw attribute vector according to ``scale_mode``.
 
-        Hybrid mode applies z-score normalization, clipping, and remapping to
-        ``[hybrid_floor_a, 1]``.
+        Hybrid mode applies three steps:
+
+        1. z-score using dataset-level mean and standard deviation;
+        2. clipping to ``[-hybrid_k, hybrid_k]``;
+        3. remapping to ``[hybrid_floor_a, 1]``.
         """
         if self.scale_mode != "hybrid":
             return normalize_with_ds_stats(self._ds_stats, self.scale_mode, self.eps, attr_type, a_raw_1d)
@@ -348,17 +305,15 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
             self.refresh_cached_normalization()
 
     # ---------- tree and attribute construction ----------
-    def _ensure_tree_and_attr(self, key: str, img_t: torch.Tensor):
-        """Populate cached tree, Jacobian, residues, and attributes for ``key``."""
-        # Accept a PyTorch tensor and convert it internally to np.ndarray.
-        if key in self._trees:
+    def _ensure_tree_info_and_attributes_cached(self, key: str, img_t: torch.Tensor):
+        """Ensure tree metadata and raw/normalized attributes exist in cache."""
+        if key in self._info_jacobian:
             return
 
         img_np = self._to_numpy_u8(img_t.detach())
-        tree, jacobian, residues = self._build_tree_jacobian_and_residues(img_np)
-        self._trees[key] = tree
-        self._jacobians[key] = jacobian
-        self._residues[key] = residues
+        tree, info = self._compute_tree_info_for_jacobian(img_np)
+        # The tree itself is not cached by the implicit implementation.
+        self._info_jacobian[key] = info
 
         per_attr_raw, per_attr_norm = {}, {}
         for attr_type in self._all_attr_types:
@@ -373,14 +328,13 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         self._norm_attrs[key] = per_attr_norm
         self._norm_epoch_by_key[key] = self._stats_epoch
 
-
     # ---------- inspection ----------
     def inspect_training_sample(self, img: torch.Tensor, channel: int = 0, idx: int | None = None, build_if_missing: bool = True):
         """Return cached or on-the-fly inspection data for one sample.
 
         When ``idx`` is provided, the method inspects cached data under
-        ``f"{idx}_{channel}"``. Without an index, the tree, dense Jacobian, and
-        attributes are computed on the fly and are not persisted.
+        ``f"{idx}_{channel}"``. Without an index, the tree and attributes are
+        computed on the fly and are not persisted.
         """
         # Normalize image layout to (C, H, W).
         if img.dim() == 2:
@@ -404,12 +358,13 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
             use_cache = False
 
         if use_cache:
-            if (key not in self._trees) and build_if_missing:
-                self._ensure_tree_and_attr(key, imgCHW[c])
-            elif key not in self._trees:
+            if (key not in self._info_jacobian) and build_if_missing:
+                self._ensure_tree_info_and_attributes_cached(key, imgCHW[c])
+            elif key not in self._info_jacobian:
                 raise KeyError("Tree/attributes not found in cache. Use build_if_missing=True.")
             self._maybe_refresh_norm_for_key(key)
-            tree = self._trees[key]
+            # The implicit implementation does not store the tree object itself.
+            tree = None
             base_attrs_by_group = {}
             norm_attrs_by_group = {}
             weights_by_group    = {}
@@ -427,7 +382,8 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         else:
             print("[inspect_training_sample] Running without cache; computing tree and attributes directly.")
             img_np = self._to_numpy_u8(imgCHW[c].detach())
-            tree, jacobian, residues = self._build_tree_jacobian_and_residues(img_np)
+            tree, info = self._compute_tree_info_for_jacobian(img_np)
+            residues = info["residues"]
             base_attrs_by_group = {}
             norm_attrs_by_group = {}
             weights_by_group    = {}
@@ -458,8 +414,13 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
 
     # ---------- forward ----------
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply CFP to a batch and return ``(B, C * groups, H, W)`` output."""
-        # Match the input conventions used by the CFP layers.
+        """Apply CFP to a batch and return ``(B, C * groups, H, W)`` output.
+
+        The input can be a tensor, ``(x, idx)``, or ``[x, idx]`` from a
+        DataLoader. Indexed inputs use persistent caches keyed by sample index
+        and channel; plain tensor inputs build trees and attributes on demand.
+        """
+        # Match the input conventions used by the CFP reference layers.
         if isinstance(x, tuple) and len(x) == 2:
             x, idx = x
             use_cache = True
@@ -476,34 +437,42 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         B, C, H, W = x.shape
         assert C == self.in_channels, f"in_channels={self.in_channels}, input C={C}"
 
-        out = torch.empty((B, self.out_channels, H, W), dtype=torch.float32, device=self.device)
+        out_dtype = next(self.parameters()).dtype
+        out = torch.empty((B, self.out_channels, H, W), dtype=out_dtype, device=self.device)
+        clamp_min, clamp_max = self._clamp_bounds()
 
         for b in range(B):
             for c in range(C):
                 if use_cache:
                     # Use idx as part of the persistent per-channel cache key.
                     key = f"{int(idx[b])}_{c}"
-                    self._ensure_tree_and_attr(key, x[b, c])
-                    tree = self._trees[key]
+                    self._ensure_tree_info_and_attributes_cached(key, x[b, c])
                     self._maybe_refresh_norm_for_key(key)
+                    info = self._info_jacobian[key]
                     for g, group in enumerate(self.group_defs):
                         gname = self._group_name(group)
                         # Build A_norm by stacking one normalized column per group attribute.
-                        cols = [self._norm_attrs[key][attr_type].view(-1, 1) for attr_type in group]
+                        cols = [self._norm_attrs[key][attr_type].view(-1, 1).to(dtype=out_dtype) for attr_type in group]
                         A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                        y_ch = ConnectedFilterPreprocessingExplicitJacobianFunction.apply(
-                            self._jacobians[key],
-                            self._residues[key],
-                            tree.numRows,
-                            tree.numCols,
-                            A_norm,
+                        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
                             self._weights[gname],
                             self._biases[gname],
+                            info["residues"].to(dtype=out_dtype),
+                            info["tpre"],
+                            info["tpost"],
+                            info["parent"],
+                            info["node_of_pixel"],
+                            A_norm,
+                            info["numRows"],
+                            info["numCols"],
                             self.beta_f,
-                            self.clamp_logits
+                            clamp_min,
+                            clamp_max,
+                            info["order_forward"],
+                            info["order_backward"]
                         )
                         if self.top_hat:
-                            x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
+                            x_bc = x[b, c].to(dtype=out_dtype, device=self.device)
                             tt = self.tree_type
                             if tt == "max-tree":
                                 y_out = x_bc - y_ch
@@ -516,10 +485,9 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                         out[b, c * self.num_groups + g].copy_(y_out, non_blocking=True)
                 else:
                     # No persistent key was provided; build tree and attributes directly.
-                    #print("[ConnectedFilterPreprocessingLayerWithExplicitJacobian] Cache is not used because no index was provided.")
                     img_np = self._to_numpy_u8(x[b, c].detach())
-                    tree, jacobian, residues = self._build_tree_jacobian_and_residues(img_np)
-                    # Compute and normalize attributes directly, without storing them.
+                    tree, info = self._compute_tree_info_for_jacobian(img_np)
+                    residues = info["residues"]
                     per_attr_norm = {}
                     for attr_type in self._all_attr_types:
                         attr_np = morphology.compute_attributes(tree, [attr_type])[1]
@@ -528,21 +496,27 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                         per_attr_norm[attr_type] = a_norm
                     for g, group in enumerate(self.group_defs):
                         gname = self._group_name(group)
-                        cols = [per_attr_norm[attr_type].view(-1, 1) for attr_type in group]
+                        cols = [per_attr_norm[attr_type].view(-1, 1).to(dtype=out_dtype) for attr_type in group]
                         A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                        y_ch = ConnectedFilterPreprocessingExplicitJacobianFunction.apply(
-                            jacobian,
-                            residues,
-                            tree.numRows,
-                            tree.numCols,
-                            A_norm,
+                        y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
                             self._weights[gname],
                             self._biases[gname],
+                            info["residues"].to(dtype=out_dtype),
+                            info["tpre"],
+                            info["tpost"],
+                            info["parent"],
+                            info["node_of_pixel"],
+                            A_norm,
+                            info["numRows"],
+                            info["numCols"],
                             self.beta_f,
-                            self.clamp_logits
+                            clamp_min,
+                            clamp_max,
+                            info["order_forward"],
+                            info["order_backward"]
                         )
                         if self.top_hat:
-                            x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
+                            x_bc = x[b, c].to(dtype=out_dtype, device=self.device)
                             tt = self.tree_type
                             if tt == "max-tree":
                                 y_out = x_bc - y_ch
@@ -574,32 +548,41 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                     x = torch.stack(x, dim=0)
                 idx = torch.arange(x.size(0), device=x.device)
                 use_cache = False
+
             B, C, H, W = x.shape
-            out = torch.empty((B, self.out_channels, H, W), dtype=torch.float32, device=self.device)
+            out_dtype = next(self.parameters()).dtype
+            out = torch.empty((B, self.out_channels, H, W), dtype=out_dtype, device=self.device)
+            clamp_min, clamp_max = self._clamp_bounds()
             for b in range(B):
                 for c in range(C):
                     if use_cache:
                         key = f"{int(idx[b])}_{c}"
-                        self._ensure_tree_and_attr(key, x[b, c])
-                        tree = self._trees[key]
+                        self._ensure_tree_info_and_attributes_cached(key, x[b, c])
                         self._maybe_refresh_norm_for_key(key)
+                        info = self._info_jacobian[key]
                         for g, group in enumerate(self.group_defs):
                             gname = self._group_name(group)
-                            cols = [self._norm_attrs[key][attr_type].view(-1, 1) for attr_type in group]
+                            cols = [self._norm_attrs[key][attr_type].view(-1, 1).to(dtype=out_dtype) for attr_type in group]
                             A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                            y_ch = ConnectedFilterPreprocessingExplicitJacobianFunction.apply(
-                                self._jacobians[key],
-                                self._residues[key],
-                                tree.numRows,
-                                tree.numCols,
-                                A_norm,
+                            y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
                                 self._weights[gname],
                                 self._biases[gname],
+                                info["residues"].to(dtype=out_dtype),
+                                info["tpre"],
+                                info["tpost"],
+                                info["parent"],
+                                info["node_of_pixel"],
+                                A_norm,
+                                info["numRows"],
+                                info["numCols"],
                                 beta_f,  # caller-provided beta_f
-                                self.clamp_logits
+                                clamp_min,
+                                clamp_max,
+                                info["order_forward"],
+                                info["order_backward"]
                             )
                             if self.top_hat:
-                                x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
+                                x_bc = x[b, c].to(dtype=out_dtype, device=self.device)
                                 tt = self.tree_type
                                 if tt == "max-tree":
                                     y_out = x_bc - y_ch
@@ -611,9 +594,8 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                                 y_out = y_ch
                             out[b, c * self.num_groups + g].copy_(y_out, non_blocking=True)
                     else:
-                        #print("[ConnectedFilterPreprocessingLayerWithExplicitJacobian] Cache is not used during prediction because no index was provided.")
                         img_np = self._to_numpy_u8(x[b, c].detach())
-                        tree, jacobian, residues = self._build_tree_jacobian_and_residues(img_np)
+                        tree, info = self._compute_tree_info_for_jacobian(img_np)
                         per_attr_norm = {}
                         for attr_type in self._all_attr_types:
                             attr_np = morphology.compute_attributes(tree, [attr_type])[1]
@@ -622,21 +604,27 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                             per_attr_norm[attr_type] = a_norm
                         for g, group in enumerate(self.group_defs):
                             gname = self._group_name(group)
-                            cols = [per_attr_norm[attr_type].view(-1, 1) for attr_type in group]
+                            cols = [per_attr_norm[attr_type].view(-1, 1).to(dtype=out_dtype) for attr_type in group]
                             A_norm = torch.cat(cols, dim=1)  # (numNodes, K)
-                            y_ch = ConnectedFilterPreprocessingExplicitJacobianFunction.apply(
-                                jacobian,
-                                residues,
-                                tree.numRows,
-                                tree.numCols,
-                                A_norm,
+                            y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
                                 self._weights[gname],
                                 self._biases[gname],
+                                info["residues"].to(dtype=out_dtype),
+                                info["tpre"],
+                                info["tpost"],
+                                info["parent"],
+                                info["node_of_pixel"],
+                                A_norm,
+                                info["numRows"],
+                                info["numCols"],
                                 beta_f,  # caller-provided beta_f
-                                self.clamp_logits
+                                clamp_min,
+                                clamp_max,
+                                info["order_forward"],
+                                info["order_backward"]
                             )
                             if self.top_hat:
-                                x_bc = x[b, c].to(dtype=torch.float32, device=self.device)
+                                x_bc = x[b, c].to(dtype=out_dtype, device=self.device)
                                 tt = self.tree_type
                                 if tt == "max-tree":
                                     y_out = x_bc - y_ch
@@ -696,7 +684,8 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
         """Initialize near identity by using only a positive bias.
 
         For each group, weights are set to zero and bias is set to
-        ``logit(p0) / beta_f``.
+        ``logit(p0) / beta_f``. This keeps the initial filtering probability
+        near ``p0`` while leaving trainable parameters free to move.
         """
         L = self._logit(p0) / float(self.beta_f)
         for group in self.group_defs:
@@ -710,7 +699,8 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
 
         This assumes normalized attributes live in ``[a, 1]`` where
         ``a = hybrid_floor_a``. Each group receives constant weights
-        ``c = logit(p0) / (beta_f * K * a)`` and zero bias.
+        ``c = logit(p0) / (beta_f * K * a)`` and zero bias, so the lower bound
+        on the group logits keeps the initial probability near ``p0``.
         """
         if self.scale_mode != "hybrid":
             print("[init_identity_bias_zero] Warning: this initializer assumes scale_mode == 'hybrid'.")
@@ -724,10 +714,12 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
             self._biases[gname].zero_()
 
     def build_dataloader_cached(self, dataloader):
-        """Precompute trees, dense Jacobians, and attributes for a DataLoader.
+        """Precompute tree metadata and attributes for a DataLoader.
 
         The returned DataLoader wraps the original dataset and emits
         ``((x, idx), y)`` batches, where ``idx`` is the original dataset index.
+        The layer uses those indexes to reuse cached preprocessing during
+        training.
         """
         from torch.utils.data import DataLoader
 
@@ -743,7 +735,7 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
             persistent_workers=getattr(dataloader, "persistent_workers", False),
         )
 
-        print(f"[ConnectedFilterPreprocessingLayerWithExplicitJacobian] Preprocessing dataset using mode '{self.scale_mode}'...")
+        print(f"[ConnectedFilterPreprocessingLayer] Preprocessing dataset using mode '{self.scale_mode}'...")
         self._stats_frozen = False
         total_batches = len(new_loader)
 
@@ -753,22 +745,14 @@ class ConnectedFilterPreprocessingLayerWithExplicitJacobian(torch.nn.Module):
                 for b in range(B):
                     for c in range(C):
                         key = f"{int(idx[b])}_{c}"
-                        self._ensure_tree_and_attr(key, x[b, c])
+                        self._ensure_tree_info_and_attributes_cached(key, x[b, c])
                 if (batch_i + 1) % 10 == 0 or batch_i == total_batches - 1:
                     print(f"  [{batch_i+1}/{total_batches}] batches processed.")
 
         self.freeze_ds_stats()
         self.refresh_cached_normalization()
-        print(f"[ConnectedFilterPreprocessingLayerWithExplicitJacobian] Full and normalized cache with '{self.scale_mode}'.")
+        print(f"[ConnectedFilterPreprocessingLayer] Full and normalized cache with '{self.scale_mode}'.")
         return new_loader
 
 
-CFPLayerWithExplicitJacobian = ConnectedFilterPreprocessingLayerWithExplicitJacobian
-CFPExplicitJacobianFunction = ConnectedFilterPreprocessingExplicitJacobianFunction
-
-__all__ = [
-    'ConnectedFilterPreprocessingLayerWithExplicitJacobian',
-    'ConnectedFilterPreprocessingExplicitJacobianFunction',
-    'CFPLayerWithExplicitJacobian',
-    'CFPExplicitJacobianFunction',
-]
+__all__ = ["ConnectedFilterPreprocessingLayerLegacy"]

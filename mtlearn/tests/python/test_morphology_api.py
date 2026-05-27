@@ -110,6 +110,7 @@ def test_attribute_descriptions_are_exposed_through_facade():
     assert area_description.startswith("Area:")
     assert all_descriptions["AREA"] == area_description
     assert "MAX_DIST" in all_descriptions
+    assert "CONTOUR_PERIMETER" in all_descriptions
 
 
 def test_attribute_filter_validates_node_sized_inputs():

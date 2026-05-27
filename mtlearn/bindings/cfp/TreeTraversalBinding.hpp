@@ -21,13 +21,20 @@ inline void init_ConnectedFilterPreprocessingTreeTraversal(py::module& m)
 {
     using TreeTraversal = cfp::ConnectedFilterPreprocessingTreeTraversal;
 
-    py::class_<TreeTraversal>(m, "ConnectedFilterPreprocessingTreeTraversal")
+    py::class_<TreeTraversal>(
+        m,
+        "ConnectedFilterPreprocessingTreeTraversal",
+        R"pbdoc(CPU tree-traversal backend used by reference CFP implementations.
+
+The primary CFP layer uses implicit tensor metadata, but this class remains
+available for compatibility and validation of the CPU traversal path.
+)pbdoc")
         .def_static(
             "filtering",
             &TreeTraversal::filtering,
             py::arg("tree"),
             py::arg("sigmoid"),
-            "Reconstruct the filtered image.")
+            "Reconstruct a filtered image from node-wise sigmoid decisions.")
         // Legacy 4-argument gradient API for weights and bias. Keep this
         // signature stable because the CPU traversal autograd Function calls
         // it directly.
@@ -38,7 +45,7 @@ inline void init_ConnectedFilterPreprocessingTreeTraversal(py::module& m)
             py::arg("attributes"),
             py::arg("sigmoid"),
             py::arg("grad_output"),
-            "Compute weight and bias gradients from the tree structure.");
+            "Compute CFP weight and bias gradients from CPU tree traversal.");
 }
 
 } // namespace mtlearn

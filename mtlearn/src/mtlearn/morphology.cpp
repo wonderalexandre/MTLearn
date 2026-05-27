@@ -9,6 +9,8 @@
 
 #include "mtlearn/detail/morphology_backend.hpp"
 
+#include <mmcfilters/trees/MorphologicalTreeFactory.hpp>
+
 #include <cstddef>
 #include <stdexcept>
 
@@ -76,7 +78,9 @@ WeightedTree::~WeightedTree() = default;
 WeightedTree WeightedTree::createComponentTree(ImageViewUInt8 image, bool isMaxTree, double radius)
 {
     return WeightedTree(std::make_shared<Impl>(
-        detail::BackendWeightedTree::createComponentTree(backendImageFromView(image), isMaxTree, radius)));
+        isMaxTree
+            ? mmcfilters::MorphologicalTreeFactory::createMaxTree(backendImageFromView(image), radius)
+            : mmcfilters::MorphologicalTreeFactory::createMinTree(backendImageFromView(image), radius)));
 }
 
 WeightedTree WeightedTree::createTreeOfShapes(
@@ -86,7 +90,7 @@ WeightedTree WeightedTree::createTreeOfShapes(
     int infinitySeedCol)
 {
     return WeightedTree(std::make_shared<Impl>(
-        detail::BackendWeightedTree::createTreeOfShapes(
+        mmcfilters::MorphologicalTreeFactory::createTreeOfShapes(
             backendImageFromView(image),
             toBackendInterpolation(interpolation),
             infinitySeedRow,

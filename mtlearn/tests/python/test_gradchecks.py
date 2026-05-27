@@ -8,6 +8,10 @@ try:
     import numpy as np
     import torch
     from torch.autograd import gradcheck
+    try:
+        from torch.func import functional_call
+    except Exception:  # pragma: no cover - compatibility with older PyTorch
+        from torch.nn.utils.stateless import functional_call
 except Exception as exc:  # pragma: no cover
     pytest.skip(f"Python dependency unavailable: {exc}", allow_module_level=True)
 
@@ -44,6 +48,29 @@ def _learnable_parameters(dtype):
     weight = torch.tensor([0.35, -0.2], dtype=dtype, requires_grad=True)
     bias = torch.tensor([0.1], dtype=dtype, requires_grad=True)
     return weight, bias
+
+
+def _small_layer_input(dtype=torch.float64):
+    return torch.tensor(
+        [
+            [
+                [
+                    [1, 1, 0, 4, 4],
+                    [1, 3, 0, 4, 2],
+                    [5, 3, 3, 2, 2],
+                    [5, 0, 6, 6, 2],
+                    [0, 0, 6, 1, 1],
+                ]
+            ]
+        ],
+        dtype=dtype,
+    )
+
+
+def _tos_spec_kwargs(tree_type):
+    if tree_type == morphology.TreeType.TREE_OF_SHAPES:
+        return {"tos_interpolation": morphology.ToSInterpolation.Min8cMax4c}
+    return {}
 
 
 def test_explicit_jacobian_function_gradcheck():
@@ -92,11 +119,78 @@ def test_implicit_jacobian_function_gradcheck():
             attributes,
             tree.numRows,
             tree.numCols,
-            1.0,
-            False,
+            2.0,
         ).mean()
 
     assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    ("clamp_min", "clamp_max"),
+    [
+        pytest.param(-12.0, 12.0, id="symmetric-12"),
+        pytest.param(-8.0, 10.0, id="asymmetric"),
+        pytest.param(-1.0, 1.0, id="saturating"),
+    ],
+)
+def test_implicit_jacobian_function_gradcheck_with_clamp_bounds(clamp_min, clamp_max):
+    tree, attributes = _small_gradcheck_case(torch.float64)
+    residues, tpre, tpost, parent, node_of_pixel = (
+        mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+    )
+    residues = residues.to(dtype=torch.float64)
+    weight = torch.tensor([2.0, -0.5], dtype=torch.float64, requires_grad=True)
+    bias = torch.tensor([0.0], dtype=torch.float64, requires_grad=True)
+
+    def filtered_mean(w, b):
+        return mtlearn.layers.ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
+            w,
+            b,
+            residues,
+            tpre,
+            tpost,
+            parent,
+            node_of_pixel,
+            attributes,
+            tree.numRows,
+            tree.numCols,
+            3.0,
+            clamp_min,
+            clamp_max,
+        ).mean()
+
+    assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)
+
+
+def test_implicit_jacobian_function_clamp_saturates_backward():
+    tree, _ = _small_gradcheck_case(torch.float64)
+    residues, tpre, tpost, parent, node_of_pixel = (
+        mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+    )
+    residues = residues.to(dtype=torch.float64)
+    attributes = torch.ones((residues.numel(), 2), dtype=torch.float64)
+    weight = torch.tensor([10.0, 10.0], dtype=torch.float64, requires_grad=True)
+    bias = torch.tensor([10.0], dtype=torch.float64, requires_grad=True)
+
+    output = mtlearn.layers.ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
+        weight,
+        bias,
+        residues,
+        tpre,
+        tpost,
+        parent,
+        node_of_pixel,
+        attributes,
+        tree.numRows,
+        tree.numCols,
+        1.0,
+        -1.0,
+        1.0,
+    )
+    output.sum().backward()
+
+    assert torch.equal(weight.grad, torch.zeros_like(weight))
+    assert torch.equal(bias.grad, torch.zeros_like(bias))
 
 
 def test_implicit_jacobian_function_gradcheck_tree_of_shapes():
@@ -124,7 +218,140 @@ def test_implicit_jacobian_function_gradcheck_tree_of_shapes():
             tree.numRows,
             tree.numCols,
             1.0,
-            False,
+        ).mean()
+
+    assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    "clamp",
+    [
+        pytest.param(None, id="clamp-none"),
+        pytest.param(12, id="clamp-scalar"),
+        pytest.param((-8.0, 10.0), id="clamp-pair"),
+        pytest.param(1.0, id="clamp-saturating"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("tree_type", "valuation"),
+    [
+        pytest.param(
+            morphology.TreeType.MAX_TREE,
+            None,
+            id="max-filtered-altitude",
+        ),
+        pytest.param(
+            morphology.TreeType.MAX_TREE,
+            mtlearn.layers.CFPValuation.ALTITUDE_TOPHAT,
+            id="max-tophat-altitude",
+        ),
+        pytest.param(
+            morphology.TreeType.MIN_TREE,
+            None,
+            id="min-filtered-altitude",
+        ),
+        pytest.param(
+            morphology.TreeType.MIN_TREE,
+            mtlearn.layers.CFPValuation.ALTITUDE_TOPHAT,
+            id="min-tophat-altitude",
+        ),
+        pytest.param(
+            morphology.TreeType.TREE_OF_SHAPES,
+            None,
+            id="tos-filtered-altitude",
+        ),
+        pytest.param(
+            morphology.TreeType.TREE_OF_SHAPES,
+            mtlearn.layers.CFPValuation.ALTITUDE_TOPHAT,
+            id="tos-tophat-altitude",
+        ),
+        pytest.param(
+            morphology.TreeType.MAX_TREE,
+            mtlearn.layers.CFPValuation.node_attribute(morphology.AttributeType.AREA),
+            id="max-filtered-area-valuation",
+        ),
+        pytest.param(
+            morphology.TreeType.MAX_TREE,
+            mtlearn.layers.CFPValuation.node_attribute(morphology.AttributeType.VARIANCE_LEVEL),
+            id="max-filtered-variance-valuation",
+        ),
+    ],
+)
+def test_filter_specs_layer_gradcheck(tree_type, valuation, clamp):
+    spec = {
+        "tree_type": tree_type,
+        "attributes": (
+            morphology.AttributeType.AREA,
+            morphology.AttributeType.COMPACTNESS,
+        ),
+        **_tos_spec_kwargs(tree_type),
+    }
+    if valuation is not None:
+        spec["valuation"] = valuation
+
+    layer = mtlearn.layers.ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[spec],
+        device="cpu",
+        scale_mode="none",
+        beta_f=2.0,
+        clamp=clamp,
+    ).double()
+    image = _small_layer_input(torch.float64)
+    weight, bias = _learnable_parameters(torch.float64)
+
+    def filtered_mean(w, b):
+        return functional_call(
+            layer,
+            {
+                "_weights.spec_000": w,
+                "_biases.spec_000": b,
+            },
+            (image,),
+        ).mean()
+
+    assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    ("tree_type", "top_hat"),
+    [
+        pytest.param(morphology.TreeType.MAX_TREE, False, id="max-filtered"),
+        pytest.param(morphology.TreeType.MAX_TREE, True, id="max-tophat"),
+        pytest.param(morphology.TreeType.MIN_TREE, False, id="min-filtered"),
+        pytest.param(morphology.TreeType.MIN_TREE, True, id="min-tophat"),
+        pytest.param(morphology.TreeType.TREE_OF_SHAPES, False, id="tos-filtered"),
+        pytest.param(morphology.TreeType.TREE_OF_SHAPES, True, id="tos-tophat"),
+    ],
+)
+def test_legacy_layer_gradcheck(tree_type, top_hat):
+    layer = mtlearn.layers.ConnectedFilterPreprocessingLayerLegacy(
+        in_channels=1,
+        attributes_spec=[
+            (
+                morphology.AttributeType.AREA,
+                morphology.AttributeType.COMPACTNESS,
+            )
+        ],
+        tree_type=tree_type,
+        device="cpu",
+        scale_mode="none",
+        beta_f=2.0,
+        top_hat=top_hat,
+        clamp_logits=False,
+        **_tos_spec_kwargs(tree_type),
+    ).double()
+    image = _small_layer_input(torch.float64)
+    weight, bias = _learnable_parameters(torch.float64)
+
+    def filtered_mean(w, b):
+        return functional_call(
+            layer,
+            {
+                "_weights.AREA+COMPACTNESS": w,
+                "_biases.AREA+COMPACTNESS": b,
+            },
+            (image,),
         ).mean()
 
     assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)

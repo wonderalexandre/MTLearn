@@ -136,6 +136,8 @@ def test_build_tree_returns_weighted_tree_for_supported_types():
 
         assert morphology.is_tree(tree)
         assert tree.getRoot() >= 0
+        assert tree.getProperPartOwner(0) >= 0
+        assert not hasattr(tree, "getSmallestComponent")
 
 
 def test_morphology_facade_computes_attributes_and_filters():
@@ -144,6 +146,17 @@ def test_morphology_facade_computes_attributes_and_filters():
 
     assert morphology.AttributeType is morphology.Attribute.Type
     assert morphology.AttributeGroup is morphology.Attribute.Group
+    assert hasattr(morphology.AttributeGroup, "SHAPE")
+    assert hasattr(morphology.AttributeGroup, "BOUNDARY")
+    assert not hasattr(morphology.AttributeGroup, "GEOMETRIC")
+    assert morphology.TreeType.MAX_TREE.value == "max-tree"
+    assert morphology.normalize_tree_type(morphology.TreeType.TREE_OF_SHAPES) == "tree-of-shapes"
+    assert morphology.AttributeType.ALTITUDE == morphology.AttributeType.LEVEL
+    assert hasattr(morphology.AttributeType, "CONTOUR_PERIMETER")
+    boundary_attributes = morphology.expand_attribute_group(morphology.AttributeGroup.BOUNDARY)
+    assert morphology.AttributeType.BITQUADS_AREA in boundary_attributes
+    assert morphology.AttributeType.CONTOUR_PERIMETER in boundary_attributes
+    assert morphology.AttributeType.MAX_DIST not in boundary_attributes
 
     attr_index, attr_values = morphology.compute_attributes(
         tree,
@@ -218,6 +231,14 @@ def test_connected_filter_preprocessing_public_aliases():
         mtlearn.layers.CFPLayerWithCPUTreeTraversal
         is mtlearn.layers.ConnectedFilterPreprocessingLayerWithCPUTreeTraversal
     )
+    assert mtlearn.layers.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
+    assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingLayerLegacy")
+    assert hasattr(mtlearn.layers, "CFPValuation")
+    assert hasattr(mtlearn.layers.CFPValuation, "ALTITUDE")
+    assert hasattr(mtlearn.layers.CFPValuation, "ALTITUDE_TOPHAT")
+    assert hasattr(mtlearn.layers, "collect_cfp_configs")
+    assert hasattr(mtlearn.layers, "save_checkpoint")
+    assert hasattr(mtlearn.layers, "load_checkpoint")
     assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingImplicitJacobianFunction")
     assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingCPUTreeTraversalFunction")
     assert not hasattr(mtlearn.layers, "ConnectedFilterLayerByThresholds")
@@ -237,9 +258,14 @@ def test_connected_filter_preprocessing_public_aliases():
 def test_connected_filter_preprocessing_layer_forward_smoke():
     layer = mtlearn.layers.ConnectedFilterPreprocessingLayer(
         in_channels=1,
-        attributes_spec=[(morphology.AttributeType.AREA,)],
-        tree_type="max-tree",
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
         device="cpu",
+        scale_mode="none",
     )
     x = torch.tensor([[[[1, 2], [3, 4]]]], dtype=torch.float32)
 

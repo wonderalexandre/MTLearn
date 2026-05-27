@@ -24,6 +24,7 @@ from ._helpers import (
     make_stats_payload,
     load_stats_payload,
     IndexedDatasetWrapper,
+    normalize_attributes_spec,
     validate_attributes_for_tree_type,
 )
 
@@ -158,17 +159,8 @@ class ConnectedFilterPreprocessingLayerWithCPUTreeTraversal(torch.nn.Module):
         self.tos_infinity_seed_row = int(tos_infinity_seed_row)
         self.tos_infinity_seed_col = int(tos_infinity_seed_col)
 
-        # Attribute groups and the flat set of attribute types used by them.
-        self.group_defs = []
-        all_attr_types_set = set()
-        for item in attributes_spec:
-            group = tuple(item) if isinstance(item, (list, tuple)) else (item,)
-            if len(group) < 1:
-                raise ValueError("Each attribute group must contain at least one attribute.")
-            self.group_defs.append(group)
-            for at in group:
-                all_attr_types_set.add(at)
-        self._all_attr_types = list(all_attr_types_set)
+        # Attribute groups and the flat set of scalar attribute types used by them.
+        self.group_defs, self._all_attr_types = normalize_attributes_spec(attributes_spec, self.tree_type)
         validate_attributes_for_tree_type(self._all_attr_types, self.tree_type)
 
         self.num_groups   = len(self.group_defs)
