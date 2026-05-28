@@ -94,6 +94,33 @@ def test_compute_attributes_returns_sorted_index_and_expected_shape():
     assert "COMPACTNESS" in attr_index
 
 
+def test_compute_attributes_accepts_float_dtype():
+    tree = morphology.create_max_tree(_small_image())
+    attributes = [morphology.AttributeType.AREA, morphology.AttributeType.COMPACTNESS]
+
+    attr_index32, attr_values32 = morphology.compute_attributes(
+        tree,
+        attributes,
+        dtype=np.float32,
+    )
+    attr_index64, attr_values64 = morphology.compute_attributes(
+        tree,
+        attributes,
+        dtype=np.float64,
+    )
+    _, attr_values64_from_string = morphology.compute_attributes(
+        tree,
+        attributes,
+        dtype="float64",
+    )
+
+    assert attr_index64 == attr_index32
+    assert attr_values32.dtype == np.float32
+    assert attr_values64.dtype == np.float64
+    assert attr_values64_from_string.dtype == np.float64
+    assert np.allclose(attr_values32, attr_values64, equal_nan=True)
+
+
 def test_compute_single_attribute_matches_tree_node_space():
     tree = morphology.create_max_tree(_small_image())
 
@@ -101,6 +128,42 @@ def test_compute_single_attribute_matches_tree_node_space():
 
     assert area.shape == (tree.numInternalNodeSlots,)
     assert area.dtype == np.float32
+
+
+def test_compute_single_attribute_accepts_float_dtype():
+    tree = morphology.create_max_tree(_small_image())
+
+    area32 = morphology.compute_single_attribute(
+        tree,
+        morphology.AttributeType.AREA,
+        dtype=np.float32,
+    )
+    area64 = morphology.compute_single_attribute(
+        tree,
+        morphology.AttributeType.AREA,
+        dtype=np.float64,
+    )
+    area64_from_python_float = morphology.compute_single_attribute(
+        tree,
+        morphology.AttributeType.AREA,
+        dtype=float,
+    )
+
+    assert area32.dtype == np.float32
+    assert area64.dtype == np.float64
+    assert area64_from_python_float.dtype == np.float64
+    assert np.allclose(area32, area64)
+
+
+def test_compute_attribute_rejects_non_float_dtype():
+    tree = morphology.create_max_tree(_small_image())
+
+    with pytest.raises(ValueError, match="dtype must be np.float32 or np.float64"):
+        morphology.compute_single_attribute(
+            tree,
+            morphology.AttributeType.AREA,
+            dtype=np.int32,
+        )
 
 
 def test_attribute_descriptions_are_exposed_through_facade():
@@ -122,6 +185,35 @@ def test_attribute_filter_validates_node_sized_inputs():
 
     with pytest.raises(ValueError, match="attr must have length"):
         attribute_filter.filteringMin(np.ones(1, dtype=np.float32), 1.0)
+
+
+def test_attribute_filter_accepts_float64_attributes():
+    tree = morphology.create_max_tree(_small_image())
+    area = morphology.compute_single_attribute(
+        tree,
+        morphology.AttributeType.AREA,
+        dtype=np.float64,
+    )
+    attribute_filter = morphology.create_attribute_filter(tree)
+
+    filtered_min = attribute_filter.filteringMin(area, float(np.median(area)))
+    filtered_max = attribute_filter.filteringMax(area, float(np.median(area)))
+
+    assert filtered_min.shape == _small_image().shape
+    assert filtered_max.shape == _small_image().shape
+    assert filtered_min.dtype == np.uint8
+    assert filtered_max.dtype == np.uint8
+
+
+def test_attribute_filter_rejects_non_float_attribute_array():
+    tree = morphology.create_max_tree(_small_image())
+    attribute_filter = morphology.create_attribute_filter(tree)
+
+    with pytest.raises(ValueError, match="attr must be a 1D np.float32 or np.float64 array"):
+        attribute_filter.filteringMin(
+            np.ones(tree.numInternalNodeSlots, dtype=np.int32),
+            1.0,
+        )
 
 
 def test_removed_backend_symbols_are_not_reexported():

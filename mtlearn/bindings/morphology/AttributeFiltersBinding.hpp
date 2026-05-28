@@ -10,6 +10,7 @@
 
 #include <mmcfilters/filters/AttributeFilters.hpp>
 
+#include <concepts>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -28,11 +29,15 @@ public:
     {
     }
 
-    // Threshold-based filters consume one float value per internal node slot.
-    py::array_t<uint8_t> filteringMin(FloatArray attribute, float threshold)
+    // Threshold-based filters consume one floating-point value per internal
+    // node slot. Float32 remains the default output dtype of attribute
+    // computation, but float64 buffers are accepted without downcasting.
+    py::array_t<uint8_t> filteringMin(py::array attribute, double threshold)
     {
-        requireNodeAttributeArray(attribute, "attr");
-        return imageToNumpy(filter_.filteringByPruningMin(floatArrayView(attribute), threshold));
+        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+            return filteringMinTyped<double>(std::move(attribute), threshold);
+        }
+        return filteringMinTyped<float>(std::move(attribute), static_cast<float>(threshold));
     }
 
     // Criterion-based filters consume one boolean decision per internal node
@@ -43,10 +48,12 @@ public:
         return imageToNumpy(filter_.filteringByPruningMin(criterion));
     }
 
-    py::array_t<uint8_t> filteringMax(FloatArray attribute, float threshold)
+    py::array_t<uint8_t> filteringMax(py::array attribute, double threshold)
     {
-        requireNodeAttributeArray(attribute, "attr");
-        return imageToNumpy(filter_.filteringByPruningMax(floatArrayView(attribute), threshold));
+        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+            return filteringMaxTyped<double>(std::move(attribute), threshold);
+        }
+        return filteringMaxTyped<float>(std::move(attribute), static_cast<float>(threshold));
     }
 
     py::array_t<uint8_t> filteringMax(std::vector<bool> criterion)
@@ -99,9 +106,29 @@ private:
         return morphology::detail::topology(*tree_);
     }
 
-    void requireNodeAttributeArray(const FloatArray& attribute, std::string_view argumentName) const
+    template <std::floating_point Real>
+    py::array_t<Real, py::array::c_style> requireNodeAttributeArray(
+        py::array attribute,
+        std::string_view argumentName) const
     {
-        require1DArray(attribute.request(), topology().getNumInternalNodeSlots(), argumentName);
+        return require1DFloatingArray<Real>(
+            std::move(attribute),
+            topology().getNumInternalNodeSlots(),
+            argumentName);
+    }
+
+    template <std::floating_point Real>
+    py::array_t<uint8_t> filteringMinTyped(py::array attribute, Real threshold)
+    {
+        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
+        return imageToNumpy(filter_.filteringByPruningMin(floatingArrayView(typed), threshold));
+    }
+
+    template <std::floating_point Real>
+    py::array_t<uint8_t> filteringMaxTyped(py::array attribute, Real threshold)
+    {
+        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
+        return imageToNumpy(filter_.filteringByPruningMax(floatingArrayView(typed), threshold));
     }
 
     void requireNodeCriterion(const std::vector<bool>& criterion, std::string_view argumentName) const
@@ -132,7 +159,7 @@ or node scores and return reconstructed NumPy images. Create instances through
 )pbdoc")
         .def(py::init<morphology::WeightedTreePtr>(), "tree"_a, "Create filters bound to ``tree``.")
         .def("filteringMin",
-            py::overload_cast<FloatArray, float>(&AttributeFiltersPybind::filteringMin),
+            py::overload_cast<py::array, double>(&AttributeFiltersPybind::filteringMin),
             "attr"_a,
             "threshold"_a,
             "Prune by a minimum-threshold rule over one node attribute array.")
@@ -141,7 +168,7 @@ or node scores and return reconstructed NumPy images. Create instances through
             "criterion"_a,
             "Prune by a boolean minimum criterion with one value per node slot.")
         .def("filteringMax",
-            py::overload_cast<FloatArray, float>(&AttributeFiltersPybind::filteringMax),
+            py::overload_cast<py::array, double>(&AttributeFiltersPybind::filteringMax),
             "attr"_a,
             "threshold"_a,
             "Prune by a maximum-threshold rule over one node attribute array.")

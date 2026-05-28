@@ -227,8 +227,8 @@ def update_ds_stats(ds_stats: Dict[Any, Dict[str, torch.Tensor]],
                 changed = True
         return changed
     elif scale_mode == "zscore_tree":
-        v = a_raw_1d.detach().to(torch.float32)
-        cnt = torch.tensor(v.numel(), dtype=torch.long)
+        v = a_raw_1d.detach()
+        cnt = torch.tensor(v.numel(), dtype=torch.long, device=v.device)
         sm = torch.sum(v)
         sq = torch.sum(v * v)
         if attr_type not in ds_stats:
@@ -273,7 +273,7 @@ def normalize_with_ds_stats(ds_stats: Mapping[Any, Dict[str, torch.Tensor]],
             mean = torch.mean(a_raw_1d)
             std  = torch.std(a_raw_1d).clamp_min(eps)
         else:
-            count = stats["count"].to(torch.float32)
+            count = stats["count"].to(dtype=stats["sum"].dtype, device=stats["sum"].device)
             mean  = stats["sum"] / count
             var   = stats["sumsq"] / count - mean * mean
             std   = torch.sqrt(torch.clamp(var, min=eps))
