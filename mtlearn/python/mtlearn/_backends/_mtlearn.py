@@ -116,12 +116,22 @@ def build_tree(
     )
 
 
-def compute_attributes(tree, attributes: Iterable):
-    return Attribute.computeAttributes(tree, attributes)
+def compute_attributes(
+    tree,
+    attributes: Iterable,
+    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
+    dtype=None,
+):
+    return Attribute.computeAttributes(tree, attributes, output_space, dtype)
 
 
-def compute_single_attribute(tree, attribute):
-    return Attribute.computeSingleAttribute(tree, attribute)
+def compute_single_attribute(
+    tree,
+    attribute,
+    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
+    dtype=None,
+):
+    return Attribute.computeSingleAttribute(tree, attribute, output_space, dtype)
 
 
 def describe_attribute(attribute):

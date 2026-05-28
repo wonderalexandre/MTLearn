@@ -294,6 +294,24 @@ def _normalize_clamp(value: Any) -> tuple[float, float] | None:
     raise TypeError("clamp must be None, a positive scalar, or a (min, max) pair.")
 
 
+def _normalize_attribute_dtype(value: Any) -> np.dtype:
+    if value is None:
+        return np.dtype(np.float32)
+    if isinstance(value, torch.dtype):
+        if value == torch.float32:
+            return np.dtype(np.float32)
+        if value == torch.float64:
+            return np.dtype(np.float64)
+        raise ValueError("attribute_dtype must be np.float32, np.float64, torch.float32, or torch.float64.")
+    try:
+        dtype = np.dtype(value)
+    except TypeError as exc:
+        raise TypeError("attribute_dtype must be np.float32, np.float64, torch.float32, or torch.float64.") from exc
+    if dtype == np.dtype(np.float32) or dtype == np.dtype(np.float64):
+        return dtype
+    raise ValueError("attribute_dtype must be np.float32, np.float64, torch.float32, or torch.float64.")
+
+
 _FILTER_SPEC_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -343,6 +361,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         clamp=None,
         hybrid_k: float = 3.0,
         hybrid_floor_a: float = 0.05,
+        attribute_dtype=None,
         tos_interpolation=None,
         tos_infinity_seed_row: int = 0,
         tos_infinity_seed_col: int = 0,
@@ -371,6 +390,11 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 symmetric bounds, or ``(min, max)`` for explicit bounds.
             hybrid_k: Clipping radius used by ``scale_mode="hybrid"``.
             hybrid_floor_a: Lower endpoint used by hybrid rescaling.
+            attribute_dtype: Floating dtype used for morphology attribute
+                extraction, cache storage, and normalization. Accepts
+                ``np.float32``, ``np.float64``, ``torch.float32``,
+                ``torch.float64``, and equivalent NumPy dtype strings. ``None``
+                keeps the historical ``np.float32`` default.
             tos_interpolation: Default tree-of-shapes interpolation for specs
                 that do not override it.
             tos_infinity_seed_row: Default tree-of-shapes infinity seed row.
@@ -390,6 +414,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self.eps = float(eps)
         self.beta_f = float(beta_f)
         self.clamp = _normalize_clamp(clamp)
+        self.attribute_dtype = _normalize_attribute_dtype(attribute_dtype)
 
         self.filter_specs = self._normalize_filter_specs(
             filter_specs,
@@ -564,7 +589,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 "scale_mode='hybrid' requires dataset statistics. "
                 "Call build_dataloader_cached(...) or load_stats(...) before forward/inspection."
             )
-        count = st["count"].to(torch.float32)
+        count = st["count"].to(dtype=st["sum"].dtype, device=st["sum"].device)
         mean = st["sum"] / torch.clamp(count, min=1.0)
         var = st["sumsq"] / torch.clamp(count, min=1.0) - mean * mean
         std = torch.sqrt(torch.clamp(var, min=self.eps))
@@ -579,8 +604,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             return info["residues"]
 
         attr_type = valuation.attribute
-        attr_np = morphology.compute_attributes(tree, [attr_type])[1]
-        values = torch.as_tensor(attr_np, device=self.device).squeeze(1).to(torch.float32)
+        attr_np = morphology.compute_attributes(tree, [attr_type], dtype=self.attribute_dtype)[1]
+        values = torch.as_tensor(attr_np, device=self.device).squeeze(1)
         parent = info["parent"]
         parent_values = values[parent.clamp_min(0)]
         increments = values - parent_values
@@ -597,7 +622,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         base_attrs = {}
         norm_attrs = {}
         for attr_type in self._scoring_attrs_by_tree_key.get(tree_key, ()):
-            attr_np = morphology.compute_attributes(tree, [attr_type])[1]
+            attr_np = morphology.compute_attributes(tree, [attr_type], dtype=self.attribute_dtype)[1]
             a_raw_1d = torch.as_tensor(attr_np, device=self.device).squeeze(1)
             stat_key = self._stat_key(tree_key, attr_type)
             if update_stats:
@@ -892,6 +917,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             "clamp": None if self.clamp is None else list(self.clamp),
             "hybrid_k": self.hybrid_k,
             "hybrid_floor_a": self.hybrid_floor_a,
+            "attribute_dtype": self.attribute_dtype.name,
         }
 
     def get_weight_contract(self) -> dict[str, Any]:
@@ -1064,6 +1090,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             "clamp": config.get("clamp", None),
             "hybrid_k": float(config.get("hybrid_k", 3.0)),
             "hybrid_floor_a": float(config.get("hybrid_floor_a", 0.05)),
+            "attribute_dtype": config.get("attribute_dtype", None),
         }
 
     @classmethod

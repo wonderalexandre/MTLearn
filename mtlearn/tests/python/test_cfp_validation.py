@@ -94,6 +94,75 @@ def test_constructor_rejects_invalid_clamp_parameter(clamp):
         )
 
 
+@pytest.mark.parametrize(
+    ("attribute_dtype", "expected_name"),
+    [
+        (torch.float32, "float32"),
+        (torch.float64, "float64"),
+        ("float64", "float64"),
+    ],
+)
+def test_constructor_normalizes_attribute_dtype(attribute_dtype, expected_name):
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+        attribute_dtype=attribute_dtype,
+    )
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config())
+
+    assert layer.attribute_dtype.name == expected_name
+    assert layer.get_config()["attribute_dtype"] == expected_name
+    assert restored.attribute_dtype.name == expected_name
+
+
+def test_constructor_rejects_invalid_attribute_dtype():
+    with pytest.raises((TypeError, ValueError), match="attribute_dtype"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+            attribute_dtype=torch.float16,
+        )
+
+
+def test_attribute_dtype_controls_cached_attributes_and_valuations():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "valuation": CFPValuation.node_attribute(morphology.AttributeType.AREA),
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+        attribute_dtype=torch.float64,
+    )
+    image = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
+
+    inspected = layer.inspect_training_sample(image)["specs"]["spec_000"]
+    output = layer(image.reshape(1, 1, 2, 2))
+
+    assert inspected["base_attrs"].dtype == torch.float64
+    assert inspected["norm_attrs"].dtype == torch.float64
+    assert inspected["valuation_increments"].dtype == torch.float64
+    assert output.dtype == torch.float32
+
+
 @pytest.mark.parametrize("name", ["", "has.dot", "1starts_with_digit", "with space", object()])
 def test_constructor_rejects_invalid_filter_spec_name(name):
     with pytest.raises((TypeError, ValueError), match="filter spec name"):
