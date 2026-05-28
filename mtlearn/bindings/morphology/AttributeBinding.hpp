@@ -174,13 +174,11 @@ inline py::dict sortedAttributeIndex(const mmcfilters::AttributeNames& attribute
     return result;
 }
 
-// Compute several attributes or attribute groups and return the pair used by
-// Python: {attribute_name: column_index}, values. The values array is owned by
-// NumPy through vectorToNumpyOwned.
-inline std::pair<py::dict, py::array_t<float>> computeAttributes(
+template <std::floating_point Real>
+std::pair<py::dict, py::array> computeAttributesTyped(
     morphology::WeightedTreePtr tree,
     const std::vector<morphology::AttributeOrGroup>& attributes,
-    morphology::NodeIdSpace outputSpace = morphology::NodeIdSpace::MORPHOLOGICAL_TREE)
+    morphology::NodeIdSpace outputSpace)
 {
     if (!tree) {
         throw py::value_error("invalid WeightedMorphologicalTree");
@@ -188,7 +186,7 @@ inline std::pair<py::dict, py::array_t<float>> computeAttributes(
 
     const auto backendAttributes = toBackend(attributes);
     auto [attributeNames, buffer] =
-        mmcfilters::AttributeComputation::computeAttributes(
+        mmcfilters::AttributeComputation::computeAttributes<Real>(
             morphology::detail::backend(*tree),
             backendAttributes,
             toBackend(outputSpace));
@@ -198,25 +196,53 @@ inline std::pair<py::dict, py::array_t<float>> computeAttributes(
         vectorToNumpyOwned(std::move(buffer), outputSize(*tree, outputSpace), attributeNames.NUM_ATTRIBUTES)};
 }
 
-// Single-attribute convenience wrapper. The backend still returns an
-// AttributeNames object, but only the value vector is part of this Python API.
-inline py::array_t<float> computeSingleAttribute(
+// Compute several attributes or attribute groups and return the pair used by
+// Python: {attribute_name: column_index}, values. The values array is owned by
+// NumPy through vectorToNumpyOwned.
+inline std::pair<py::dict, py::array> computeAttributes(
+    morphology::WeightedTreePtr tree,
+    const std::vector<morphology::AttributeOrGroup>& attributes,
+    morphology::NodeIdSpace outputSpace = morphology::NodeIdSpace::MORPHOLOGICAL_TREE,
+    py::object dtype = py::none())
+{
+    if (parseFloatingDType(std::move(dtype)) == FloatingDType::Float64) {
+        return computeAttributesTyped<double>(std::move(tree), attributes, outputSpace);
+    }
+    return computeAttributesTyped<float>(std::move(tree), attributes, outputSpace);
+}
+
+template <std::floating_point Real>
+py::array computeSingleAttributeTyped(
     morphology::WeightedTreePtr tree,
     morphology::Attribute attribute,
-    morphology::NodeIdSpace outputSpace = morphology::NodeIdSpace::MORPHOLOGICAL_TREE)
+    morphology::NodeIdSpace outputSpace)
 {
     if (!tree) {
         throw py::value_error("invalid WeightedMorphologicalTree");
     }
 
     auto [attributeNames, buffer] =
-        mmcfilters::AttributeComputation::computeSingleAttribute(
+        mmcfilters::AttributeComputation::computeSingleAttribute<Real>(
             morphology::detail::backend(*tree),
             toBackend(attribute),
             toBackend(outputSpace));
     (void)attributeNames;
 
     return vectorToNumpyOwned(std::move(buffer), outputSize(*tree, outputSpace));
+}
+
+// Single-attribute convenience wrapper. The backend still returns an
+// AttributeNames object, but only the value vector is part of this Python API.
+inline py::array computeSingleAttribute(
+    morphology::WeightedTreePtr tree,
+    morphology::Attribute attribute,
+    morphology::NodeIdSpace outputSpace = morphology::NodeIdSpace::MORPHOLOGICAL_TREE,
+    py::object dtype = py::none())
+{
+    if (parseFloatingDType(std::move(dtype)) == FloatingDType::Float64) {
+        return computeSingleAttributeTyped<double>(std::move(tree), attribute, outputSpace);
+    }
+    return computeSingleAttributeTyped<float>(std::move(tree), attribute, outputSpace);
 }
 
 // Register Attribute static methods plus nested Group and Type enums. The
@@ -239,11 +265,13 @@ same objects as ``AttributeType`` and ``AttributeGroup``.
             "tree"_a,
             "attributes"_a,
             "outputSpace"_a = morphology::NodeIdSpace::MORPHOLOGICAL_TREE,
+            "dtype"_a = py::none(),
             R"pbdoc(Compute several attributes or attribute groups for a tree.
 
 Returns:
     ``(attribute_index, values)`` where ``attribute_index`` maps attribute names
-    to columns and ``values`` is a float32 NumPy array. By default rows are
+    to columns and ``values`` is a NumPy array. ``dtype`` accepts ``np.float32``
+    and ``np.float64``; the default is ``np.float32``. By default rows are
     indexed by morphology-tree node slots.
 )pbdoc")
         .def_static(
@@ -252,7 +280,8 @@ Returns:
             "tree"_a,
             "attribute"_a,
             "outputSpace"_a = morphology::NodeIdSpace::MORPHOLOGICAL_TREE,
-            "Compute one scalar attribute and return a 1D float32 NumPy array.")
+            "dtype"_a = py::none(),
+            "Compute one scalar attribute and return a 1D NumPy array.")
         .def_static(
             "describe",
             &describeAttribute,

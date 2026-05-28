@@ -15,9 +15,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <concepts>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
@@ -35,7 +37,45 @@ using namespace pybind11::literals;
 namespace morphology_pybind {
 
 using UInt8InputArray = py::array_t<uint8_t, py::array::c_style | py::array::forcecast>;
-using FloatArray = py::array_t<float, py::array::c_style | py::array::forcecast>;
+
+enum class FloatingDType {
+    Float32,
+    Float64,
+};
+
+// Normalize Python dtype-like objects through NumPy. `None` preserves the
+// historical mtlearn default: float32 attribute buffers.
+inline FloatingDType parseFloatingDType(py::object dtype, std::string_view argumentName = "dtype")
+{
+    if (dtype.is_none()) {
+        return FloatingDType::Float32;
+    }
+
+    py::object numpy = py::module_::import("numpy");
+    py::object normalized = numpy.attr("dtype")(std::move(dtype));
+    const std::string name = py::str(normalized.attr("name")).cast<std::string>();
+    if (name == "float32") {
+        return FloatingDType::Float32;
+    }
+    if (name == "float64") {
+        return FloatingDType::Float64;
+    }
+    throw std::invalid_argument(std::string(argumentName) + " must be np.float32 or np.float64");
+}
+
+inline FloatingDType parseFloatingArrayDType(const py::array& array, std::string_view argumentName)
+{
+    py::object numpy = py::module_::import("numpy");
+    py::object normalized = numpy.attr("dtype")(array.dtype());
+    const std::string name = py::str(normalized.attr("name")).cast<std::string>();
+    if (name == "float32") {
+        return FloatingDType::Float32;
+    }
+    if (name == "float64") {
+        return FloatingDType::Float64;
+    }
+    throw std::invalid_argument(std::string(argumentName) + " must be a 1D np.float32 or np.float64 array");
+}
 
 // Wrap a backend-owned image buffer as a NumPy array. The capsule owns a
 // shared_ptr copy so the backend image memory remains alive for Python even
@@ -79,33 +119,35 @@ inline py::array_t<uint8_t> imageToNumpy(morphology::UInt8Image image)
         freeWhenDone);
 }
 
-// Move an owned std::vector<float> into a NumPy array without copying. The
+// Move an owned std::vector<Real> into a NumPy array without copying. The
 // capsule owns the vector and therefore controls the array's backing storage.
-inline py::array_t<float> vectorToNumpyOwned(std::vector<float>&& buffer, int rows, int cols)
+template <std::floating_point Real>
+py::array_t<Real> vectorToNumpyOwned(std::vector<Real>&& buffer, int rows, int cols)
 {
-    auto* owned = new std::vector<float>(std::move(buffer));
+    auto* owned = new std::vector<Real>(std::move(buffer));
     py::capsule freeWhenDone(owned, [](void* ptr) {
-        delete reinterpret_cast<std::vector<float>*>(ptr);
+        delete reinterpret_cast<std::vector<Real>*>(ptr);
     });
 
-    return py::array_t<float>(
+    return py::array_t<Real>(
         {rows, cols},
-        {static_cast<py::ssize_t>(sizeof(float) * cols), static_cast<py::ssize_t>(sizeof(float))},
+        {static_cast<py::ssize_t>(sizeof(Real) * cols), static_cast<py::ssize_t>(sizeof(Real))},
         owned->data(),
         freeWhenDone);
 }
 
 // One-dimensional overload used by single-attribute computations.
-inline py::array_t<float> vectorToNumpyOwned(std::vector<float>&& buffer, int size)
+template <std::floating_point Real>
+py::array_t<Real> vectorToNumpyOwned(std::vector<Real>&& buffer, int size)
 {
-    auto* owned = new std::vector<float>(std::move(buffer));
+    auto* owned = new std::vector<Real>(std::move(buffer));
     py::capsule freeWhenDone(owned, [](void* ptr) {
-        delete reinterpret_cast<std::vector<float>*>(ptr);
+        delete reinterpret_cast<std::vector<Real>*>(ptr);
     });
 
-    return py::array_t<float>(
+    return py::array_t<Real>(
         {size},
-        {static_cast<py::ssize_t>(sizeof(float))},
+        {static_cast<py::ssize_t>(sizeof(Real))},
         owned->data(),
         freeWhenDone);
 }
@@ -125,14 +167,12 @@ inline morphology::ImageViewUInt8 imageViewFromArray(const UInt8InputArray& inpu
         static_cast<int>(buffer.shape[1])};
 }
 
-// Create a shared_ptr view over a NumPy float array while capturing the Python
-// object as owner. This lets backend APIs consume shared_ptr<float[]> without
-// copying attribute buffers supplied from Python.
-inline std::shared_ptr<float[]> floatArrayView(const FloatArray& input)
+template <std::floating_point Real>
+std::shared_ptr<Real[]> floatingArrayView(const py::array_t<Real, py::array::c_style>& input)
 {
-    return std::shared_ptr<float[]>(
-        static_cast<float*>(input.request().ptr),
-        [owner = py::object(input)](float*) mutable {});
+    return std::shared_ptr<Real[]>(
+        static_cast<Real*>(input.request().ptr),
+        [owner = py::object(input)](Real*) mutable {});
 }
 
 // Validation helpers keep binding errors consistent and fail before backend
@@ -150,6 +190,27 @@ inline void require1DArray(const py::buffer_info& buffer, py::ssize_t expectedSi
                 << ", got " << buffer.shape[0];
         throw std::invalid_argument(message.str());
     }
+}
+
+template <std::floating_point Real>
+py::array_t<Real, py::array::c_style> require1DFloatingArray(
+    py::array input,
+    py::ssize_t expectedSize,
+    std::string_view argumentName)
+{
+    const FloatingDType actualDType = parseFloatingArrayDType(input, argumentName);
+    const FloatingDType expectedDType = std::same_as<Real, double>
+        ? FloatingDType::Float64
+        : FloatingDType::Float32;
+    if (actualDType != expectedDType) {
+        throw std::invalid_argument(std::string(argumentName) + " must be a 1D np.float32 or np.float64 array");
+    }
+    const py::buffer_info buffer = input.request();
+    require1DArray(buffer, expectedSize, argumentName);
+    if (buffer.strides[0] != static_cast<py::ssize_t>(sizeof(Real))) {
+        throw std::invalid_argument(std::string(argumentName) + " must be C-contiguous");
+    }
+    return py::reinterpret_borrow<py::array_t<Real, py::array::c_style>>(input);
 }
 
 template <class T>

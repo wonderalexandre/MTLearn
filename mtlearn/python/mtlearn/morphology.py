@@ -137,33 +137,63 @@ def normalize_tos_interpolation(interpolation=None):
     return _backend.normalize_tos_interpolation(interpolation)
 
 
-def compute_attributes(tree, attributes: Iterable):
+def compute_attributes(
+    tree,
+    attributes: Iterable,
+    *,
+    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
+    dtype=None,
+):
     """Compute several scalar attributes or attribute groups for ``tree``.
 
     Args:
         tree: A tree returned by this module.
         attributes: Iterable containing ``AttributeType`` values,
             ``AttributeGroup`` values, or a mix of both.
+        output_space: Node-id space used by rows of the output buffer.
+        dtype: Optional NumPy-compatible floating dtype. Supported values are
+            ``np.float32`` and ``np.float64``. ``None`` keeps the historical
+            ``np.float32`` default.
 
     Returns:
         ``(attribute_index, values)`` where ``attribute_index`` maps attribute
-        names to output columns and ``values`` is a float32 NumPy array with one
+        names to output columns and ``values`` is a NumPy array with one
         row per node slot in the selected node-id space.
     """
-    return _backend.compute_attributes(tree, attributes)
+    return _backend.compute_attributes(
+        tree,
+        attributes,
+        output_space=output_space,
+        dtype=dtype,
+    )
 
 
-def compute_single_attribute(tree, attribute):
+def compute_single_attribute(
+    tree,
+    attribute,
+    *,
+    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
+    dtype=None,
+):
     """Compute one scalar attribute for ``tree``.
 
     Args:
         tree: A tree returned by this module.
         attribute: One ``AttributeType`` value.
+        output_space: Node-id space used by rows of the output buffer.
+        dtype: Optional NumPy-compatible floating dtype. Supported values are
+            ``np.float32`` and ``np.float64``. ``None`` keeps the historical
+            ``np.float32`` default.
 
     Returns:
-        A 1D float32 NumPy array indexed by morphology-tree node slot.
+        A 1D NumPy array indexed by the selected node-id space.
     """
-    return _backend.compute_single_attribute(tree, attribute)
+    return _backend.compute_single_attribute(
+        tree,
+        attribute,
+        output_space=output_space,
+        dtype=dtype,
+    )
 
 
 def describe_attribute(attribute):

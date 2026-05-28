@@ -167,6 +167,12 @@ def test_morphology_facade_computes_attributes_and_filters():
         morphology.AttributeType.AREA,
         morphology.NodeIdSpace.MORPHOLOGICAL_TREE,
     )
+    single_attr64 = morphology.Attribute.computeSingleAttribute(
+        tree,
+        morphology.AttributeType.AREA,
+        morphology.NodeIdSpace.MORPHOLOGICAL_TREE,
+        np.float64,
+    )
     attribute_filter = morphology.create_attribute_filter(tree)
     filtered = attribute_filter.filteringSubtractiveRule(
         np.ones(attr_values.shape[0], dtype=bool)
@@ -175,6 +181,7 @@ def test_morphology_facade_computes_attributes_and_filters():
     assert "AREA" in attr_index
     assert len(attr_index) > 1
     assert attr_values.shape[0] == single_attr.shape[0]
+    assert single_attr64.dtype == np.float64
     assert filtered.shape == img.shape
 
     area_description = morphology.Attribute.describe(morphology.AttributeType.AREA)
