@@ -32,7 +32,7 @@ __all__ = [
     "ConnectedFilterPreprocessingTreeTraversal",
 ]
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 
 
 def __getattr__(name: str):
