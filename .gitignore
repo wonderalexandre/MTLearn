@@ -1,6 +1,7 @@
 build/
 dist/
 __pycache__/
+mtlearn/python/mtlearn/_version.py
 *.py[cod]
 .DS_Store
 .ipynb_checkpoints/
