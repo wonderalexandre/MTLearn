@@ -33,12 +33,16 @@ class IndexedDatasetWrapper(Dataset):
 
     CFP layers can use the index to build cache keys that remain stable across
     DataLoader batches. The wrapper expects samples shaped like ``(x, y)`` or
-    ``(x, y, ...)`` and returns ``((x, idx), y)``.
+    ``(x, y, ...)`` and returns ``((x, idx + index_offset), y)``.
+
+    ``index_offset`` lets different dataset splits use disjoint cache keys even
+    when their local sample indices all start at zero.
     """
 
-    def __init__(self, base_dataset):
+    def __init__(self, base_dataset, *, index_offset: int = 0):
         """Store the dataset that will be indexed by this wrapper."""
         self.base_dataset = base_dataset
+        self.index_offset = int(index_offset)
 
     def __len__(self):
         """Return the number of samples in the wrapped dataset."""
@@ -57,7 +61,7 @@ class IndexedDatasetWrapper(Dataset):
             y = sample[1]
         else:
             raise ValueError("Dataset samples must be tuples/lists containing at least (x, y).")
-        return (x, idx), y
+        return (x, idx + self.index_offset), y
 
 
 

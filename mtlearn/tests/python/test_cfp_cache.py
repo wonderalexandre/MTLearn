@@ -20,6 +20,7 @@ from mtlearn.layers import (
     load_checkpoint,
     save_checkpoint,
 )
+from mtlearn.layers._helpers import IndexedDatasetWrapper
 
 pytestmark = pytest.mark.integration
 
@@ -34,6 +35,16 @@ def _tiny_dataset_loader(batch_size=2):
     )
     y = torch.tensor([0, 1], dtype=torch.long)
     return DataLoader(TensorDataset(x, y), batch_size=batch_size, shuffle=False)
+
+
+def _clone_stats(stats):
+    return {
+        key: {
+            name: value.clone() if torch.is_tensor(value) else value
+            for name, value in values.items()
+        }
+        for key, values in stats.items()
+    }
 
 
 def _single_area_layer(layer_cls=ConnectedFilterPreprocessingLayer, *, scale_mode="minmax01"):
@@ -114,6 +125,54 @@ def test_build_dataloader_cached_populates_primary_layer_cache():
     assert x.shape == (2, 1, 3, 3)
     assert idx.tolist() == [0, 1]
     assert y.tolist() == [0, 1]
+
+
+def test_indexed_dataset_wrapper_applies_index_offset():
+    dataset = TensorDataset(torch.arange(3, dtype=torch.float32).view(3, 1), torch.arange(3))
+    wrapper = IndexedDatasetWrapper(dataset, index_offset=100)
+
+    (x, idx), y = wrapper[2]
+
+    assert x.item() == 2.0
+    assert idx == 102
+    assert y.item() == 2
+
+
+def test_build_dataloader_cached_fixed_stats_keeps_stats_unchanged():
+    layer = _single_area_layer(scale_mode="minmax01")
+    layer.build_dataloader_cached(_tiny_dataset_loader())
+    stats_epoch = layer._stats_epoch
+    stats_before = _clone_stats(layer._ds_stats)
+
+    eval_loader = layer.build_dataloader_cached_fixed_stats(
+        _tiny_dataset_loader(),
+        index_offset=100,
+    )
+
+    assert layer._stats_epoch == stats_epoch
+    assert set(layer._tree_info) == {"0_0", "1_0", "100_0", "101_0"}
+    assert layer._norm_epoch_by_key["100_0"] == stats_epoch
+    assert layer._norm_epoch_by_key["101_0"] == stats_epoch
+
+    for stat_key, values in stats_before.items():
+        for name, before in values.items():
+            after = layer._ds_stats[stat_key][name]
+            if torch.is_tensor(before):
+                assert torch.equal(after, before)
+            else:
+                assert after == before
+
+    ((x, idx), y) = next(iter(eval_loader))
+    assert x.shape == (2, 1, 3, 3)
+    assert idx.tolist() == [100, 101]
+    assert y.tolist() == [0, 1]
+
+
+def test_build_dataloader_cached_fixed_stats_rejects_missing_stats():
+    layer = _single_area_layer(scale_mode="minmax01")
+
+    with pytest.raises(RuntimeError, match="fixed dataset statistics"):
+        layer.build_dataloader_cached_fixed_stats(_tiny_dataset_loader(), index_offset=100)
 
 
 def test_cached_forward_matches_uncached_forward_with_same_parameters():

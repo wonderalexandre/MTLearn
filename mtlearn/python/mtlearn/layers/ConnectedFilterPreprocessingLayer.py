@@ -642,17 +642,44 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             "valuation_increments": valuation_increments,
         }
 
-    def _ensure_tree_payload_cached(self, base_key: str, img_t: torch.Tensor, tree_key: str) -> None:
+    def _ensure_tree_payload_cached(
+        self,
+        base_key: str,
+        img_t: torch.Tensor,
+        tree_key: str,
+        *,
+        update_stats: bool = True,
+    ) -> None:
         if base_key in self._tree_info and tree_key in self._tree_info[base_key]:
             return
 
         img_np = self._to_numpy_u8(img_t.detach())
-        payload = self._compute_tree_payload(img_np, tree_key, update_stats=True)
+        payload = self._compute_tree_payload(img_np, tree_key, update_stats=update_stats)
         self._tree_info.setdefault(base_key, {})[tree_key] = payload["info"]
         self._base_attrs.setdefault(base_key, {})[tree_key] = payload["base_attrs"]
         self._norm_attrs.setdefault(base_key, {})[tree_key] = payload["norm_attrs"]
         self._valuation_increments.setdefault(base_key, {})[tree_key] = payload["valuation_increments"]
         self._norm_epoch_by_key[base_key] = self._stats_epoch
+
+    def _require_fixed_dataset_stats(self) -> None:
+        if self.scale_mode == "none":
+            return
+
+        missing = []
+        for tree_key, attr_types in self._scoring_attrs_by_tree_key.items():
+            for attr_type in attr_types:
+                stat_key = self._stat_key(tree_key, attr_type)
+                if stat_key not in self._ds_stats:
+                    missing.append(stat_key)
+
+        if missing:
+            shown = ", ".join(missing[:3])
+            suffix = "" if len(missing) <= 3 else f", ... ({len(missing)} total)"
+            raise RuntimeError(
+                "build_dataloader_cached_fixed_stats(...) requires fixed dataset statistics. "
+                "Call build_dataloader_cached(...) on the training split or load_stats(...) first. "
+                f"Missing stats: {shown}{suffix}"
+            )
 
     def _maybe_refresh_norm_for_key(self, base_key: str) -> None:
         if base_key not in self._base_attrs:
@@ -1227,6 +1254,47 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
 
         self.freeze_ds_stats()
         self.refresh_cached_normalization()
+        return new_loader
+
+    def build_dataloader_cached_fixed_stats(self, dataloader, *, index_offset: int = 0):
+        """Wrap a DataLoader and precompute CFP caches without updating stats.
+
+        Use this for validation/test splits after training statistics have been
+        built with ``build_dataloader_cached(...)`` or restored with
+        ``load_stats(...)``. The returned DataLoader yields
+        ``((x, idx + index_offset), y)`` so callers can keep split cache keys
+        disjoint.
+        """
+        from torch.utils.data import DataLoader
+
+        self._require_fixed_dataset_stats()
+
+        dataset_wrapped = IndexedDatasetWrapper(dataloader.dataset, index_offset=index_offset)
+        new_loader = DataLoader(
+            dataset_wrapped,
+            batch_size=dataloader.batch_size,
+            shuffle=False,
+            num_workers=dataloader.num_workers,
+            pin_memory=dataloader.pin_memory,
+            drop_last=False,
+            collate_fn=dataloader.collate_fn,
+            persistent_workers=getattr(dataloader, "persistent_workers", False),
+        )
+
+        with torch.no_grad():
+            for (x, idx), _ in new_loader:
+                B, C, _, _ = x.shape
+                for b in range(B):
+                    for c in range(C):
+                        base_key = f"{int(idx[b])}_{c}"
+                        for tree_key in self._tree_spec_by_key:
+                            self._ensure_tree_payload_cached(
+                                base_key,
+                                x[b, c],
+                                tree_key,
+                                update_stats=False,
+                            )
+
         return new_loader
 
 
