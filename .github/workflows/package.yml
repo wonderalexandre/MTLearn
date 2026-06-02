@@ -97,12 +97,7 @@ jobs:
           python -m venv --system-site-packages .venv-install
           .venv-install/bin/python -m pip install --upgrade pip
           .venv-install/bin/python -m pip install --no-deps --force-reinstall dist/mtlearn-*.whl
-          version="$(python - <<'PY'
-          import tomllib
-          from pathlib import Path
-          print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])
-          PY
-          )"
+          version="$(python scripts/resolve_package_version.py)"
           .venv-install/bin/python scripts/smoke_test_release.py --expected-version "${version}"
 
       - name: Upload distributions

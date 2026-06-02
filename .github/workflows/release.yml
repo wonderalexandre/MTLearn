@@ -34,24 +34,20 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Install version dependency
+        run: python -m pip install "setuptools-scm>=8"
+
       - name: Validate tag and package version
         id: version
         shell: bash
         run: |
-          package_version="$(python - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          metadata = tomllib.loads(Path("pyproject.toml").read_text())
-          print(metadata["project"]["version"])
-          PY
-          )"
+          package_version="$(python scripts/resolve_package_version.py)"
           echo "package-version=${package_version}" >> "${GITHUB_OUTPUT}"
 
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             tag_version="${GITHUB_REF_NAME#v}"
             if [[ "${tag_version}" != "${package_version}" ]]; then
-              echo "::error::Tag ${GITHUB_REF_NAME} does not match pyproject.toml version ${package_version}."
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match resolved package version ${package_version}."
               exit 1
             fi
           fi

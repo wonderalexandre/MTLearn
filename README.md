@@ -51,6 +51,8 @@ pip install mtlearn
 See [docs/installation.md](docs/installation.md) for installation instructions
 and [docs/development.md](docs/development.md) for source builds, validation,
 and releases.
+For the public scalar attribute and group catalog, see
+[docs/source/concepts/attributes.md](docs/source/concepts/attributes.md).
 
 ## Quick Start
 

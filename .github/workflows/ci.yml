@@ -124,14 +124,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          package_version="$(python - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          metadata = tomllib.loads(Path("pyproject.toml").read_text())
-          print(metadata["project"]["version"])
-          PY
-          )"
+          package_version="$(python scripts/resolve_package_version.py)"
 
           required_torch_versions=(2.10.0 2.11.0)
           candidate_torch_versions=(2.12.0)
