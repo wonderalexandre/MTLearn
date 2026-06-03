@@ -85,15 +85,24 @@ external/MorphologicalAttributeFilters
 
 ## Editable Install
 
+For local development, start from an environment that already has the PyTorch
+build you want to use. This is especially important for CUDA environments,
+where `torch`, `torchvision`, and `torchaudio` must use matching wheel builds.
+
+The release dependency helper installs the minimum supported CPU Torch build by
+default on Linux. Use `--torch none` to keep the active environment's PyTorch
+installation intact:
+
 ```bash
-python scripts/install_release_dependencies.py --build-tools
-pip install -e .
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e . --no-build-isolation --no-deps
 ```
 
 For notebooks from a source checkout:
 
 ```bash
-pip install -e ".[notebooks]"
+pip install ipykernel matplotlib "nbformat>=5" "papermill>=2.4"
+pip install -e . --no-build-isolation --no-deps
 ```
 
 ## Next Steps

@@ -21,13 +21,44 @@ Source builds require a working native build environment:
 build toolchain. Python bindings currently expose Torch tensors, so building the
 Python extension also requires Torch support.
 
+Documentation builds additionally use Doxygen and the `docs` optional Python
+dependencies:
+
+```bash
+pip install "breathe>=4.35" "myst-parser>=2" "sphinx>=7" "sphinx-autodoc-typehints>=1.25"
+```
+
+## Local Dependency Setup
+
+Install the PyTorch build you intend to use before building `mtlearn`. For CUDA
+environments, keep `torch`, `torchvision`, and `torchaudio` on matching wheel
+builds from the same PyTorch index.
+
+The release dependency helper defaults to the minimum supported Torch version.
+On Linux, that default is a CPU wheel and can replace an existing CUDA Torch
+installation. For everyday development in an environment that already has the
+right Torch build, preserve it with `--torch none`:
+
+```bash
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e . --no-build-isolation --no-deps
+```
+
+Use the helper without `--torch none` only when you explicitly want the
+minimum-supported CPU Torch build used by release checks. Use `--no-deps` on
+local `mtlearn` installs when preserving an existing Torch stack; otherwise pip
+may replace a newer or CUDA-enabled Torch build to satisfy package metadata.
+
 ## Wheel Build
 
 ```bash
-python scripts/install_release_dependencies.py --build-tools
-python -m build --wheel
-python -m pip install dist/mtlearn-*.whl
+python scripts/install_release_dependencies.py --build-tools --torch none
+python -m build --wheel --no-isolation
+python -m pip install dist/mtlearn-*.whl --no-deps
 ```
+
+This wheel build path assumes PyTorch is already installed in the active
+environment as described above.
 
 The `mtlearn` Python package uses the native `_mtlearn` extension. The top-level
 `mmcfilters` Python package is not a runtime dependency of `mtlearn`.
@@ -77,9 +108,59 @@ python -c "import torch"
   Default: `OFF`.
 - `MTLEARN_ENABLE_ASSERTS`: keep runtime assertions enabled in core C++ code.
   Default: `OFF`.
+- `MTLEARN_ENABLE_DOC_TARGETS`: add mtlearn-specific Doxygen documentation
+  targets. Default: `ON`.
 
 `MTLEARN_BUILD_PYTHON=ON` currently requires `MTLEARN_WITH_TORCH=ON` because the
 bindings expose Torch tensors.
+
+## Documentation Builds
+
+The root project exposes mtlearn-specific Doxygen targets when Doxygen is
+available. Target names are prefixed with `mtlearn_` so they do not collide
+with backend documentation targets.
+
+```bash
+cmake -S . -B build-docs \
+      -DMTLEARN_BUILD_PYTHON=OFF \
+      -DMTLEARN_WITH_TORCH=OFF \
+      -DMTLEARN_ENABLE_DOC_TARGETS=ON
+cmake --build build-docs --target mtlearn_docs_cpp_public
+cmake --build build-docs --target mtlearn_docs_cpp_internal
+```
+
+Generated files are written below:
+
+```text
+build-docs/docs/mtlearn/public
+build-docs/docs/mtlearn/internal
+```
+
+The public target documents the installed C++ facade in
+`mtlearn/morphology.hpp`. The internal target also includes implementation and
+binding sources for contributor-oriented navigation.
+
+The Sphinx site combines Python autodoc pages with the Doxygen XML consumed
+through Breathe:
+
+```bash
+cmake --build build-docs --target mtlearn_docs_site
+```
+
+If `sphinx-build` is not on `PATH`, run it directly after generating the public
+Doxygen XML:
+
+```bash
+MTLEARN_DOXYGEN_XML="$PWD/build-docs/docs/mtlearn/public/xml" \
+PYTHONPATH="$PWD/mtlearn/python" \
+python -m sphinx -W -b html docs/source build-docs/docs/mtlearn/site
+```
+
+The generated site is written to:
+
+```text
+build-docs/docs/mtlearn/site
+```
 
 ## Public API Notes
 
@@ -107,7 +188,8 @@ target_link_libraries(my_target PRIVATE mtlearn::core)
 ### Direct Python Tests
 
 ```bash
-pip install -e ".[test]"
+pip install "pytest>=8"
+pip install -e . --no-build-isolation --no-deps
 PYTHONPATH=mtlearn/python:build/mtlearn/bindings python -m pytest -q -m "not gradcheck" mtlearn/tests/python
 PYTHONPATH=mtlearn/python:build/mtlearn/bindings python -m pytest -q -m gradcheck mtlearn/tests/python
 ```
@@ -124,7 +206,8 @@ git diff --check
 From a source checkout with a local CMake build:
 
 ```bash
-pip install -e ".[notebooks]"
+pip install ipykernel matplotlib "nbformat>=5" "papermill>=2.4"
+pip install -e . --no-build-isolation --no-deps
 python scripts/validate_notebooks.py --bindings-dir build/mtlearn/bindings
 ```
 
