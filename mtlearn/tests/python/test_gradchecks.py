@@ -125,6 +125,37 @@ def test_implicit_jacobian_function_gradcheck():
     assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)
 
 
+def test_implicit_jacobian_function_gradcheck_with_preserved_root():
+    tree, attributes = _small_gradcheck_case(torch.float64)
+    residues, tpre, tpost, parent, node_of_pixel = (
+        mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+    )
+    residues = residues.to(dtype=torch.float64)
+    weight, bias = _learnable_parameters(torch.float64)
+
+    def filtered_mean(w, b):
+        return mtlearn.layers.ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
+            w,
+            b,
+            residues,
+            tpre,
+            tpost,
+            parent,
+            node_of_pixel,
+            attributes,
+            tree.numRows,
+            tree.numCols,
+            2.0,
+            None,
+            None,
+            None,
+            None,
+            True,
+        ).mean()
+
+    assert gradcheck(filtered_mean, (weight, bias), eps=1e-6, atol=1e-4)
+
+
 @pytest.mark.parametrize(
     ("clamp_min", "clamp_max"),
     [

@@ -106,7 +106,25 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         return grad_nodes
 
     @staticmethod
-    def forward(ctx, weight, bias, residues, tpre, tpost, parent, node_of_pixel, attrs2d, numRows: int, numCols: int, beta_f: float = 1.0, clamp_min=None, clamp_max=None, order_forward=None, order_backward=None):
+    def forward(
+        ctx,
+        weight,
+        bias,
+        residues,
+        tpre,
+        tpost,
+        parent,
+        node_of_pixel,
+        attrs2d,
+        numRows: int,
+        numCols: int,
+        beta_f: float = 1.0,
+        clamp_min=None,
+        clamp_max=None,
+        order_forward=None,
+        order_backward=None,
+        preserve_root: bool = False,
+    ):
         """Apply the connected filter using implicit reconstruction metadata.
 
         Args:
@@ -123,6 +141,7 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
                 before sigmoid.
             order_forward: optional cached order for forward reconstruction.
             order_backward: optional cached order for gradient propagation.
+            preserve_root: Whether to force the root-node gate to one.
 
         Returns:
             Filtered image with shape ``(numRows, numCols)``.
@@ -142,6 +161,10 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         else:
             clamp_mask = torch.ones_like(s, dtype=torch.bool)
         sigmoid = torch.sigmoid(s)
+        if preserve_root:
+            node_ids = torch.arange(parent.numel(), device=parent.device)
+            root_mask = (parent == node_ids) & (tpost > tpre)
+            sigmoid = torch.where(root_mask, torch.ones_like(sigmoid), sigmoid)
 
         # Implicit reconstruction from filtered node residues to pixels.
         filtered_res = residues * sigmoid
@@ -197,7 +220,8 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
             None,        # clamp_min
             None,        # clamp_max
             None,        # order_forward
-            None         # order_backward
+            None,        # order_backward
+            None         # preserve_root
         )
 
 
@@ -234,6 +258,8 @@ class _NormalizedFilterSpec:
     attributes: tuple[Any, ...]
     valuation: CFPValuation
     valuation_key: str
+    preserve_root: bool
+    monotonicity_weight: float
     tos_interpolation: Any
     tos_infinity_seed_row: int
     tos_infinity_seed_col: int
@@ -292,6 +318,15 @@ def _normalize_clamp(value: Any) -> tuple[float, float] | None:
             raise ValueError("clamp bounds must satisfy min < max.")
         return (clamp_min, clamp_max)
     raise TypeError("clamp must be None, a positive scalar, or a (min, max) pair.")
+
+
+def _normalize_nonnegative_scalar(value: Any, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} must be a non-negative finite scalar.")
+    scalar = float(value)
+    if not math.isfinite(scalar) or scalar < 0.0:
+        raise ValueError(f"{name} must be a non-negative finite scalar.")
+    return scalar
 
 
 def _normalize_attribute_dtype(value: Any) -> np.dtype:
@@ -372,8 +407,9 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             in_channels: Number of input image channels expected by ``forward``.
             filter_specs: Iterable of mappings. Each mapping must define
                 ``tree_type`` and ``attributes`` and may define ``name``,
-                ``valuation``, ``tos_interpolation``,
-                ``tos_infinity_seed_row``, and ``tos_infinity_seed_col``.
+                ``valuation``, ``preserve_root``, ``monotonicity_weight``,
+                ``tos_interpolation``, ``tos_infinity_seed_row``, and
+                ``tos_infinity_seed_col``.
                 One output channel is produced for each input channel and each
                 filter spec.
             device: Device used for CFP tensors and trainable parameters.
@@ -518,6 +554,11 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                     attributes=tuple(attributes),
                     valuation=valuation,
                     valuation_key=_valuation_key(valuation),
+                    preserve_root=bool(raw_spec.get("preserve_root", False)),
+                    monotonicity_weight=_normalize_nonnegative_scalar(
+                        raw_spec.get("monotonicity_weight", 0.0),
+                        "monotonicity_weight",
+                    ),
                     tos_interpolation=spec_tos_interpolation,
                     tos_infinity_seed_row=spec_tos_infinity_seed_row,
                     tos_infinity_seed_col=spec_tos_infinity_seed_col,
@@ -696,18 +737,73 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self._norm_attrs[base_key] = refreshed
         self._norm_epoch_by_key[base_key] = self._stats_epoch
 
-    def _apply_spec(self, spec: _NormalizedFilterSpec, info, norm_attrs, valuation_increments, beta_f):
+    def _normalized_attribute_matrix(self, spec: _NormalizedFilterSpec, norm_attrs, *, dtype: torch.dtype):
+        cols = [norm_attrs[attr_type].view(-1, 1).to(dtype=dtype, device=self.device) for attr_type in spec.attributes]
+        return torch.cat(cols, dim=1)
+
+    def _gate_scores(self, spec: _NormalizedFilterSpec, info, norm_attrs) -> torch.Tensor:
         weight = self._weights[spec.key]
         bias = self._biases[spec.key]
+        attrs2d = self._normalized_attribute_matrix(spec, norm_attrs, dtype=weight.dtype)
+        logits = attrs2d @ weight.view(-1) + bias
+        s = self.beta_f * logits
+        if self.clamp is not None:
+            s = torch.clamp(s, self.clamp[0], self.clamp[1])
+        scores = torch.sigmoid(s)
+        if spec.preserve_root:
+            parent = info["parent"]
+            node_ids = torch.arange(parent.numel(), device=parent.device)
+            root_mask = (parent == node_ids) & (info["tpost"] > info["tpre"])
+            scores = torch.where(root_mask, torch.ones_like(scores), scores)
+        return scores
+
+    def _monotonicity_penalty_for_spec(self, spec: _NormalizedFilterSpec, info, norm_attrs) -> torch.Tensor:
+        scores = self._gate_scores(spec, info, norm_attrs)
+        parent = info["parent"]
+        node_ids = torch.arange(parent.numel(), device=parent.device)
+        alive = info["tpost"] > info["tpre"]
+        parent_alive = alive[parent]
+        edge_mask = alive & parent_alive & (parent != node_ids)
+        if not bool(edge_mask.any().item()):
+            return scores.sum() * 0.0
+
+        violations = torch.relu(scores[edge_mask] - scores[parent[edge_mask]])
+        return float(spec.monotonicity_weight) * violations.square().mean()
+
+    def _zero_parameter_penalty(self) -> torch.Tensor:
+        parameter = next(self.parameters())
+        return parameter.sum() * 0.0
+
+    def _get_tree_payload_for_sample(self, base_key: str, img_ch: torch.Tensor, spec: _NormalizedFilterSpec, direct_payloads, *, use_cache: bool):
+        if use_cache:
+            self._ensure_tree_payload_cached(base_key, img_ch, spec.tree_key)
+            self._maybe_refresh_norm_for_key(base_key)
+            return (
+                self._tree_info[base_key][spec.tree_key],
+                self._norm_attrs[base_key][spec.tree_key],
+                self._valuation_increments[base_key][spec.tree_key],
+            )
+
+        if spec.tree_key not in direct_payloads:
+            img_np = self._to_numpy_u8(img_ch.detach())
+            direct_payloads[spec.tree_key] = self._compute_tree_payload(
+                img_np,
+                spec.tree_key,
+                update_stats=False,
+            )
+        payload = direct_payloads[spec.tree_key]
+        return payload["info"], payload["norm_attrs"], payload["valuation_increments"]
+
+    def _apply_spec(self, spec: _NormalizedFilterSpec, info, norm_attrs, valuation_increments, beta_f):
+        weight = self._weights[spec.key]
         dtype = weight.dtype
         clamp_min, clamp_max = self.clamp if self.clamp is not None else (None, None)
 
-        cols = [norm_attrs[attr_type].view(-1, 1).to(dtype=dtype, device=self.device) for attr_type in spec.attributes]
-        A_norm = torch.cat(cols, dim=1)
+        A_norm = self._normalized_attribute_matrix(spec, norm_attrs, dtype=dtype)
         increments = valuation_increments[spec.valuation_key].to(dtype=dtype, device=self.device)
         y_ch = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
             weight,
-            bias,
+            self._biases[spec.key],
             increments,
             info["tpre"],
             info["tpost"],
@@ -721,6 +817,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             clamp_max,
             info["order_forward"],
             info["order_backward"],
+            spec.preserve_root,
         )
 
         if not _is_altitude_tophat_valuation(spec.valuation):
@@ -771,24 +868,13 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 base_key = f"{int(idx[b])}_{c}"
                 direct_payloads = {}
                 for spec in self.filter_specs:
-                    if use_cache:
-                        self._ensure_tree_payload_cached(base_key, x[b, c], spec.tree_key)
-                        self._maybe_refresh_norm_for_key(base_key)
-                        info = self._tree_info[base_key][spec.tree_key]
-                        norm_attrs = self._norm_attrs[base_key][spec.tree_key]
-                        valuation_increments = self._valuation_increments[base_key][spec.tree_key]
-                    else:
-                        if spec.tree_key not in direct_payloads:
-                            img_np = self._to_numpy_u8(x[b, c].detach())
-                            direct_payloads[spec.tree_key] = self._compute_tree_payload(
-                                img_np,
-                                spec.tree_key,
-                                update_stats=False,
-                            )
-                        payload = direct_payloads[spec.tree_key]
-                        info = payload["info"]
-                        norm_attrs = payload["norm_attrs"]
-                        valuation_increments = payload["valuation_increments"]
+                    info, norm_attrs, valuation_increments = self._get_tree_payload_for_sample(
+                        base_key,
+                        x[b, c],
+                        spec,
+                        direct_payloads,
+                        use_cache=use_cache,
+                    )
 
                     y_out = self._apply_spec(
                         spec,
@@ -799,6 +885,41 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                     )
                     out[b, c * self.num_specs + spec.index].copy_(y_out, non_blocking=True)
         return out
+
+    def monotonicity_penalty(self, x: torch.Tensor) -> torch.Tensor:
+        """Return the per-spec monotonicity regularization for CFP gates.
+
+        Specs with ``monotonicity_weight=0.0`` are skipped. Callers must add
+        the returned scalar to their training objective explicitly; this method
+        never changes ``forward`` outputs or legacy training code.
+        """
+        x, idx, use_cache = self._batch_input(x)
+        assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
+        B, C, _, _ = x.shape
+        assert C == self.in_channels, f"in_channels={self.in_channels}, input C={C}"
+
+        active_specs = [spec for spec in self.filter_specs if spec.monotonicity_weight > 0.0]
+        if not active_specs:
+            return self._zero_parameter_penalty()
+        num_applications = B * C
+        if num_applications == 0:
+            return self._zero_parameter_penalty()
+
+        penalty = self._zero_parameter_penalty()
+        for b in range(B):
+            for c in range(C):
+                base_key = f"{int(idx[b])}_{c}"
+                direct_payloads = {}
+                for spec in active_specs:
+                    info, norm_attrs, _ = self._get_tree_payload_for_sample(
+                        base_key,
+                        x[b, c],
+                        spec,
+                        direct_payloads,
+                        use_cache=use_cache,
+                    )
+                    penalty = penalty + self._monotonicity_penalty_for_spec(spec, info, norm_attrs)
+        return penalty / float(num_applications)
 
     def predict(self, x: torch.Tensor, beta_f: float = 1000.0) -> torch.Tensor:
         """Run inference with a caller-provided sigmoid gain.
@@ -1089,6 +1210,13 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             restored["name"] = spec["name"]
         if "valuation" in spec:
             restored["valuation"] = cls._valuation_from_config(spec["valuation"])
+        if "preserve_root" in spec:
+            restored["preserve_root"] = bool(spec["preserve_root"])
+        if "monotonicity_weight" in spec:
+            restored["monotonicity_weight"] = _normalize_nonnegative_scalar(
+                spec["monotonicity_weight"],
+                "monotonicity_weight",
+            )
         tos_interpolation = spec.get("tos_interpolation", None)
         if tos_interpolation is not None:
             restored["tos_interpolation"] = cls._tos_interpolation_from_name(tos_interpolation)
@@ -1153,6 +1281,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 "kind": spec.valuation.kind,
                 "attribute": None if _uses_altitude_signal(spec.valuation) else _enum_name(spec.valuation.attribute),
             },
+            "preserve_root": spec.preserve_root,
+            "monotonicity_weight": spec.monotonicity_weight,
             "tos_interpolation": tos_interpolation,
             "tos_infinity_seed_row": spec.tos_infinity_seed_row,
             "tos_infinity_seed_col": spec.tos_infinity_seed_col,
@@ -1175,6 +1305,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 "attribute": valuation_attribute,
             },
             "valuation_key": spec.valuation_key,
+            "preserve_root": spec.preserve_root,
+            "monotonicity_weight": spec.monotonicity_weight,
             "tos_interpolation": tos_interpolation,
             "tos_infinity_seed_row": spec.tos_infinity_seed_row,
             "tos_infinity_seed_col": spec.tos_infinity_seed_col,

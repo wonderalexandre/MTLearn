@@ -348,6 +348,159 @@ def test_filter_spec_defaults_to_filtered_altitude_valuation():
     assert layer.filter_specs[0].valuation == CFPValuation.ALTITUDE
 
 
+def test_preserve_root_defaults_to_false_and_roundtrips_in_config():
+    layer = _single_area_layer()
+
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+
+    assert not hasattr(layer, "preserve_root")
+    assert "preserve_root" not in layer.get_config()
+    assert "preserve_root" not in layer.get_weight_contract()
+    assert layer.filter_specs[0].preserve_root is False
+    assert layer.get_config()["filter_specs"][0]["preserve_root"] is False
+    assert restored.filter_specs[0].preserve_root is False
+    assert restored.get_weight_contract() == layer.get_weight_contract()
+
+
+def test_monotonicity_weight_defaults_to_zero_and_roundtrips_in_config():
+    layer = _single_area_layer()
+
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+
+    assert not hasattr(layer, "monotonicity_weight")
+    assert "monotonicity_weight" not in layer.get_config()
+    assert "monotonicity_weight" not in layer.get_weight_contract()
+    assert layer.filter_specs[0].monotonicity_weight == 0.0
+    assert layer.get_config()["filter_specs"][0]["monotonicity_weight"] == 0.0
+    assert restored.filter_specs[0].monotonicity_weight == 0.0
+    assert restored.get_weight_contract() == layer.get_weight_contract()
+
+
+@pytest.mark.parametrize(
+    "monotonicity_weight",
+    [True, False, -1.0, float("nan"), float("inf"), "1", object()],
+)
+def test_filter_spec_rejects_invalid_monotonicity_weight(monotonicity_weight):
+    with pytest.raises((TypeError, ValueError), match="monotonicity_weight"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "monotonicity_weight": monotonicity_weight,
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+        )
+
+
+def test_monotonicity_penalty_defaults_to_zero_without_building_payload():
+    layer = _single_area_layer()
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.monotonicity_penalty(image)
+
+    assert penalty.item() == 0.0
+    assert penalty.requires_grad
+    assert layer._tree_info == {}
+
+
+def test_monotonicity_penalty_is_positive_and_backpropagates_when_enabled():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "monotonicity_weight": 2.0,
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    with torch.no_grad():
+        layer._weights["spec_000"].fill_(-4.0)
+        layer._biases["spec_000"].zero_()
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.monotonicity_penalty(image)
+    penalty.backward()
+
+    assert penalty.item() > 0.0
+    assert torch.isfinite(layer._weights["spec_000"].grad).all()
+    assert torch.isfinite(layer._biases["spec_000"].grad).all()
+    assert layer._weights["spec_000"].grad.abs().sum().item() > 0.0
+
+
+def test_monotonicity_weight_is_not_layer_level_option():
+    with pytest.raises(TypeError, match="monotonicity_weight"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+            monotonicity_weight=1.0,
+        )
+
+
+def test_preserve_root_is_not_layer_level_option():
+    with pytest.raises(TypeError, match="preserve_root"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+            preserve_root=True,
+        )
+
+
+def test_preserve_root_keeps_constant_image_when_enabled():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "preserve_root": True,
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+        beta_f=1.0,
+        clamp=None,
+    )
+    assert layer.filter_specs[0].preserve_root is True
+    assert layer.get_config()["filter_specs"][0]["preserve_root"] is True
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+    assert restored.filter_specs[0].preserve_root is True
+    with torch.no_grad():
+        layer._weights["spec_000"].zero_()
+        layer._biases["spec_000"].zero_()
+    image = torch.full((1, 1, 2, 2), 7.0, dtype=torch.float32)
+
+    output = layer(image)
+
+    assert torch.allclose(output, image)
+
+
 def test_filter_specs_can_mix_tree_types_and_valuations():
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
@@ -425,6 +578,7 @@ def test_save_params_includes_filter_specs_metadata(tmp_path):
                     morphology.AttributeType.AREA,
                     morphology.AttributeType.COMPACTNESS,
                 ),
+                "monotonicity_weight": 0.25,
             },
             {
                 "name": "tos_boundary",
@@ -432,6 +586,7 @@ def test_save_params_includes_filter_specs_metadata(tmp_path):
                 "attributes": (morphology.AttributeGroup.BOUNDARY,),
                 "valuation": CFPValuation.ALTITUDE_TOPHAT,
                 "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
+                "preserve_root": True,
             },
             {
                 "tree_type": morphology.TreeType.MAX_TREE,
@@ -451,6 +606,10 @@ def test_save_params_includes_filter_specs_metadata(tmp_path):
     assert "filter_specs" in payload
     assert payload["clamp"] == [-8.0, 10.0]
     assert payload["weight_contract"] == layer.get_weight_contract()
+    assert "preserve_root" not in payload["config"]
+    assert "preserve_root" not in payload["weight_contract"]
+    assert "monotonicity_weight" not in payload["config"]
+    assert "monotonicity_weight" not in payload["weight_contract"]
     assert set(payload["weights"]) == {"area_compactness", "tos_boundary", "spec_002"}
     assert payload["filter_specs"][0]["key"] == "area_compactness"
     assert payload["filter_specs"][0]["name"] == "area_compactness"
@@ -458,18 +617,28 @@ def test_save_params_includes_filter_specs_metadata(tmp_path):
     assert payload["filter_specs"][0]["attributes"] == ["AREA", "COMPACTNESS"]
     assert payload["filter_specs"][0]["valuation"]["kind"] == "altitude"
     assert payload["filter_specs"][0]["valuation"]["attribute"] == "ALTITUDE"
+    assert payload["filter_specs"][0]["preserve_root"] is False
+    assert payload["filter_specs"][0]["monotonicity_weight"] == pytest.approx(0.25)
     assert payload["filter_specs"][1]["key"] == "tos_boundary"
     assert payload["filter_specs"][1]["name"] == "tos_boundary"
     assert payload["filter_specs"][1]["tree_type"] == "tree-of-shapes"
     assert payload["filter_specs"][1]["valuation"]["kind"] == "altitude_tophat"
     assert payload["filter_specs"][1]["valuation"]["attribute"] == "ALTITUDE"
+    assert payload["filter_specs"][1]["preserve_root"] is True
+    assert payload["filter_specs"][1]["monotonicity_weight"] == 0.0
     assert payload["filter_specs"][1]["tos_interpolation"] == "Min8cMax4c"
     assert payload["filter_specs"][2]["key"] == "spec_002"
     assert payload["filter_specs"][2]["name"] == "spec_002"
     assert payload["filter_specs"][2]["valuation"]["kind"] == "node_attribute"
     assert payload["filter_specs"][2]["valuation"]["attribute"] == "MEAN_LEVEL"
+    assert payload["filter_specs"][2]["preserve_root"] is False
+    assert payload["filter_specs"][2]["monotonicity_weight"] == 0.0
     assert payload["config"]["clamp"] == [-8.0, 10.0]
     assert payload["config"]["filter_specs"][0]["name"] == "area_compactness"
+    assert payload["config"]["filter_specs"][0]["preserve_root"] is False
+    assert payload["config"]["filter_specs"][0]["monotonicity_weight"] == pytest.approx(0.25)
+    assert payload["config"]["filter_specs"][1]["preserve_root"] is True
+    assert payload["config"]["filter_specs"][1]["monotonicity_weight"] == 0.0
     assert payload["config"]["filter_specs"][1]["tos_interpolation"] == "Min8cMax4c"
 
     alias_path = tmp_path / "params_alias.pt"
@@ -490,6 +659,7 @@ def test_get_config_and_from_config_reconstruct_layer_contract():
                     morphology.AttributeType.COMPACTNESS,
                 ),
                 "valuation": CFPValuation.node_attribute(morphology.AttributeType.VARIANCE_LEVEL),
+                "monotonicity_weight": 0.125,
             },
             {
                 "name": "tos_tophat",
@@ -516,6 +686,7 @@ def test_get_config_and_from_config_reconstruct_layer_contract():
     assert restored.get_weight_contract() == layer.get_weight_contract()
     assert restored.out_channels == layer.out_channels
     assert set(restored._weights) == {"variance_max", "tos_tophat"}
+    assert restored.filter_specs[0].monotonicity_weight == pytest.approx(0.125)
 
 
 def test_forward_orders_outputs_by_input_channel_then_filter_spec(monkeypatch):
