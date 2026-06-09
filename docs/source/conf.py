@@ -19,10 +19,25 @@ if build_bindings.exists():
 
 project = "MTLearn"
 author = "Wonder Alexandre Luz Alves"
-release = "1.0.6"
+
+
+def _resolve_release() -> str:
+    try:
+        from setuptools_scm import get_version
+
+        return get_version(
+            root=ROOT,
+            version_scheme="post-release",
+            local_scheme="no-local-version",
+            tag_regex=r"^v?(?P<version>\d+\.\d+\.\d+(?:[.-].*)?)$",
+        )
+    except Exception:
+        return os.environ.get("MTLEARN_DOCS_VERSION", "0+unknown")
+
+
+release = _resolve_release()
 
 extensions = [
-    "breathe",
     "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
@@ -50,6 +65,7 @@ autodoc_default_options = {
     "show-inheritance": True,
 }
 
+
 def _has_importable_spec(module_name: str) -> bool:
     try:
         return find_spec(module_name) is not None
@@ -70,13 +86,5 @@ if not _has_importable_spec("cv2"):
 if not _has_importable_spec("_mtlearn"):
     autodoc_mock_imports.extend(["_mtlearn", "mtlearn._mtlearn"])
 suppress_warnings = ["autodoc.mocked_object"]
-
-breathe_default_project = "mtlearn"
-breathe_projects = {
-    "mtlearn": os.environ.get(
-        "MTLEARN_DOXYGEN_XML",
-        str(ROOT / "build-docs" / "docs" / "mtlearn" / "public" / "xml"),
-    )
-}
 
 nitpicky = False

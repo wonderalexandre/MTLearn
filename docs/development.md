@@ -6,6 +6,10 @@ This page documents source builds, validation, and release checks for
 For basic installation and notebook dependency setup, see
 [installation.md](installation.md).
 
+## Navigation
+
+- [Installation](installation.md)
+
 ## Build Requirements
 
 Source builds require a working native build environment:
@@ -21,11 +25,10 @@ Source builds require a working native build environment:
 build toolchain. Python bindings currently expose Torch tensors, so building the
 Python extension also requires Torch support.
 
-Documentation builds additionally use Doxygen and the `docs` optional Python
-dependencies:
+Documentation builds use these Python dependencies:
 
 ```bash
-pip install "breathe>=4.35" "myst-parser>=2" "sphinx>=7" "sphinx-autodoc-typehints>=1.25"
+pip install "myst-parser>=2" "sphinx>=7" "sphinx-autodoc-typehints>=1.25"
 ```
 
 ## Local Dependency Setup
@@ -108,50 +111,15 @@ python -c "import torch"
   Default: `OFF`.
 - `MTLEARN_ENABLE_ASSERTS`: keep runtime assertions enabled in core C++ code.
   Default: `OFF`.
-- `MTLEARN_ENABLE_DOC_TARGETS`: add mtlearn-specific Doxygen documentation
-  targets. Default: `ON`.
 
 `MTLEARN_BUILD_PYTHON=ON` currently requires `MTLEARN_WITH_TORCH=ON` because the
 bindings expose Torch tensors.
 
 ## Documentation Builds
 
-The root project exposes mtlearn-specific Doxygen targets when Doxygen is
-available. Target names are prefixed with `mtlearn_` so they do not collide
-with backend documentation targets.
+Build the Sphinx documentation directly from the source checkout:
 
 ```bash
-cmake -S . -B build-docs \
-      -DMTLEARN_BUILD_PYTHON=OFF \
-      -DMTLEARN_WITH_TORCH=OFF \
-      -DMTLEARN_ENABLE_DOC_TARGETS=ON
-cmake --build build-docs --target mtlearn_docs_cpp_public
-cmake --build build-docs --target mtlearn_docs_cpp_internal
-```
-
-Generated files are written below:
-
-```text
-build-docs/docs/mtlearn/public
-build-docs/docs/mtlearn/internal
-```
-
-The public target documents the installed C++ facade in
-`mtlearn/morphology.hpp`. The internal target also includes implementation and
-binding sources for contributor-oriented navigation.
-
-The Sphinx site combines Python autodoc pages with the Doxygen XML consumed
-through Breathe:
-
-```bash
-cmake --build build-docs --target mtlearn_docs_site
-```
-
-If `sphinx-build` is not on `PATH`, run it directly after generating the public
-Doxygen XML:
-
-```bash
-MTLEARN_DOXYGEN_XML="$PWD/build-docs/docs/mtlearn/public/xml" \
 PYTHONPATH="$PWD/mtlearn/python" \
 python -m sphinx -W -b html docs/source build-docs/docs/mtlearn/site
 ```
@@ -160,6 +128,17 @@ The generated site is written to:
 
 ```text
 build-docs/docs/mtlearn/site
+```
+
+The Python API pages are generated from docstrings. The C++ pages document the
+installed public facade in `mtlearn/morphology.hpp`; the root CMake project does
+not currently define mtlearn-specific Doxygen targets.
+
+The external backend submodule may expose its own documentation targets. Inspect
+the configured CMake build if you need backend documentation:
+
+```bash
+cmake --build build --target help
 ```
 
 ## Public API Notes
@@ -206,8 +185,8 @@ git diff --check
 From a source checkout with a local CMake build:
 
 ```bash
-pip install ipykernel matplotlib "nbformat>=5" "papermill>=2.4"
-pip install -e . --no-build-isolation --no-deps
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e ".[notebooks]" --no-build-isolation
 python scripts/validate_notebooks.py --bindings-dir build/mtlearn/bindings
 ```
 
@@ -233,15 +212,16 @@ For a production release:
 
 1. Make sure the `CI`, `Package`, and `Notebooks` workflows are green on
    `main`.
-2. Update `pyproject.toml` if the release version is changing.
-3. Create and push a semantic version tag matching the package version, for
-   example `v1.0.0`.
+2. Choose the release version. Package versions are resolved from Git tags by
+   `setuptools_scm`; `pyproject.toml` does not contain a fixed version field.
+3. Create and push a semantic version tag matching the resolved package version,
+   for example `v1.0.0`.
 4. The `Release` workflow builds the source distribution and supported platform
    wheels, checks the package metadata, and attaches the artifacts to a GitHub
    Release.
 
-The workflow rejects a tag when the tag version does not match
-`pyproject.toml`.
+The workflow rejects a tag when the tag version does not match the package
+version resolved by `scripts/resolve_package_version.py`.
 
 The release wheel matrix currently produces 22 wheels and targets Python 3.9
 through 3.14 on:
@@ -278,6 +258,7 @@ cmake --build build-cpp --parallel
 ctest --test-dir build-cpp --output-on-failure
 python scripts/install_release_dependencies.py --build-tools
 python -m build --wheel --no-isolation
-python -m pip install dist/mtlearn-*.whl
+wheel="$(ls dist/mtlearn-*.whl | head -n 1)"
+python -m pip install "${wheel}[notebooks]"
 python scripts/validate_notebooks.py --installed-package
 ```

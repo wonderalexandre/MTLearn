@@ -58,21 +58,6 @@ members such as explicit `MAX_DIST` when expanding broad groups.
 
 See {doc}`attributes` for the user-facing attribute catalog.
 
-## CFP Valuation
-
-Connected Filter Preprocessing (CFP) learns node-wise sigmoid gates from
-normalized attributes. A valuation defines what signal is reconstructed after
-gating:
-
-- `CFPValuation.ALTITUDE` reconstructs filtered node altitude increments.
-- `CFPValuation.ALTITUDE_TOPHAT` reconstructs the tree-type-specific top-hat
-  signal.
-- `CFPValuation.node_attribute(attribute)` reconstructs increments of one
-  scalar node attribute.
-
-The scoring attributes and valuation are separate. For example, a filter can
-score nodes with `AREA` and `CIRCULARITY` but reconstruct `MEAN_LEVEL`.
-
 ## Dataset Statistics and Caching
 
 The primary CFP layer can cache tree metadata and raw attributes by stable

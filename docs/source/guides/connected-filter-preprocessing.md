@@ -7,13 +7,13 @@ reconstructs one output image per input channel and filter spec.
 
 ## Minimal Layer
 
-Each filter spec defines a tree type, scoring attributes, and optionally the
-signal reconstructed after gating.
+Each filter spec defines a tree type and scoring attributes. The public
+examples below use the default reconstructed signal.
 
 ```python
 import torch
 from mtlearn import morphology
-from mtlearn.layers import ConnectedFilterPreprocessingLayer, CFPValuation
+from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
 layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
@@ -25,7 +25,6 @@ layer = ConnectedFilterPreprocessingLayer(
                 morphology.AttributeType.AREA,
                 morphology.AttributeType.GRAY_HEIGHT,
             ],
-            "valuation": CFPValuation.ALTITUDE,
         },
     ],
     scale_mode="minmax01",
@@ -48,7 +47,6 @@ A spec has these user-facing fields:
 | `name` | No | Stable key for weights, biases, exported params, and checkpoints. |
 | `tree_type` | Yes | `"max-tree"`, `"min-tree"`, `"tree-of-shapes"`, or `TreeType`. |
 | `attributes` | Yes | One scalar attribute, one group, or a list/tuple of scalar attributes. |
-| `valuation` | No | Reconstructed signal. Defaults to `CFPValuation.ALTITUDE`. |
 | `tos_interpolation` | No | Per-spec tree-of-shapes interpolation override. |
 | `tos_infinity_seed_row` | No | Per-spec tree-of-shapes infinity seed row. |
 | `tos_infinity_seed_col` | No | Per-spec tree-of-shapes infinity seed column. |
@@ -67,43 +65,9 @@ filter_specs = [
         "name": "dark_topology",
         "tree_type": "min-tree",
         "attributes": morphology.AttributeGroup.TREE_TOPOLOGY,
-        "valuation": CFPValuation.ALTITUDE_TOPHAT,
     },
 ]
 ```
-
-## Valuations
-
-The scoring attributes decide the gate. The valuation decides what signal is
-reconstructed through that gate.
-
-```python
-specs = [
-    {
-        "name": "altitude",
-        "tree_type": "max-tree",
-        "attributes": morphology.AttributeType.AREA,
-        "valuation": CFPValuation.ALTITUDE,
-    },
-    {
-        "name": "tophat",
-        "tree_type": "max-tree",
-        "attributes": morphology.AttributeType.AREA,
-        "valuation": CFPValuation.ALTITUDE_TOPHAT,
-    },
-    {
-        "name": "mean_level_signal",
-        "tree_type": "max-tree",
-        "attributes": morphology.AttributeType.AREA,
-        "valuation": CFPValuation.node_attribute(
-            morphology.AttributeType.MEAN_LEVEL,
-        ),
-    },
-]
-```
-
-`CFPValuation.node_attribute` expects one scalar attribute, not an
-`AttributeGroup`.
 
 ## Normalization and Caching
 
@@ -165,7 +129,7 @@ with torch.no_grad():
 ## Inspect One Sample
 
 Use `inspect_training_sample` to debug attributes, normalized attributes,
-valuation increments, and current trainable parameters.
+tree payloads, and current trainable parameters.
 
 ```python
 report = layer.inspect_training_sample(x[0], channel=0, idx=0)

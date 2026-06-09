@@ -21,7 +21,7 @@ Example:
 
 ```python
 from mtlearn import morphology
-from mtlearn.layers import ConnectedFilterPreprocessingLayer, CFPValuation
+from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
 shape_and_contrast = [
     morphology.AttributeType.AREA,
@@ -84,7 +84,6 @@ filter_specs = [
         "name": "min_area_tophat",
         "tree_type": "min-tree",
         "attributes": morphology.AttributeType.AREA,
-        "valuation": CFPValuation.ALTITUDE_TOPHAT,
     },
 ]
 ```
@@ -114,36 +113,6 @@ The current CFP validation rejects scalar attributes that are undefined for
 tree-of-shapes. Broad groups may be expanded with unsupported members removed
 when the backend exposes a safe group-level fallback.
 
-## Valuation Patterns
-
-The default valuation is altitude reconstruction. Use top-hat when the output
-should emphasize what the filter removes. Use node-attribute valuation when the
-output should reconstruct a measured signal instead of gray-level altitude.
-
-```python
-specs = [
-    {
-        "name": "opened_image",
-        "tree_type": "max-tree",
-        "attributes": morphology.AttributeType.AREA,
-    },
-    {
-        "name": "removed_bright_detail",
-        "tree_type": "max-tree",
-        "attributes": morphology.AttributeType.AREA,
-        "valuation": CFPValuation.ALTITUDE_TOPHAT,
-    },
-    {
-        "name": "mean_level_by_area",
-        "tree_type": "max-tree",
-        "attributes": morphology.AttributeType.AREA,
-        "valuation": CFPValuation.node_attribute(
-            morphology.AttributeType.MEAN_LEVEL,
-        ),
-    },
-]
-```
-
 ## Config Round Trip
 
 Use `get_config` and `from_config` to store the layer architecture separately
@@ -155,8 +124,8 @@ restored = ConnectedFilterPreprocessingLayer.from_config(config)
 ```
 
 This is the same config shape used by checkpoint helpers. It records tree type,
-attributes, valuation, normalization mode, clamp bounds, and hybrid
-normalization constants.
+attributes, normalization mode, clamp bounds, and hybrid normalization
+constants.
 
 ## Practical Checklist
 

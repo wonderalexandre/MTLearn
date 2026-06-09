@@ -6,7 +6,7 @@ based on morphological trees.
 This site combines:
 
 - Python API reference generated from docstrings.
-- C++ API reference generated from Doxygen XML through Breathe.
+- C++ source-level notes for the installed public facade.
 - Development notes for building, validating, and extending the project.
 
 ```{toctree}

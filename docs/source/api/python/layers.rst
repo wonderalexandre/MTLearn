@@ -13,10 +13,6 @@ Primary CFP Layer
    :members:
    :show-inheritance:
 
-.. autoclass:: mtlearn.layers.CFPValuation
-   :members:
-   :show-inheritance:
-
 Checkpoint Helpers
 ------------------
 

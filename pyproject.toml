@@ -57,7 +57,11 @@ notebooks = [
   "ipykernel",
   "matplotlib",
   "nbformat>=5",
-  "papermill>=2.4"
+  "papermill>=2.4",
+  "pandas",
+  "scikit-learn",
+  "scipy",
+  "segmentation-models-pytorch"
 ]
 test = [
   "pytest>=8"
