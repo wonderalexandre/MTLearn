@@ -28,6 +28,7 @@ def test_default_data_dir_prefers_environment_variable(monkeypatch, tmp_path):
 def test_dataset_path_uses_registered_target_and_explicit_root(tmp_path):
     assert data.dataset_path("misc256", tmp_path) == tmp_path / "misc256"
     assert data.dataset_path("screws_segmentation", tmp_path) == tmp_path / "screws_segmentation"
+    assert data.dataset_path("plants_segmentation", tmp_path) == tmp_path / "PlantDataset"
 
 
 def test_dropbox_download_url_forces_direct_download():
@@ -100,3 +101,56 @@ def test_require_local_dataset_reports_expected_locations(tmp_path):
     assert "private validation set is not available" in message
     assert "Set MTLEARN_PRIVATE_DATASET" in message
     assert str(tmp_path / "private-set") in message
+
+
+def test_restricted_dataset_prefers_authorized_local_copy(monkeypatch, tmp_path):
+    env_dataset = tmp_path / "plants-local"
+    env_dataset.mkdir()
+    (env_dataset / "sample_tfb.png").write_text("ok")
+    monkeypatch.setenv("MTLEARN_PLANTS_DATASET", str(env_dataset))
+
+    assert data.ensure_dataset("plants_segmentation", tmp_path) == env_dataset.resolve()
+
+
+def test_restricted_dataset_requires_local_copy_or_url(monkeypatch, tmp_path):
+    monkeypatch.delenv("MTLEARN_PLANTS_DATASET", raising=False)
+    monkeypatch.delenv("MTLEARN_PLANTS_SEGMENTATION_URL", raising=False)
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        data.ensure_dataset("plants_segmentation", tmp_path)
+
+    message = str(excinfo.value)
+    assert "plants_segmentation is not available" in message
+    assert "MTLEARN_PLANTS_DATASET" in message
+    assert "MTLEARN_PLANTS_SEGMENTATION_URL" in message
+    assert "--url" in message
+
+
+def test_configured_download_url_prefers_override_then_environment(monkeypatch):
+    spec = data.DATASETS["plants_segmentation"]
+    monkeypatch.setenv("MTLEARN_PLANTS_SEGMENTATION_URL", "https://example.test/env.zip")
+
+    assert data._configured_download_url(spec) == "https://example.test/env.zip"
+    assert data._configured_download_url(spec, "https://example.test/override.zip") == (
+        "https://example.test/override.zip"
+    )
+
+
+def test_cli_rejects_url_for_multiple_datasets(capsys):
+    result = data.main(["misc256", "screws_segmentation", "--url", "https://example.test/data.zip"])
+
+    captured = capsys.readouterr()
+    assert result == 2
+    assert "--url can only be used with exactly one selected dataset" in captured.err
+
+
+def test_cli_reports_restricted_dataset_without_traceback(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("MTLEARN_PLANTS_DATASET", raising=False)
+    monkeypatch.delenv("MTLEARN_PLANTS_SEGMENTATION_URL", raising=False)
+
+    result = data.main(["plants_segmentation", "--data-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "plants_segmentation is not available" in captured.err
+    assert "MTLEARN_PLANTS_SEGMENTATION_URL" in captured.err
