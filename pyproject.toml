@@ -154,6 +154,7 @@ exclude = [
   "external/MorphologicalAttributeFilters/python/**",
   "external/MorphologicalAttributeFilters/unit-tests/**",
   "external/MorphologicalAttributeFilters/unit-tests/CMakeLists.txt",
+  "docs/source/guides/connected-filter-preprocessing.md",
   "**/.ipynb_checkpoints/**",
   "**/.ipynb_checkpoints",
   "mtlearn/python/**/__pycache__/**",
