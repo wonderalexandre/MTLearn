@@ -160,9 +160,24 @@ def parse_args() -> argparse.Namespace:
         help="Continue with remaining executions if one notebook fails.",
     )
     parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate existing outputs and exit without executing notebooks.",
+    )
+    parser.add_argument(
+        "--no-auto-validate",
+        action="store_true",
+        help="Skip automatic validation after normal execution finishes.",
+    )
+    parser.add_argument(
         "--progress-bar",
         action="store_true",
         help="Show Papermill's per-cell progress bar.",
+    )
+    parser.add_argument(
+        "--no-global-progress",
+        action="store_true",
+        help="Disable the campaign-level progress bar for notebook runs.",
     )
     parser.add_argument(
         "--scale-in",
@@ -248,6 +263,123 @@ def append_summary_row(summary_path: Path, row: dict[str, object]) -> None:
         if write_header:
             writer.writeheader()
         writer.writerow(row)
+
+
+def _read_csv_rows(csv_path: Path) -> list[dict[str, str]]:
+    with csv_path.open(newline="") as csv_file:
+        return list(csv.DictReader(csv_file))
+
+
+def _int_row_value(row: dict[str, str], key: str) -> int | None:
+    value = row.get(key)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def validate_outputs(
+    output_root: Path,
+    configs: list[NotebookConfig],
+    run_ids: list[int],
+) -> bool:
+    """Validate reproducibility outputs and return True when expected artifacts exist."""
+
+    summary_path = output_root / "execution_summary.csv"
+    if not summary_path.exists():
+        print(f"Missing execution summary: {summary_path}")
+        return False
+
+    summary_rows = _read_csv_rows(summary_path)
+    if not summary_rows:
+        print("No runs recorded yet in execution_summary.csv.")
+        return False
+
+    selected_keys = {cfg.key for cfg in configs}
+    selected_ids = set(run_ids)
+
+    seen_pairs: set[tuple[str, int]] = set()
+    selected_status: dict[str, int] = {"success": 0, "failed": 0, "skipped": 0, "other": 0}
+    latest_rows_by_pair: dict[tuple[str, int], dict[str, str]] = {}
+
+    for row in summary_rows:
+        config = row.get("config", "").strip()
+        run_id = _int_row_value(row, "run_id")
+        if config not in selected_keys or run_id is None or run_id not in selected_ids:
+            continue
+        seen_pairs.add((config, run_id))
+        latest_rows_by_pair[(config, run_id)] = row
+
+    for (config, run_id), row in latest_rows_by_pair.items():
+        status = row.get("status", "").strip()
+        if status in selected_status:
+            selected_status[status] += 1
+        else:
+            selected_status["other"] += 1
+
+        if status == "failed":
+            error = row.get("error", "").strip()
+            print(f"Run failed: {config} run_{run_id:03d}: {error}")
+
+    expected_pairs = {
+        (cfg.key, run_id) for cfg in configs for run_id in selected_ids
+    }
+    missing_summary = sorted(expected_pairs - seen_pairs)
+    found_pairs = len(seen_pairs)
+    total_expected_pairs = len(expected_pairs)
+    if missing_summary:
+        for config, run_id in missing_summary:
+            print(f"No execution row found: {config} run_{run_id:03d}")
+
+    missing_csvs: list[str] = []
+    for config, run_id in sorted(expected_pairs):
+        run_dir = output_root / config / "runs" / f"run_{run_id:03d}"
+        for prefix in ("base.csv", "cfp.csv"):
+            if not (run_dir / prefix).exists():
+                missing_csvs.append(f"{run_dir / prefix}")
+
+    if missing_csvs:
+        for path in missing_csvs:
+            print(f"Missing artifact: {path}")
+
+    paper_csv = output_root / "paper_table_metrics.csv"
+    if paper_csv.exists():
+        paper_rows = _read_csv_rows(paper_csv)
+        print(f"paper_table_metrics rows: {len(paper_rows)}")
+        if paper_rows:
+            thresholds = sorted(
+                {
+                    str(row.get("threshold_protocol", "")).strip()
+                    for row in paper_rows
+                    if row.get("threshold_protocol")
+                }
+            )
+            configs_in_table = sorted(
+                {
+                    str(row.get("config", "")).strip()
+                    for row in paper_rows
+                    if row.get("config")
+                }
+            )
+            print(f"threshold_protocol values: {thresholds}")
+            print(f"configs in table: {configs_in_table}")
+        else:
+            print("paper_table_metrics.csv exists but is empty.")
+    else:
+        print("paper_table_metrics.csv not found.")
+
+    print(
+        "Summary for selected runs: "
+        f"success={selected_status['success']}, "
+        f"failed={selected_status['failed']}, "
+        f"skipped={selected_status['skipped']}, "
+        f"other={selected_status['other']}"
+    )
+    print(f"Runs found/expected: {found_pairs}/{total_expected_pairs}")
+
+    return not missing_summary and not missing_csvs
 
 
 def list_plan(configs: list[NotebookConfig], run_ids: list[int]) -> None:
@@ -456,6 +588,9 @@ def execute(args: argparse.Namespace) -> int:
         list_plan(configs, run_ids)
         return 0
 
+    if args.validate_only:
+        return 0 if validate_outputs(output_root, configs, run_ids) else 1
+
     executions: list[tuple[NotebookConfig, int, int, Path, Path, Path]] = []
     for config in configs:
         input_notebook = notebook_dir() / config.notebook
@@ -471,16 +606,12 @@ def execute(args: argparse.Namespace) -> int:
                 (config, run_id, seed, input_notebook, output_notebook, run_dir)
             )
 
-    print(f"Planned executions: {len(executions)}")
-    for config, run_id, seed, input_notebook, output_notebook, run_dir in executions:
-        print(
-            f"- {config.key} run_{run_id:03d} seed={seed}\n"
-            f"  input:  {input_notebook}\n"
-            f"  output: {output_notebook}\n"
-            f"  results: {run_dir}"
-        )
-
     if args.dry_run:
+        for config, run_id, seed, input_notebook, output_notebook, run_dir in executions:
+            print(
+                f"{config.key} run_{run_id:03d} seed={seed} -> "
+                f"input={input_notebook} output={output_notebook} results={run_dir}"
+            )
         return 0
 
     output_root.mkdir(parents=True, exist_ok=True)
@@ -495,6 +626,39 @@ def execute(args: argparse.Namespace) -> int:
         ) from exc
 
     failures = 0
+    aborted = False
+    total_executions = len(executions)
+    completed_executions = 0
+    try:
+        from tqdm.auto import tqdm
+    except ModuleNotFoundError:
+        tqdm = None
+
+    progress = None
+    if tqdm is not None and not args.no_global_progress and total_executions:
+        progress = tqdm(
+            total=total_executions,
+            unit="run",
+            desc="Runs",
+            position=1 if args.progress_bar else 0,
+            dynamic_ncols=True,
+        )
+
+    notebook_bar_position = 0
+    notebook_progress = {
+        "unit": "cell",
+        "desc": "Executing",
+        "position": notebook_bar_position,
+        "leave": False,
+    }
+
+    def _update_progress(tag: str) -> None:
+        nonlocal completed_executions
+        completed_executions += 1
+        if progress is not None:
+            progress.update(1)
+            progress.set_postfix_str(f"{completed_executions}/{total_executions} | {tag}")
+
     for config, run_id, seed, input_notebook, output_notebook, run_dir in executions:
         if output_notebook.exists() and args.skip_existing:
             print(f"Skipping existing output: {output_notebook}")
@@ -514,8 +678,9 @@ def execute(args: argparse.Namespace) -> int:
                     "output_notebook": output_notebook,
                     "results_dir": run_dir,
                     "error": "",
-                },
+            },
             )
+            _update_progress(f"skip={config.key}/run_{run_id:03d}")
             continue
 
         output_notebook.parent.mkdir(parents=True, exist_ok=True)
@@ -531,12 +696,13 @@ def execute(args: argparse.Namespace) -> int:
         if args.scale_in is not None:
             parameters["DATASET_SCALE_IN"] = args.scale_in == "true"
         try:
+            notebook_progress["desc"] = f"{config.key} run_{run_id:03d}"
             pm.execute_notebook(
                 input_path=str(input_notebook),
                 output_path=str(output_notebook),
                 parameters=parameters,
                 kernel_name=args.kernel,
-                progress_bar=args.progress_bar,
+                progress_bar=notebook_progress if args.progress_bar else False,
                 request_save_on_cell_execute=False,
             )
         except Exception as exc:
@@ -564,12 +730,15 @@ def execute(args: argparse.Namespace) -> int:
                 f"{format_duration(elapsed_seconds)}"
             )
             if not args.continue_on_error:
-                raise
+                aborted = True
+                _update_progress(f"failed={config.key}/run_{run_id:03d}")
+                break
             print(
                 f"Execution failed for {config.key} run_{run_id:03d}; "
                 "continuing because --continue-on-error was set.",
                 file=sys.stderr,
             )
+            _update_progress(f"failed={config.key}/run_{run_id:03d}")
             continue
 
         elapsed_seconds = perf_counter() - start
@@ -594,6 +763,13 @@ def execute(args: argparse.Namespace) -> int:
             f"Finished {config.key} run_{run_id:03d} in "
             f"{format_duration(elapsed_seconds)}"
         )
+        _update_progress(f"done={config.key}/run_{run_id:03d}")
+
+    if progress is not None:
+        if aborted or failures:
+            status = "aborted" if aborted else "completed_with_errors"
+            progress.set_postfix_str(f"status={status}")
+        progress.close()
 
     consolidated_path = write_consolidated_paper_metrics(output_root, configs)
     if consolidated_path is not None:
@@ -601,8 +777,17 @@ def execute(args: argparse.Namespace) -> int:
     else:
         print("\nNo metric CSV files found for consolidation.")
 
+    validation_ok = True
+    if not args.no_auto_validate:
+        validation_ok = validate_outputs(output_root, configs, run_ids)
+
+    if aborted:
+        print("\nExecution aborted due to error (use --continue-on-error to keep running).", file=sys.stderr)
+
     if failures:
         print(f"\nCompleted with {failures} failure(s).", file=sys.stderr)
+
+    if failures or not validation_ok:
         return 1
 
     print(f"\nCompleted. Executed notebooks are under: {output_root}")
