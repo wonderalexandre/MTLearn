@@ -18,7 +18,7 @@ Use this guide to:
 - inspect and validate generated outputs,
 - rebuild the aggregate paper table used for comparison.
 
-Only the materials and commands in this folder are required, plus a checkout of the `rrpr-icpr2026` branch and access credentials/URL for the restricted plant-segmentation dataset.
+Only the materials and commands in this folder are required, plus access credentials/URL for the restricted plant-segmentation dataset.
 
 ## Repository and Output Layout
 
@@ -105,7 +105,6 @@ The RRPR reference environment used Python `3.12`.
 ```bash
 git clone --recurse-submodules https://github.com/wonderalexandre/MTLearn.git
 cd MTLearn
-git checkout rrpr-icpr2026
 python -m pip install -U pip
 python scripts/install_release_dependencies.py --build-tools --torch none
 python -m pip install -e ".[notebooks]" --no-build-isolation
@@ -167,6 +166,29 @@ Start here to understand how the campaign is executed.
 python notebooks/ICPR2026/run_icpr2026_seeds.py --help
 ```
 
+## Execution Protocol
+
+To reproduce the paper results, run the six notebooks for each fixed seed used in the campaign:
+
+1. choose experiment configurations with `--configs`;
+2. choose deterministic seeds with `--run-ids`;
+3. execute all planned notebook runs;
+4. validate outputs and aggregated tables.
+
+The full paper run is:
+
+```bash
+python notebooks/ICPR2026/run_icpr2026_seeds.py --configs all --run-ids 0 1 2 3 4 5 6 7 8 9
+```
+
+This produces:
+
+- two experiment rows per configuration/run in `runs/run_###/base.csv` and `runs/run_###/cfp.csv`;
+- campaign-level execution log in `<root>/execution_summary.csv`;
+- aggregate table in `<root>/paper_table_metrics.csv` (mean/std over the executed runs).
+
+Reviewer workflow generally runs this in two phases: one smoke test (e.g. `--configs screw_convnet --run-ids 0`) and then the full required subset for the paper tables.
+
 ## Experiment Configurations
 
 Each row is one executable RRPR configuration. The `Config key` is the identifier accepted by `run_icpr2026_seeds.py --configs`.
@@ -201,7 +223,7 @@ Each row is one executable RRPR configuration. The `Config key` is the identifie
 | Smoke test (single configuration, seed 0) | `python notebooks/ICPR2026/run_icpr2026_seeds.py --configs screw_convnet --run-ids 0` | Writes `executions/` and `runs/run_000/` for the selected config and updates summary CSVs. |
 | Full campaign | `python notebooks/ICPR2026/run_icpr2026_seeds.py --configs all --run-ids 0 1 2 3 4 5 6 7 8 9` | Writes all runs for all 6 configs, plus `execution_summary.csv` and `paper_table_metrics.csv`. |
 | Resume partial subset | `python notebooks/ICPR2026/run_icpr2026_seeds.py --configs plants --run-ids 0 1 2 3 4 --continue-on-error` | Continues remaining selected runs even when one execution fails. |
-| Run with custom output directory | `python notebooks/ICPR2026/run_icpr2026_seeds.py --configs all --run-ids 0 1 2 3 4 --output-dir /path/to/ICPR2026_runs_rrpr` | Runs are written under the custom path and `paper_table_metrics.csv` is regenerated there. |
+| Run with custom output directory | `python notebooks/ICPR2026/run_icpr2026_seeds.py --configs all --run-ids 0 1 2 3 4 --output-dir /path/to/ICPR2026_runs` | Runs are written under the custom path and `paper_table_metrics.csv` is regenerated there. |
 | Validate finished runs | `python notebooks/ICPR2026/run_icpr2026_seeds.py --configs all --run-ids 0 1 2 3 4 5 6 7 8 9 --validate-only` | Checks execution summary, required result CSVs, and prints aggregate table metadata. |
 
 Optional arguments:
