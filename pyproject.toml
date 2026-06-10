@@ -61,7 +61,8 @@ notebooks = [
   "pandas",
   "scikit-learn",
   "scipy",
-  "segmentation-models-pytorch"
+  "segmentation-models-pytorch",
+  "tqdm>=4.66"
 ]
 test = [
   "pytest>=8"
