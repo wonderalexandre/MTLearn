@@ -19,46 +19,67 @@ from pathlib import Path
 class DatasetSpec:
     key: str
     description: str
-    url: str
     target: tuple[str, ...]
+    url: str | None = None
+    url_env_var: str | None = None
+    local_env_var: str | None = None
+    access_note: str | None = None
+    download_by_default: bool = True
 
 
 DATASETS: dict[str, DatasetSpec] = {
     "misc256": DatasetSpec(
         key="misc256",
         description="Small 256x256 sample images used by lightweight examples.",
+        target=("misc256",),
         url=(
             "https://www.dropbox.com/scl/fo/ki7t7lkliig7vmzbi3288/"
             "AAsKiUaOsReUehU3VACZYww?rlkey=vm2hln945ytftq5kmk3qmx7mh"
         ),
-        target=("misc256",),
     ),
     "washer_removal": DatasetSpec(
         key="washer_removal",
         description="Washer-removal image pairs.",
+        target=("washer_removal",),
         url=(
             "https://www.dropbox.com/scl/fo/sgo8vztm52flhjcp0jj40/"
             "AFqr_iSdlxpwm2qmI3AV4N8?rlkey=v1e90ktw5q0u98hcw8j00dur9"
         ),
-        target=("washer_removal",),
     ),
     "bushing_removal": DatasetSpec(
         key="bushing_removal",
         description="Bushing-removal image pairs.",
+        target=("bushing_removal",),
         url=(
             "https://www.dropbox.com/scl/fo/sm16qo4ka55yi2u4vip91/"
             "AMwibDVfy_LW1peEMvfS-7E?rlkey=7wrxpv1858kmpkklvsco7iooo"
         ),
-        target=("bushing_removal",),
     ),
     "screws_segmentation": DatasetSpec(
         key="screws_segmentation",
         description="Screw-segmentation image pairs.",
+        target=("screws_segmentation",),
         url=(
             "https://www.dropbox.com/scl/fo/2owxbpc8oxi7mpegcda3u/"
             "AJJ4GbKk3N2ucOTT6bnOf7g?rlkey=l24jp4tnvzbvcap2wxpc6im95"
         ),
-        target=("screws_segmentation",),
+    ),
+    "plants_segmentation": DatasetSpec(
+        key="plants_segmentation",
+        description=(
+            "Plant Phenotyping foreground/background segmentation subset used "
+            "by the ICPR 2026 notebooks. Requires an authorized local copy or "
+            "a review-only download URL."
+        ),
+        target=("PlantDataset",),
+        url_env_var="MTLEARN_PLANTS_SEGMENTATION_URL",
+        local_env_var="MTLEARN_PLANTS_DATASET",
+        access_note=(
+            "This dataset is derived from the Plant Phenotyping Dataset and is "
+            "not redistributed by MTLearn. Use only an authorized local copy "
+            "or an explicitly authorized review-only package URL."
+        ),
+        download_by_default=False,
     ),
 }
 
@@ -92,6 +113,42 @@ def dataset_path(key: str, data_dir: Path | None = None) -> Path:
     spec = DATASETS[key]
     root = (data_dir or default_data_dir()).expanduser()
     return root / Path(*spec.target)
+
+
+def _local_dataset_path(spec: DatasetSpec) -> Path | None:
+    if spec.local_env_var and (env_value := os.environ.get(spec.local_env_var)):
+        candidate = Path(env_value).expanduser()
+        if has_existing_files(candidate):
+            return candidate.resolve()
+    return None
+
+
+def _configured_download_url(
+    spec: DatasetSpec,
+    url_override: str | None = None,
+) -> str | None:
+    if url_override:
+        return url_override
+    if spec.url_env_var and (env_value := os.environ.get(spec.url_env_var)):
+        return env_value
+    return spec.url
+
+
+def _missing_download_url_message(spec: DatasetSpec, target_dir: Path) -> str:
+    hints = []
+    if spec.local_env_var:
+        hints.append(f"set {spec.local_env_var} to an authorized local copy")
+    if spec.url_env_var:
+        hints.append(f"set {spec.url_env_var}")
+    hints.append("pass --url to scripts/download_data.py or python -m mtlearn.data")
+    hint_text = "; ".join(hints)
+    message = (
+        f"{spec.key} is not available at {target_dir} and no download URL is "
+        f"configured. To use this dataset, {hint_text}."
+    )
+    if spec.access_note:
+        message = f"{message} {spec.access_note}"
+    return message
 
 
 def require_local_dataset(
@@ -195,13 +252,21 @@ def ensure_dataset(
     *,
     force: bool = False,
     keep_archive: bool = False,
+    url: str | None = None,
 ) -> Path:
     spec = DATASETS[key]
     root = (data_dir or default_data_dir()).expanduser().resolve()
     target_dir = root / Path(*spec.target)
+    if not force and (local_path := _local_dataset_path(spec)):
+        print(f"{spec.key}: using {spec.local_env_var} at {local_path}")
+        return local_path
     if has_existing_files(target_dir) and not force:
         print(f"{spec.key}: already available at {target_dir}")
         return target_dir
+
+    download_url = _configured_download_url(spec, url)
+    if download_url is None:
+        raise FileNotFoundError(_missing_download_url_message(spec, target_dir))
 
     root.mkdir(parents=True, exist_ok=True)
     print(f"{spec.key}: downloading to {target_dir}")
@@ -211,7 +276,7 @@ def ensure_dataset(
         extract_dir = tmp_dir / "extracted"
         extract_dir.mkdir()
 
-        download_file(spec.url, archive)
+        download_file(download_url, archive)
         if not zipfile.is_zipfile(archive):
             raise RuntimeError(f"Downloaded file for {spec.key} is not a zip archive")
 
@@ -241,7 +306,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Download every registered dataset.",
+        help="Download every public registered dataset.",
+    )
+    parser.add_argument(
+        "--include-restricted",
+        action="store_true",
+        help="Include restricted datasets when using --all. Their URLs must be configured.",
     )
     parser.add_argument(
         "--list",
@@ -264,6 +334,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Keep the downloaded zip archive next to the extracted data.",
     )
+    parser.add_argument(
+        "--url",
+        help="Override the download URL for a single selected dataset.",
+    )
     return parser.parse_args(argv)
 
 
@@ -273,9 +347,16 @@ def list_datasets(data_dir: Path | None = None) -> None:
     for key in sorted(DATASETS):
         spec = DATASETS[key]
         target = root / Path(*spec.target)
-        status = "present" if has_existing_files(target) else "missing"
+        local_path = _local_dataset_path(spec)
+        status = "present" if local_path or has_existing_files(target) else "missing"
         print(f"{key:22s} {status:8s} {target}")
         print(f"  {spec.description}")
+        if local_path:
+            print(f"  Local override: {spec.local_env_var}={local_path}")
+        if spec.url is None and spec.url_env_var:
+            print(f"  Download URL: set {spec.url_env_var} or pass --url.")
+        if spec.access_note:
+            print(f"  Note: {spec.access_note}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -286,12 +367,37 @@ def main(argv: list[str] | None = None) -> int:
         list_datasets(data_dir)
         return 0
 
-    selected = sorted(DATASETS) if args.all else args.datasets
+    if args.url and (args.all or len(args.datasets) != 1):
+        print("--url can only be used with exactly one selected dataset.", file=sys.stderr)
+        return 2
+
+    if args.all:
+        selected = sorted(
+            key
+            for key, spec in DATASETS.items()
+            if args.include_restricted or spec.download_by_default
+        )
+    else:
+        selected = args.datasets
     if not selected:
         print("No dataset selected. Use --list, --all, or pass one or more dataset keys.", file=sys.stderr)
         return 2
 
     for key in selected:
-        ensure_dataset(key, data_dir, force=args.force, keep_archive=args.keep_archive)
+        try:
+            ensure_dataset(
+                key,
+                data_dir,
+                force=args.force,
+                keep_archive=args.keep_archive,
+                url=args.url,
+            )
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

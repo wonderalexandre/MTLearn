@@ -6,6 +6,10 @@ This page documents source builds, validation, and release checks for
 For basic installation and notebook dependency setup, see
 [installation.md](installation.md).
 
+## Navigation
+
+- [Installation](installation.md)
+
 ## Build Requirements
 
 Source builds require a working native build environment:
@@ -21,13 +25,43 @@ Source builds require a working native build environment:
 build toolchain. Python bindings currently expose Torch tensors, so building the
 Python extension also requires Torch support.
 
+Documentation builds use these Python dependencies:
+
+```bash
+pip install "myst-parser>=2" "sphinx>=7" "sphinx-autodoc-typehints>=1.25"
+```
+
+## Local Dependency Setup
+
+Install the PyTorch build you intend to use before building `mtlearn`. For CUDA
+environments, keep `torch`, `torchvision`, and `torchaudio` on matching wheel
+builds from the same PyTorch index.
+
+The release dependency helper defaults to the minimum supported Torch version.
+On Linux, that default is a CPU wheel and can replace an existing CUDA Torch
+installation. For everyday development in an environment that already has the
+right Torch build, preserve it with `--torch none`:
+
+```bash
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e . --no-build-isolation --no-deps
+```
+
+Use the helper without `--torch none` only when you explicitly want the
+minimum-supported CPU Torch build used by release checks. Use `--no-deps` on
+local `mtlearn` installs when preserving an existing Torch stack; otherwise pip
+may replace a newer or CUDA-enabled Torch build to satisfy package metadata.
+
 ## Wheel Build
 
 ```bash
-python scripts/install_release_dependencies.py --build-tools
-python -m build --wheel
-python -m pip install dist/mtlearn-*.whl
+python scripts/install_release_dependencies.py --build-tools --torch none
+python -m build --wheel --no-isolation
+python -m pip install dist/mtlearn-*.whl --no-deps
 ```
+
+This wheel build path assumes PyTorch is already installed in the active
+environment as described above.
 
 The `mtlearn` Python package uses the native `_mtlearn` extension. The top-level
 `mmcfilters` Python package is not a runtime dependency of `mtlearn`.
@@ -81,6 +115,32 @@ python -c "import torch"
 `MTLEARN_BUILD_PYTHON=ON` currently requires `MTLEARN_WITH_TORCH=ON` because the
 bindings expose Torch tensors.
 
+## Documentation Builds
+
+Build the Sphinx documentation directly from the source checkout:
+
+```bash
+PYTHONPATH="$PWD/mtlearn/python" \
+python -m sphinx -W -b html docs/source build-docs/docs/mtlearn/site
+```
+
+The generated site is written to:
+
+```text
+build-docs/docs/mtlearn/site
+```
+
+The Python API pages are generated from docstrings. The C++ pages document the
+installed public facade in `mtlearn/morphology.hpp`; the root CMake project does
+not currently define mtlearn-specific Doxygen targets.
+
+The external backend submodule may expose its own documentation targets. Inspect
+the configured CMake build if you need backend documentation:
+
+```bash
+cmake --build build --target help
+```
+
 ## Public API Notes
 
 The README shows the main Python entry points. For C++ consumers, the public
@@ -107,7 +167,8 @@ target_link_libraries(my_target PRIVATE mtlearn::core)
 ### Direct Python Tests
 
 ```bash
-pip install -e ".[test]"
+pip install "pytest>=8"
+pip install -e . --no-build-isolation --no-deps
 PYTHONPATH=mtlearn/python:build/mtlearn/bindings python -m pytest -q -m "not gradcheck" mtlearn/tests/python
 PYTHONPATH=mtlearn/python:build/mtlearn/bindings python -m pytest -q -m gradcheck mtlearn/tests/python
 ```
@@ -124,7 +185,8 @@ git diff --check
 From a source checkout with a local CMake build:
 
 ```bash
-pip install -e ".[notebooks]"
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e ".[notebooks]" --no-build-isolation
 python scripts/validate_notebooks.py --bindings-dir build/mtlearn/bindings
 ```
 
@@ -150,15 +212,16 @@ For a production release:
 
 1. Make sure the `CI`, `Package`, and `Notebooks` workflows are green on
    `main`.
-2. Update `pyproject.toml` if the release version is changing.
-3. Create and push a semantic version tag matching the package version, for
-   example `v1.0.0`.
+2. Choose the release version. Package versions are resolved from Git tags by
+   `setuptools_scm`; `pyproject.toml` does not contain a fixed version field.
+3. Create and push a semantic version tag matching the resolved package version,
+   for example `v1.0.0`.
 4. The `Release` workflow builds the source distribution and supported platform
    wheels, checks the package metadata, and attaches the artifacts to a GitHub
    Release.
 
-The workflow rejects a tag when the tag version does not match
-`pyproject.toml`.
+The workflow rejects a tag when the tag version does not match the package
+version resolved by `scripts/resolve_package_version.py`.
 
 The release wheel matrix currently produces 22 wheels and targets Python 3.9
 through 3.14 on:
@@ -195,6 +258,7 @@ cmake --build build-cpp --parallel
 ctest --test-dir build-cpp --output-on-failure
 python scripts/install_release_dependencies.py --build-tools
 python -m build --wheel --no-isolation
-python -m pip install dist/mtlearn-*.whl
+wheel="$(ls dist/mtlearn-*.whl | head -n 1)"
+python -m pip install "${wheel}[notebooks]"
 python scripts/validate_notebooks.py --installed-package
 ```

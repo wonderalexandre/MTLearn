@@ -9,10 +9,6 @@
 /// backend internally, but downstream C++ consumers should only need this
 /// facade to create trees, inspect topology, reconstruct images, and request
 /// attribute identifiers compatible with the Python layer.
-///
-/// @defgroup mtlearn_morphology Morphology API
-/// @brief Public morphology-tree construction and query facade.
-/// @{
 
 #include <cstdint>
 #include <memory>
@@ -325,5 +321,3 @@ inline float residue(const WeightedTree& tree, NodeId nodeId)
 }
 
 } // namespace mtlearn::morphology
-
-/// @}
