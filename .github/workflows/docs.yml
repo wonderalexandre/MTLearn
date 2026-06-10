@@ -48,7 +48,7 @@ jobs:
   deploy-docs:
     name: Deploy to GitHub Pages
     needs: build-docs
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.event.repository.has_pages == true
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -57,6 +57,17 @@ jobs:
       - name: Enable GitHub Pages context
         uses: actions/configure-pages@v5
 
+      - name: Verify GitHub Pages configuration
+        id: pages-config
+        run: |
+          if [[ "${{ github.event.repository.has_pages }}" != "true" ]]; then
+            echo "::warning::GitHub Pages is not enabled for this repository. Set Settings -> Pages -> Source to 'GitHub Actions'."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy
         id: deployment
+        if: steps.pages-config.outputs.enabled == 'true'
         uses: actions/deploy-pages@v4

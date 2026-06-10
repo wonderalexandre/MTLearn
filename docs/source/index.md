@@ -31,11 +31,3 @@ guides/index
 api/python/index
 api/cpp/index
 ```
-
-```{toctree}
-:maxdepth: 1
-:caption: Project Docs
-
-project/installation
-project/development
-```
