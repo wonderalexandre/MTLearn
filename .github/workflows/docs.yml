@@ -44,11 +44,13 @@ jobs:
         uses: actions/upload-pages-artifact@v4
         with:
           path: build-docs/docs/mtlearn/site
+      - name: Enable GitHub Pages context
+        uses: actions/configure-pages@v5
 
   deploy-docs:
     name: Deploy to GitHub Pages
     needs: build-docs
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.event.repository.has_pages == true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
