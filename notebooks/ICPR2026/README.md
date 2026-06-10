@@ -106,6 +106,14 @@ The RRPR reference environment used Python `3.12`.
 git clone --recurse-submodules https://github.com/wonderalexandre/MTLearn.git
 cd MTLearn
 python -m pip install -U pip
+python scripts/install_release_dependencies.py --build-tools
+python -m pip install -e ".[notebooks]" --no-build-isolation
+```
+
+If the environment already has the exact Torch stack you want to keep, preserve
+it with `--torch none`:
+
+```bash
 python scripts/install_release_dependencies.py --build-tools --torch none
 python -m pip install -e ".[notebooks]" --no-build-isolation
 python -m pip install jupyterlab

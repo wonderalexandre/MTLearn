@@ -111,21 +111,37 @@ external/MorphologicalAttributeFilters
 
 ## Editable Install
 
-For local development, start from an environment that already has the PyTorch
-build you want to use. This is especially important for CUDA environments,
-where `torch`, `torchvision`, and `torchaudio` must use matching wheel builds.
+For local development, either:
 
-The release dependency helper installs the minimum supported CPU Torch build by
-default on Linux. Use `--torch none` to keep the active environment's PyTorch
-installation intact:
+- if your environment already has the exact PyTorch stack you want (recommended for
+  CUDA/CuDNN-aware setups), use `--torch none`;
+- if you created a fresh environment, let the helper install the minimum supported
+  Torch build (default) and install the matching CMake/Torch toolchain for you.
+
+Use one of the following flows:
+
+Existing torch stack (keep it):
 
 ```bash
 python scripts/install_release_dependencies.py --build-tools --torch none
 pip install -e . --no-build-isolation --no-deps
 ```
 
+Fresh environment (installs Torch via helper):
+
+```bash
+python scripts/install_release_dependencies.py --build-tools
+pip install -e . --no-build-isolation --no-deps
+```
+
 For notebooks from a source checkout, use the `notebooks` extra in the editable
-install:
+install. If your environment already has the desired Torch build, add
+`--torch none`:
+
+```bash
+python scripts/install_release_dependencies.py --build-tools
+pip install -e ".[notebooks]" --no-build-isolation
+```
 
 ```bash
 python scripts/install_release_dependencies.py --build-tools --torch none
