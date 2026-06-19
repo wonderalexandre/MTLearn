@@ -17,6 +17,7 @@ from .ConnectedFilterPreprocessingLayerWithExplicitJacobian import (
     ConnectedFilterPreprocessingLayerWithExplicitJacobian,
 )
 from .checkpoint import collect_cfp_configs, load_checkpoint, save_checkpoint
+from . import cfp
 
 __all__ = [
     "CFPLayer",
@@ -31,6 +32,7 @@ __all__ = [
     "ConnectedFilterPreprocessingLayerLegacy",
     "ConnectedFilterPreprocessingLayerWithCPUTreeTraversal",
     "ConnectedFilterPreprocessingLayerWithExplicitJacobian",
+    "cfp",
     "collect_cfp_configs",
     "load_checkpoint",
     "save_checkpoint",

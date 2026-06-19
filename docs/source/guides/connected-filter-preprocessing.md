@@ -69,6 +69,168 @@ filter_specs = [
 ]
 ```
 
+## Scoring Models
+
+Each spec has a scoring model that maps normalized node attributes to one score
+per tree node. The default is the legacy linear sigmoid gate:
+
+```python
+linear_spec = {
+    "name": "area_linear",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "scoring": {"kind": "linear_sigmoid"},
+}
+```
+
+The linear default keeps trainable parameters under the historical
+`_weights.<spec_name>` and `_biases.<spec_name>` names for checkpoint
+compatibility.
+
+Use an MLP scorer when the keep/discard criterion should combine attributes
+nonlinearly:
+
+```python
+mlp_spec = {
+    "name": "shape_mlp",
+    "tree_type": "max-tree",
+    "attributes": [
+        morphology.AttributeType.AREA,
+        morphology.AttributeType.COMPACTNESS,
+    ],
+    "scoring": {
+        "kind": "mlp",
+        "hidden_channels": [8],
+        "activation": "tanh",
+    },
+}
+```
+
+MLP parameters are owned by the scorer module and appear in
+`get_parameter_contract()["scoring_models"]`.
+
+## Valuation Projections
+
+Scoring decides which nodes contribute. Valuation decides what scalar node
+signal is reconstructed.
+
+The default valuation reconstructs altitude residues:
+
+```python
+altitude_spec = {
+    "name": "altitude",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+}
+```
+
+Use altitude top-hat output for residual-style features:
+
+```python
+from mtlearn.layers import CFPValuation
+
+tophat_spec = {
+    "name": "dark_tophat",
+    "tree_type": "min-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "valuation": CFPValuation.ALTITUDE_TOPHAT,
+}
+```
+
+Use node-attribute valuation to reconstruct a scalar attribute instead of the
+altitude signal:
+
+```python
+attribute_spec = {
+    "name": "mean_level_projection",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "valuation": CFPValuation.node_attribute(morphology.AttributeType.MEAN_LEVEL),
+}
+```
+
+## Constraints and Regularizers
+
+Constraints post-process scores before reconstruction. The current built-in
+constraint preserves the root score:
+
+```python
+constrained_spec = {
+    "name": "preserve_root_area",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "constraints": [{"kind": "preserve_root"}],
+}
+```
+
+The legacy shortcut is still accepted:
+
+```python
+constrained_spec["preserve_root"] = True
+```
+
+Regularizers add training penalties. They are not included in the inference
+contract, so changing a training regularizer does not invalidate checkpoint
+weight compatibility.
+
+```python
+regularized_spec = {
+    "name": "monotone_area",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "regularizers": [{"kind": "monotone_scores", "weight": 0.1}],
+}
+
+layer = ConnectedFilterPreprocessingLayer(
+    in_channels=1,
+    filter_specs=[regularized_spec],
+    scale_mode="none",
+)
+
+loss = task_loss + layer.monotonicity_penalty(x)
+```
+
+The legacy shortcut `monotonicity_weight=0.1` is still accepted.
+
+## Extension Registries
+
+The `mtlearn.layers.cfp` package exposes the default registries used by the
+layer:
+
+- `SCORING_MODEL_REGISTRY` for `ScoringModel` factories;
+- `VALUATION_PROJECTION_REGISTRY` for `ValuationProjection` factories;
+- `SCORE_CONSTRAINT_REGISTRY` for score post-processing constraints;
+- `REGULARIZER_REGISTRY` for training penalties.
+
+Register a new component kind by implementing the matching CFP interface and a
+factory that accepts serializable config fields. Specs can then reference
+registry-backed scoring models, constraints, and regularizers with
+`{"kind": "your_kind", ...}`. New valuation kinds also need updates to the
+public `CFPValuation` facade, validation, and config deserialization.
+
+## Configs and Contracts
+
+`get_config()` stores the architecture needed by `from_config()`. It includes
+tree type, attributes, scoring, valuation, constraints, normalization, and
+training-only regularizer settings.
+
+```python
+config = layer.get_config()
+restored = ConnectedFilterPreprocessingLayer.from_config(config)
+```
+
+Use named contracts when comparing checkpoints or exported parameters:
+
+```python
+contracts = layer.get_contracts()
+inference = contracts["inference_contract"]
+parameters = contracts["parameter_contract"]
+training = contracts["training_contract"]
+```
+
+`get_weight_contract()` is kept as a compatibility alias for the inference
+contract.
+
 ## Normalization and Caching
 
 The default `scale_mode` is `"hybrid"`. It uses dataset-level z-score

@@ -124,8 +124,8 @@ restored = ConnectedFilterPreprocessingLayer.from_config(config)
 ```
 
 This is the same config shape used by checkpoint helpers. It records tree type,
-attributes, normalization mode, clamp bounds, and hybrid normalization
-constants.
+attributes, scoring model, valuation projection, constraints, regularizers,
+normalization mode, clamp bounds, and hybrid normalization constants.
 
 ## Practical Checklist
 

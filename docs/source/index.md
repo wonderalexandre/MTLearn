@@ -7,7 +7,7 @@ This site combines:
 
 - Python API reference generated from docstrings.
 - C++ source-level notes for the installed public facade.
-- Development notes for building, validating, and extending the project.
+- User guides for building experiments with the public Python and C++ APIs.
 
 ```{toctree}
 :maxdepth: 2

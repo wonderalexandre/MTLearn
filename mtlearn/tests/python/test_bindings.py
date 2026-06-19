@@ -226,6 +226,17 @@ def test_connected_filter_preprocessing_tree_tensors_have_consistent_shapes():
 
 def test_connected_filter_preprocessing_public_aliases():
     assert mtlearn.layers.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
+    assert mtlearn.layers.cfp.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
+    assert mtlearn.layers.cfp.ConnectedFilterPreprocessingLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
+    assert (
+        mtlearn.layers.cfp.ConnectedFilterPreprocessingImplicitJacobianFunction
+        is mtlearn.layers.ConnectedFilterPreprocessingImplicitJacobianFunction
+    )
+    assert hasattr(mtlearn.layers.cfp, "LinearSigmoidScorer")
+    assert hasattr(mtlearn.layers.cfp, "AltitudeValuation")
+    assert hasattr(mtlearn.layers.cfp, "MonotoneScoresRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "PreserveRootConstraint")
+    assert hasattr(mtlearn.layers.cfp, "TreeReconstructionFunction")
     assert (
         mtlearn.layers.CFPLayerWithExplicitJacobian
         is mtlearn.layers.ConnectedFilterPreprocessingLayerWithExplicitJacobian
