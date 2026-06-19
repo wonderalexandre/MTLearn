@@ -57,7 +57,12 @@ notebooks = [
   "ipykernel",
   "matplotlib",
   "nbformat>=5",
-  "papermill>=2.4"
+  "papermill>=2.4",
+  "pandas",
+  "scikit-learn",
+  "scipy",
+  "segmentation-models-pytorch",
+  "tqdm>=4.66"
 ]
 test = [
   "pytest>=8"
@@ -149,6 +154,7 @@ exclude = [
   "external/MorphologicalAttributeFilters/python/**",
   "external/MorphologicalAttributeFilters/unit-tests/**",
   "external/MorphologicalAttributeFilters/unit-tests/CMakeLists.txt",
+  "docs/source/guides/connected-filter-preprocessing.md",
   "**/.ipynb_checkpoints/**",
   "**/.ipynb_checkpoints",
   "mtlearn/python/**/__pycache__/**",

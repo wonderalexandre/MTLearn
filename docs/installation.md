@@ -6,6 +6,10 @@ package and import namespace remain `mtlearn`.
 For source builds, tests, notebook validation, and releases, see
 [development.md](development.md).
 
+## Navigation
+
+- [Development and validation](development.md)
+
 ## Install From PyPI
 
 ```bash
@@ -55,12 +59,34 @@ Install the notebook extras when you want to run the public examples:
 pip install "mtlearn[notebooks]"
 ```
 
+The `notebooks` extra installs `ipykernel`, `matplotlib`, `nbformat`,
+`papermill`, `pandas`, `scikit-learn`, `scipy`, and
+`segmentation-models-pytorch`. JupyterLab is optional and only needed for
+interactive notebook editing:
+
+```bash
+pip install jupyterlab
+```
+
 Notebook files are not installed with the PyPI package. Clone the repository to
-run the public notebooks. The main public experiment example is:
+run the public notebooks. The main public example is:
 
 ```text
 notebooks/experiments/Example_screws_filtering.ipynb
 ```
+
+Repository notebooks can download public registered datasets with the dataset
+helper:
+
+```bash
+python scripts/download_data.py --list
+python scripts/download_data.py screws_segmentation
+```
+
+For ICPR 2026 RRPR review, dataset access rules, notebook links, and execution
+commands, use `notebooks/ICPR2026/README.md` as the canonical guide. To run
+those notebooks, clone the repository or use a sparse checkout so the package
+sources and helper scripts are available.
 
 ## Source Checkout
 
@@ -85,15 +111,41 @@ external/MorphologicalAttributeFilters
 
 ## Editable Install
 
+For local development, either:
+
+- if your environment already has the exact PyTorch stack you want (recommended for
+  CUDA/CuDNN-aware setups), use `--torch none`;
+- if you created a fresh environment, let the helper install the minimum supported
+  Torch build (default) and install the matching CMake/Torch toolchain for you.
+
+Use one of the following flows:
+
+Existing torch stack (keep it):
+
 ```bash
-python scripts/install_release_dependencies.py --build-tools
-pip install -e .
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e . --no-build-isolation --no-deps
 ```
 
-For notebooks from a source checkout:
+Fresh environment (installs Torch via helper):
 
 ```bash
-pip install -e ".[notebooks]"
+python scripts/install_release_dependencies.py --build-tools
+pip install -e . --no-build-isolation --no-deps
+```
+
+For notebooks from a source checkout, use the `notebooks` extra in the editable
+install. If your environment already has the desired Torch build, add
+`--torch none`:
+
+```bash
+python scripts/install_release_dependencies.py --build-tools
+pip install -e ".[notebooks]" --no-build-isolation
+```
+
+```bash
+python scripts/install_release_dependencies.py --build-tools --torch none
+pip install -e ".[notebooks]" --no-build-isolation
 ```
 
 ## Next Steps

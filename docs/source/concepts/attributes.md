@@ -21,6 +21,26 @@ attribute values are needed. Deterministic attribute filters accept both
 Use `tree.numInternalNodeSlots` when allocating criteria, scores, or any
 node-indexed array that will be passed back to filtering code.
 
+## Terminology
+
+A morphology tree has two kinds of elements:
+
+- **Proper parts** are the image-domain elements. For 2D images, each proper
+  part is one pixel identified by its row-major linear index.
+- **Internal tree nodes** represent connected components or shapes built from
+  those proper parts. These are the rows addressed by attribute vectors.
+
+A **node slot** is the dense integer row used internally for one internal tree
+node. Attribute arrays keep one row per slot so the same id can be reused by
+filters, scores, CFP parameters, and reconstruction code. In ordinary trees
+these slots correspond to live internal nodes; after advanced topology edits,
+some slots may be kept for stable indexing.
+
+The **support** of a node is the set of image pixels represented by that node:
+the pixels directly owned by the node plus the pixels represented by its
+descendant nodes. In a max-tree or min-tree, this support is the connected
+component associated with that tree node at its altitude.
+
 ## Attribute Groups
 
 Groups are convenience requests. They expand to canonical scalar attributes
@@ -50,7 +70,7 @@ The catalog uses three contracts:
 | Contract | Meaning |
 | --- | --- |
 | Altitude-aware | Reads node altitude or gray-level values from a weighted tree. |
-| Support/geometry | Reads image-domain support, coordinates, contour, or adjacency information. |
+| Support/geometry | Reads the pixel support of each node, coordinates, contour, or adjacency information. |
 | Tree topology | Reads only parent/child relations in the hierarchy. |
 
 Some support/geometry attributes require metadata that is not meaningful for
@@ -76,7 +96,7 @@ contrast, intensity, or altitude differences rather than pure geometry.
 
 | Attribute | Groups | Contract | Use |
 | --- | --- | --- | --- |
-| `AREA` | `SHAPE` | Support/geometry | Number of proper parts in the full node support. For image trees, this is the component pixel count. |
+| `AREA` | `SHAPE` | Support/geometry | Number of pixels in the full node support, including descendant supports. For image trees, this is the connected-component size. |
 | `BOX_WIDTH` | `SHAPE` | Support/geometry | Width of the smallest axis-aligned bounding box around the support. |
 | `BOX_HEIGHT` | `SHAPE` | Support/geometry | Height of the smallest axis-aligned bounding box around the support. |
 | `DIAGONAL_LENGTH` | `SHAPE` | Support/geometry | Bounding-box diagonal length. |
@@ -87,6 +107,10 @@ contrast, intensity, or altitude differences rather than pure geometry.
 | `BOX_ROW_MIN` | `SHAPE` | Support/geometry | Minimum image row covered by the support. |
 | `BOX_ROW_MAX` | `SHAPE` | Support/geometry | Maximum image row covered by the support. |
 | `MAX_DIST` | `SHAPE` | Support/geometry | Maximum distance-transform style descriptor from contour information. Prefer max-tree/min-tree use. |
+
+`AREA` is the usual attribute for size filtering. A high `AREA` value means
+that the component represented by the node covers many pixels in the original
+image domain; it is not the number of children in the tree.
 
 These attributes are the most direct tools for area openings, size priors, and
 filters that should keep or remove elongated connected components.

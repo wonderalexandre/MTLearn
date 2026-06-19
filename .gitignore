@@ -17,6 +17,7 @@ htmlcov/
 anaconda_projects/
 /dat/
 /notebooks/icpr2016/
+/notebooks/ICPR2026_runs/
 /notebooks/.ipynb_checkpoints
 python/mtlearn/.DS_Store
 notebooks/.ipynb_checkpoints/AreaOpening-checkpoint.ipynb
