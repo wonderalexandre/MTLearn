@@ -64,10 +64,6 @@ class TreePayloadCache:
         """Return a compatibility view of cached normalized attributes."""
         return self._view("norm_attrs")
 
-    def valuation_increments(self) -> dict[str, dict[str, object]]:
-        """Return a compatibility view of cached valuation increments."""
-        return self._view("valuation_increments")
-
     def clear(self) -> None:
         """Drop all cached payloads."""
         self._payloads.clear()

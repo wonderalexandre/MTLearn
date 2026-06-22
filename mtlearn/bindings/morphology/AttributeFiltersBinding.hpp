@@ -9,9 +9,12 @@
 #include "BindingSupport.hpp"
 
 #include <mmcfilters/filters/AttributeFilters.hpp>
+#include <mmcfilters/filters/ExtinctionValues.hpp>
 
+#include <cmath>
 #include <concepts>
 #include <memory>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -23,6 +26,18 @@ namespace morphology_pybind {
 // specific backend tree. The shared tree handle guarantees the topology remains
 // alive for the filter object's lifetime.
 class AttributeFiltersPybind {
+private:
+    enum class ExtinctionSelectionMode {
+        ExtremaToKeep,
+        MinExtinction,
+    };
+
+    struct ExtinctionSelection {
+        ExtinctionSelectionMode mode;
+        int extremaToKeep{0};
+        double minExtinction{0.0};
+    };
+
 public:
     explicit AttributeFiltersPybind(morphology::WeightedTreePtr tree)
         : tree_(requireTree(std::move(tree))), filter_(morphology::detail::backend(*tree_))
@@ -88,6 +103,31 @@ public:
         return filter_.getAdaptiveCriterion(criterion, delta);
     }
 
+    py::array_t<uint8_t> filteringByExtinctionValue(
+        py::array attribute,
+        py::object minExtinction,
+        py::object extremaToKeep)
+    {
+        const ExtinctionSelection selection = parseExtinctionSelection(std::move(minExtinction), std::move(extremaToKeep));
+        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+            return filteringByExtinctionValueTyped<double>(std::move(attribute), selection);
+        }
+        return filteringByExtinctionValueTyped<float>(std::move(attribute), selection);
+    }
+
+    py::array saliencyMapByExtinctionValue(
+        py::array attribute,
+        py::object minExtinction,
+        bool unweighted,
+        py::object extremaToKeep)
+    {
+        const ExtinctionSelection selection = parseExtinctionSelection(std::move(minExtinction), std::move(extremaToKeep));
+        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+            return saliencyMapByExtinctionValueTyped<double>(std::move(attribute), selection, unweighted);
+        }
+        return saliencyMapByExtinctionValueTyped<float>(std::move(attribute), selection, unweighted);
+    }
+
 private:
     // Convert a null shared_ptr into a Python ValueError before backend
     // construction can dereference it.
@@ -129,6 +169,99 @@ private:
     {
         auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
         return imageToNumpy(filter_.filteringByPruningMax(floatingArrayView(typed), threshold));
+    }
+
+    template <std::floating_point Real>
+    mmcfilters::ExtinctionValues<std::uint8_t, Real> makeExtinctionValues(py::array attribute)
+    {
+        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
+        requireFiniteNodeAttributeValues(typed);
+        return mmcfilters::ExtinctionValues<std::uint8_t, Real>(
+            morphology::detail::backend(*tree_),
+            floatingArrayView(typed));
+    }
+
+    static void requireFiniteExtinctionThreshold(double minExtinction)
+    {
+        if (!std::isfinite(minExtinction)) {
+            throw std::invalid_argument("min_extinction must be finite");
+        }
+    }
+
+    template <std::floating_point Real>
+    static void requireFiniteNodeAttributeValues(const py::array_t<Real, py::array::c_style>& attribute)
+    {
+        const py::buffer_info buffer = attribute.request();
+        const auto* values = static_cast<const Real*>(buffer.ptr);
+        for (py::ssize_t i = 0; i < buffer.shape[0]; ++i) {
+            if (!std::isfinite(static_cast<double>(values[i]))) {
+                throw std::invalid_argument("attr must contain only finite values");
+            }
+        }
+    }
+
+    template <std::floating_point Real>
+    static int countExtremaAtLeast(mmcfilters::ExtinctionValues<std::uint8_t, Real>& extinction, double minExtinction)
+    {
+        int extremaToKeep = 0;
+        for (const auto& record : extinction.getExtinctionValues()) {
+            if (static_cast<double>(record.extinction) < minExtinction) {
+                break;
+            }
+            ++extremaToKeep;
+        }
+        return extremaToKeep;
+    }
+
+    static ExtinctionSelection parseExtinctionSelection(py::object minExtinction, py::object extremaToKeep)
+    {
+        const bool hasMinExtinction = !minExtinction.is_none();
+        const bool hasExtremaToKeep = !extremaToKeep.is_none();
+        if (hasMinExtinction == hasExtremaToKeep) {
+            throw std::invalid_argument("pass exactly one of min_extinction or extrema_to_keep");
+        }
+
+        if (hasExtremaToKeep) {
+            return ExtinctionSelection{
+                ExtinctionSelectionMode::ExtremaToKeep,
+                extremaToKeep.cast<int>(),
+                0.0};
+        }
+
+        const double threshold = minExtinction.cast<double>();
+        requireFiniteExtinctionThreshold(threshold);
+        return ExtinctionSelection{
+            ExtinctionSelectionMode::MinExtinction,
+            0,
+            threshold};
+    }
+
+    template <std::floating_point Real>
+    static int resolveExtremaToKeep(
+        mmcfilters::ExtinctionValues<std::uint8_t, Real>& extinction,
+        const ExtinctionSelection& selection)
+    {
+        if (selection.mode == ExtinctionSelectionMode::ExtremaToKeep) {
+            return selection.extremaToKeep;
+        }
+        return countExtremaAtLeast(extinction, selection.minExtinction);
+    }
+
+    template <std::floating_point Real>
+    py::array_t<uint8_t> filteringByExtinctionValueTyped(py::array attribute, const ExtinctionSelection& selection)
+    {
+        auto extinction = makeExtinctionValues<Real>(std::move(attribute));
+        return imageToNumpy(extinction.filtering(resolveExtremaToKeep(extinction, selection)));
+    }
+
+    template <std::floating_point Real>
+    py::array saliencyMapByExtinctionValueTyped(
+        py::array attribute,
+        const ExtinctionSelection& selection,
+        bool unweighted)
+    {
+        auto extinction = makeExtinctionValues<Real>(std::move(attribute));
+        return imageToNumpy(extinction.saliencyMap(resolveExtremaToKeep(extinction, selection), unweighted));
     }
 
     void requireNodeCriterion(const std::vector<bool>& criterion, std::string_view argumentName) const
@@ -192,7 +325,20 @@ or node scores and return reconstructed NumPy images. Create instances through
             &AttributeFiltersPybind::getAdaptiveCriterion,
             "criterion"_a,
             "delta"_a,
-            "Expand a node criterion with the backend adaptive-criterion rule.");
+            "Expand a node criterion with the backend adaptive-criterion rule.")
+        .def("filteringByExtinctionValue",
+            &AttributeFiltersPybind::filteringByExtinctionValue,
+            "attr"_a,
+            "min_extinction"_a = py::none(),
+            "extrema_to_keep"_a = py::none(),
+            "Filter by keeping extrema selected either by ``min_extinction`` or ``extrema_to_keep``.")
+        .def("saliencyMapByExtinctionValue",
+            &AttributeFiltersPybind::saliencyMapByExtinctionValue,
+            "attr"_a,
+            "min_extinction"_a = py::none(),
+            "unweighted"_a = false,
+            "extrema_to_keep"_a = py::none(),
+            "Build a contour saliency map from extrema selected either by ``min_extinction`` or ``extrema_to_keep``.");
 }
 
 } // namespace morphology_pybind

@@ -152,7 +152,7 @@ evaluation.
 ```python
 model.eval()
 with torch.no_grad():
-    features = model.cfp.predict(x, beta_f=1000.0)
+    features = model.cfp.predict(x, score_sharpness=1000.0)
     logits = model.head(features)
 ```
 

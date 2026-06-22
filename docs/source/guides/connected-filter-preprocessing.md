@@ -109,12 +109,10 @@ mlp_spec = {
 MLP parameters are owned by the scorer module and appear in
 `get_parameter_contract()["scoring_models"]`.
 
-## Valuation Projections
+## Altitude Signal
 
-Scoring decides which nodes contribute. Valuation decides what scalar node
-signal is reconstructed.
-
-The default valuation reconstructs altitude residues:
+Scoring decides which nodes contribute to the reconstructed altitude-residue
+signal:
 
 ```python
 altitude_spec = {
@@ -124,30 +122,9 @@ altitude_spec = {
 }
 ```
 
-Use altitude top-hat output for residual-style features:
+CFP does not expose alternative signal projections as a Python extension point.
+The forward signal is fixed to morphology-tree altitude residues.
 
-```python
-from mtlearn.layers import CFPValuation
-
-tophat_spec = {
-    "name": "dark_tophat",
-    "tree_type": "min-tree",
-    "attributes": [morphology.AttributeType.AREA],
-    "valuation": CFPValuation.ALTITUDE_TOPHAT,
-}
-```
-
-Use node-attribute valuation to reconstruct a scalar attribute instead of the
-altitude signal:
-
-```python
-attribute_spec = {
-    "name": "mean_level_projection",
-    "tree_type": "max-tree",
-    "attributes": [morphology.AttributeType.AREA],
-    "valuation": CFPValuation.node_attribute(morphology.AttributeType.MEAN_LEVEL),
-}
-```
 
 ## Constraints and Regularizers
 
@@ -178,7 +155,7 @@ regularized_spec = {
     "name": "monotone_area",
     "tree_type": "max-tree",
     "attributes": [morphology.AttributeType.AREA],
-    "regularizers": [{"kind": "monotone_scores", "weight": 0.1}],
+    "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.1}],
 }
 
 layer = ConnectedFilterPreprocessingLayer(
@@ -187,10 +164,15 @@ layer = ConnectedFilterPreprocessingLayer(
     scale_mode="none",
 )
 
-loss = task_loss + layer.monotonicity_penalty(x)
+loss = task_loss + layer.regularization_penalty(x)
 ```
 
 The legacy shortcut `monotonicity_weight=0.1` is still accepted.
+
+Other registered morphological regularizers include
+`attribute_order_score_monotonicity`, which penalizes score inversions after sorting
+nodes by one normalized attribute, and `path_score_monotonicity`, which penalizes
+descendants that score higher than their ancestors.
 
 ## Extension Registries
 
@@ -198,21 +180,19 @@ The `mtlearn.layers.cfp` package exposes the default registries used by the
 layer:
 
 - `SCORING_MODEL_REGISTRY` for `ScoringModel` factories;
-- `VALUATION_PROJECTION_REGISTRY` for `ValuationProjection` factories;
 - `SCORE_CONSTRAINT_REGISTRY` for score post-processing constraints;
 - `REGULARIZER_REGISTRY` for training penalties.
 
 Register a new component kind by implementing the matching CFP interface and a
 factory that accepts serializable config fields. Specs can then reference
 registry-backed scoring models, constraints, and regularizers with
-`{"kind": "your_kind", ...}`. New valuation kinds also need updates to the
-public `CFPValuation` facade, validation, and config deserialization.
+`{"kind": "your_kind", ...}`.
 
 ## Configs and Contracts
 
 `get_config()` stores the architecture needed by `from_config()`. It includes
-tree type, attributes, scoring, valuation, constraints, normalization, and
-training-only regularizer settings.
+tree type, attributes, scoring, constraints, normalization, and training-only
+regularizer settings.
 
 ```python
 config = layer.get_config()
@@ -263,12 +243,13 @@ debug_layer = ConnectedFilterPreprocessingLayer(
 
 ## Initialization
 
-Two helpers initialize filters close to identity.
+Initialize scoring models close to identity when CFP should start by preserving
+the input image.
 
 ```python
-layer.init_identity_with_bias(p0=0.995)
+layer.init_identity(p0=0.995)
 
-# Alternative for hybrid-normalized attributes with positive floor.
+# Legacy linear-only alternative for hybrid-normalized attributes with positive floor.
 layer.init_identity_bias_zero(p0=0.99)
 ```
 
@@ -279,13 +260,13 @@ block is meant to discover strong filtering behavior from scratch.
 ## Inference
 
 `predict` temporarily switches to evaluation mode, runs without gradients, and
-uses a caller-provided sigmoid gain. A large `beta_f` makes gates closer to
-hard decisions.
+uses a caller-provided score sharpness. A large `score_sharpness` makes gates
+closer to hard decisions.
 
 ```python
 with torch.no_grad():
     y_soft = layer(x)
-    y_hard = layer.predict(x, beta_f=1000.0)
+    y_hard = layer.predict(x, score_sharpness=1000.0)
 ```
 
 ## Inspect One Sample

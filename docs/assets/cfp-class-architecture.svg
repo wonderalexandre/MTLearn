@@ -45,8 +45,8 @@
   <rect class="support" x="58" y="289" width="260" height="86" />
   <text class="label" x="188" y="313" text-anchor="middle">component_registries.py</text>
   <text class="tiny" x="188" y="333" text-anchor="middle">SCORING_MODEL_REGISTRY</text>
-  <text class="tiny" x="188" y="350" text-anchor="middle">VALUATION_PROJECTION_REGISTRY</text>
-  <text class="tiny" x="188" y="367" text-anchor="middle">SCORE_CONSTRAINT_REGISTRY, REGULARIZER_REGISTRY</text>
+  <text class="tiny" x="188" y="350" text-anchor="middle">SCORE_CONSTRAINT_REGISTRY</text>
+  <text class="tiny" x="188" y="367" text-anchor="middle">REGULARIZER_REGISTRY</text>
 
   <rect class="support" x="58" y="395" width="260" height="54" />
   <text class="label" x="188" y="418" text-anchor="middle">ConfigSerializer / ConfigDeserializer</text>
@@ -90,9 +90,9 @@
   <text class="tiny" x="985" y="344" text-anchor="middle">custom scorers</text>
 
   <rect class="ext" x="850" y="369" width="270" height="62" />
-  <text class="label" x="985" y="392" text-anchor="middle">ValuationProjection</text>
-  <text class="tiny" x="985" y="410" text-anchor="middle">Altitude, AltitudeTopHat</text>
-  <text class="tiny" x="985" y="426" text-anchor="middle">NodeAttribute, custom projections</text>
+  <text class="label" x="985" y="392" text-anchor="middle">Altitude Residues</text>
+  <text class="tiny" x="985" y="410" text-anchor="middle">fixed morphology signal</text>
+  <text class="tiny" x="985" y="426" text-anchor="middle">not a Python extension point</text>
 
   <rect class="ext" x="850" y="451" width="270" height="54" />
   <text class="label" x="985" y="474" text-anchor="middle">ScoreConstraint</text>
@@ -100,7 +100,7 @@
 
   <rect class="ext" x="850" y="525" width="270" height="54" />
   <text class="label" x="985" y="548" text-anchor="middle">Regularizer</text>
-  <text class="tiny" x="985" y="566" text-anchor="middle">MonotoneScoresRegularizer, custom penalties</text>
+  <text class="tiny" x="985" y="566" text-anchor="middle">EdgeScoreMonotonicityRegularizer, custom penalties</text>
 
   <rect class="panel" x="385" y="520" width="390" height="150" />
   <text class="section" x="580" y="546" text-anchor="middle">Persistence and analysis helpers</text>

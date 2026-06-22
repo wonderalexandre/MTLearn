@@ -26,7 +26,7 @@ class ForwardExecutor:
                 base_key = f"{int(idx[batch_index])}_{channel_index}"
                 direct_payloads = {}
                 for spec in layer.filter_specs:
-                    info, norm_attrs, valuation_increments = layer._get_tree_payload_for_sample(
+                    info, norm_attrs = layer._get_tree_payload_for_sample(
                         base_key,
                         x[batch_index, channel_index],
                         spec,
@@ -46,8 +46,7 @@ class ForwardExecutor:
                             spec,
                             info,
                             norm_attrs,
-                            valuation_increments,
-                            layer.beta_f,
+                            layer._score_sharpness_for_spec(spec),
                         )
                     finally:
                         layer._active_context = None
@@ -55,8 +54,8 @@ class ForwardExecutor:
                     out[batch_index, output_channel].copy_(y_out, non_blocking=True)
         return out
 
-    def monotonicity_penalty(self, layer, x: torch.Tensor) -> torch.Tensor:
-        """Return the per-spec monotone-score regularization."""
+    def regularization_penalty(self, layer, x: torch.Tensor) -> torch.Tensor:
+        """Return the per-spec training regularization penalty."""
         x, idx, use_cache = layer._batch_input(x)
         assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
         batch_size, channels, _, _ = x.shape
@@ -76,7 +75,7 @@ class ForwardExecutor:
                 base_key = f"{int(idx[batch_index])}_{channel_index}"
                 direct_payloads = {}
                 for spec in active_specs:
-                    info, norm_attrs, _ = layer._get_tree_payload_for_sample(
+                    info, norm_attrs = layer._get_tree_payload_for_sample(
                         base_key,
                         x[batch_index, channel_index],
                         spec,
@@ -88,10 +87,10 @@ class ForwardExecutor:
                         batch_index,
                         channel_index,
                         spec,
-                        mode="monotonicity_penalty",
+                        mode="regularization_penalty",
                     )
                     try:
-                        penalty = penalty + layer._monotonicity_penalty_for_spec(
+                        penalty = penalty + layer._regularization_penalty_for_spec(
                             spec,
                             info,
                             norm_attrs,

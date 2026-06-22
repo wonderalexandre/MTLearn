@@ -12,14 +12,13 @@ from ..._helpers import build_tree
 
 
 class TreePayloadProvider:
-    """Build tree tensors, normalized attributes, and valuation increments."""
+    """Build tree tensors and normalized attributes."""
 
     def __init__(
         self,
         *,
         tree_spec_by_key: Mapping[str, Any],
         scoring_attrs_by_tree_key: Mapping[str, set[Any]],
-        valuation_projections_by_tree_key: Mapping[str, Mapping[str, Any]],
         normalizer,
         stat_key_fn: Callable[[str, Any], str],
         device,
@@ -28,7 +27,6 @@ class TreePayloadProvider:
     ):
         self.tree_spec_by_key = tree_spec_by_key
         self.scoring_attrs_by_tree_key = scoring_attrs_by_tree_key
-        self.valuation_projections_by_tree_key = valuation_projections_by_tree_key
         self.normalizer = normalizer
         self.stat_key_fn = stat_key_fn
         self.device = torch.device(device)
@@ -63,16 +61,6 @@ class TreePayloadProvider:
             "order_backward": torch.argsort(tpre).to(self.device),
         }
 
-    def compute_valuation_increment(self, tree, info, valuation) -> torch.Tensor:
-        """Compute a valuation projection's node signal for one tree."""
-        return valuation.compute_node_signal(
-            tree,
-            info,
-            morphology_module=self.morphology,
-            attribute_dtype=self.attribute_dtype,
-            device=self.device,
-        )
-
     def compute_payload(self, image_np, tree_key: str, *, update_stats: bool):
         """Build one tree payload for a channel image and tree key."""
         spec = self.tree_spec_by_key[tree_key]
@@ -90,15 +78,10 @@ class TreePayloadProvider:
             base_attrs[attr_type] = raw_1d.unsqueeze(1)
             norm_attrs[attr_type] = self.normalizer.normalize(stat_key, raw_1d)
 
-        valuation_increments = {}
-        for valuation in self.valuation_projections_by_tree_key.get(tree_key, {}).values():
-            valuation_increments[valuation.key()] = self.compute_valuation_increment(tree, info, valuation)
-
         return {
             "info": info,
             "base_attrs": base_attrs,
             "norm_attrs": norm_attrs,
-            "valuation_increments": valuation_increments,
         }
 
     def get_payload(self, sample_key: str, image_channel, tree_spec, *, use_cache: bool):

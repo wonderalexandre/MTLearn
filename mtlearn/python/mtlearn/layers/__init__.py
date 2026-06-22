@@ -1,6 +1,5 @@
 from .ConnectedFilterPreprocessingLayer import (
     CFPLayer,
-    CFPValuation,
     ConnectedFilterPreprocessingImplicitJacobianFunction,
     ConnectedFilterPreprocessingLayer,
 )
@@ -21,7 +20,6 @@ from . import cfp
 
 __all__ = [
     "CFPLayer",
-    "CFPValuation",
     "CFPLayerWithCPUTreeTraversal",
     "CFPLayerWithExplicitJacobian",
     "CFPExplicitJacobianFunction",

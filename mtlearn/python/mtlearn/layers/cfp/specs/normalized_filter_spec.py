@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..scoring import ScoringModel
-from ..valuation import CFPValuation, ValuationProjection
 
 
 @dataclass(frozen=True)
@@ -19,9 +18,7 @@ class NormalizedFilterSpec:
     tree_key: str
     attributes: tuple[Any, ...]
     scoring_model: ScoringModel
-    valuation: CFPValuation
-    valuation_projection: ValuationProjection
-    valuation_key: str
+    score_sharpness: float
     preserve_root: bool
     monotonicity_weight: float
     constraint_configs: tuple[dict[str, Any], ...]

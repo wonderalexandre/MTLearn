@@ -361,6 +361,97 @@ def test_attribute_filter_accepts_float64_attributes():
     assert filtered_max.dtype == np.uint8
 
 
+def test_attribute_filter_extinction_methods():
+    image = _small_image()
+    tree = morphology.create_max_tree(image)
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.LEVEL)
+    level64 = morphology.compute_single_attribute(
+        tree,
+        morphology.AttributeType.LEVEL,
+        dtype=np.float64,
+    )
+    attribute_filter = morphology.create_attribute_filter(tree)
+    assert not hasattr(attribute_filter, "filteringByExtinction")
+    assert not hasattr(attribute_filter, "saliencyMapByExtinction")
+
+    reconstructed = tree.reconstructionImage()
+    filtered_keep_all = attribute_filter.filteringByExtinctionValue(
+        level,
+        extrema_to_keep=1024,
+    )
+    filtered_value_keep_all = attribute_filter.filteringByExtinctionValue(
+        level,
+        min_extinction=0.0,
+    )
+    filtered_value_keep_all_positional = attribute_filter.filteringByExtinctionValue(level, 0.0)
+    strongest_by_rank = attribute_filter.filteringByExtinctionValue(
+        level,
+        extrema_to_keep=1,
+    )
+    strongest_by_value = attribute_filter.filteringByExtinctionValue(
+        level,
+        min_extinction=float(np.finfo(level.dtype).max),
+    )
+    saliency = attribute_filter.saliencyMapByExtinctionValue(
+        level,
+        extrema_to_keep=1024,
+    )
+    saliency64 = attribute_filter.saliencyMapByExtinctionValue(
+        level64,
+        min_extinction=float(np.finfo(level64.dtype).max),
+        unweighted=False,
+    )
+
+    assert np.array_equal(filtered_keep_all, reconstructed)
+    assert np.array_equal(filtered_value_keep_all, reconstructed)
+    assert np.array_equal(filtered_value_keep_all_positional, reconstructed)
+    assert np.array_equal(strongest_by_value, strongest_by_rank)
+    assert saliency.shape == image.shape
+    assert saliency.dtype == np.float32
+    assert saliency64.shape == image.shape
+    assert saliency64.dtype == np.float64
+
+
+def test_attribute_filter_extinction_validates_inputs():
+    tree = morphology.create_max_tree(_small_image())
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.LEVEL)
+    attribute_filter = morphology.create_attribute_filter(tree)
+
+    with pytest.raises(ValueError, match="attr must have length"):
+        attribute_filter.filteringByExtinctionValue(
+            np.ones(1, dtype=np.float32),
+            extrema_to_keep=1,
+        )
+
+    with pytest.raises(ValueError, match="non-negative extremaToKeep"):
+        attribute_filter.filteringByExtinctionValue(level, extrema_to_keep=-1)
+
+    with pytest.raises(ValueError, match="min_extinction must be finite"):
+        attribute_filter.filteringByExtinctionValue(level, np.inf)
+
+    with pytest.raises(ValueError, match="exactly one of min_extinction or extrema_to_keep"):
+        attribute_filter.filteringByExtinctionValue(level)
+
+    with pytest.raises(ValueError, match="exactly one of min_extinction or extrema_to_keep"):
+        attribute_filter.filteringByExtinctionValue(
+            level,
+            min_extinction=0.0,
+            extrema_to_keep=1,
+        )
+
+    non_finite_level = level.copy()
+    non_finite_level[0] = np.nan
+    with pytest.raises(ValueError, match="attr must contain only finite values"):
+        attribute_filter.filteringByExtinctionValue(non_finite_level, extrema_to_keep=1)
+
+    tos = morphology.create_tree_of_shapes(_small_image())
+    tos_attribute_filter = morphology.create_attribute_filter(tos)
+    tos_attr = np.ones(tos.numInternalNodeSlots, dtype=np.float32)
+
+    with pytest.raises(ValueError, match="defined only for MAX_TREE and MIN_TREE"):
+        tos_attribute_filter.filteringByExtinctionValue(tos_attr, extrema_to_keep=1)
+
+
 def test_attribute_filter_rejects_non_float_attribute_array():
     tree = morphology.create_max_tree(_small_image())
     attribute_filter = morphology.create_attribute_filter(tree)

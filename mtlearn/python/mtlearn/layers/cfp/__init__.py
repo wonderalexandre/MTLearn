@@ -3,17 +3,22 @@
 This package is the migration target for the production
 ``ConnectedFilterPreprocessingLayer``. The first refactoring step keeps the
 existing layer as the runtime implementation and exposes small extension
-interfaces for future scoring models, valuation projections, constraints, and
-regularizers.
+interfaces for future scoring models, constraints, and regularizers.
 """
 
 from .constraints import PreserveRootConstraint, ScoreConstraint
 from .normalization import AttributeNormalizer, StatsSerializer
-from .regularization import MonotoneScoresRegularizer, Regularizer
+from .regularization import (
+    AttributeOrderScoreMonotonicityRegularizer,
+    EdgeScoreMonotonicityRegularizer,
+    PathScoreMonotonicityRegularizer,
+    Regularizer,
+)
 from .runtime import (
     BatchInput,
     BatchInputNormalizer,
     CachedDataLoaderBuilder,
+    CFPCacheInputError,
     CFPContext,
     ConnectedFilterPreprocessingImplicitJacobianFunction,
     ForwardExecutor,
@@ -22,6 +27,7 @@ from .runtime import (
     TreePayloadProvider,
     TreeReconstructionFunction,
     TreeReconstructor,
+    validate_cfp_cache_batch_x,
 )
 from .scoring import (
     LegacyLinearParameterInitializer,
@@ -31,18 +37,10 @@ from .scoring import (
 )
 from .serialization import ConfigDeserializer, ConfigSerializer, PersistentStateManager
 from .specs import FeatureSpec, FilterSpec, SpecRegistry, TreeSpec
-from .valuation import (
-    AltitudeTopHatValuation,
-    AltitudeValuation,
-    CFPValuation,
-    NodeAttributeValuation,
-    ValuationProjection,
-)
 from .component_registries import (
     REGULARIZER_REGISTRY,
     SCORE_CONSTRAINT_REGISTRY,
     SCORING_MODEL_REGISTRY,
-    VALUATION_PROJECTION_REGISTRY,
 )
 from .connected_filter_preprocessing_layer import (
     CFPLayer,
@@ -50,15 +48,14 @@ from .connected_filter_preprocessing_layer import (
 )
 
 __all__ = [
-    "AltitudeTopHatValuation",
-    "AltitudeValuation",
     "AttributeNormalizer",
+    "AttributeOrderScoreMonotonicityRegularizer",
     "BatchInput",
     "BatchInputNormalizer",
     "CachedDataLoaderBuilder",
+    "CFPCacheInputError",
     "CFPContext",
     "CFPLayer",
-    "CFPValuation",
     "ConfigDeserializer",
     "ConfigSerializer",
     "ConnectedFilterPreprocessingImplicitJacobianFunction",
@@ -69,8 +66,8 @@ __all__ = [
     "LegacyLinearParameterInitializer",
     "LinearSigmoidScorer",
     "MLPScorer",
-    "MonotoneScoresRegularizer",
-    "NodeAttributeValuation",
+    "EdgeScoreMonotonicityRegularizer",
+    "PathScoreMonotonicityRegularizer",
     "PersistentStateManager",
     "PreserveRootConstraint",
     "REGULARIZER_REGISTRY",
@@ -87,6 +84,5 @@ __all__ = [
     "TreeReconstructor",
     "TrainingSampleInspector",
     "TreeSpec",
-    "VALUATION_PROJECTION_REGISTRY",
-    "ValuationProjection",
+    "validate_cfp_cache_batch_x",
 ]

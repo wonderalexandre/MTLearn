@@ -27,7 +27,7 @@ layer = ConnectedFilterPreprocessingLayer(
 ```
 
 `preserve_root=True` in a filter spec forces that spec's root-node gate to one
-during the implicit CFP forward pass. This keeps the root valuation increment
+during the implicit CFP forward pass. This keeps the root altitude increment
 unfiltered for that filter only.
 
 The default is `False` per filter spec to preserve historical CFP behavior and
@@ -64,13 +64,13 @@ field restore it as `False`.
 
 ```python
 task_loss = criterion(model(inputs), targets)
-mono_loss = layer.monotonicity_penalty(inputs)
+mono_loss = layer.regularization_penalty(inputs)
 loss = task_loss + mono_loss
 ```
 
 `monotonicity_weight` is an optional non-negative scalar inside each filter
 spec. The default is `0.0`, so legacy CFP code is unchanged unless a spec opts
-in and the training loop explicitly adds `monotonicity_penalty(...)` to the
+in and the training loop explicitly adds `regularization_penalty(...)` to the
 objective.
 
 For every active spec, the regularizer computes node gates from the normalized
@@ -94,6 +94,8 @@ regularizing all non-root parent-child edges.
 
 ### Serialization
 
-`monotonicity_weight` is serialized inside each filter spec in `get_config()`,
-`get_weight_contract()`, and `export_params()`. It is intentionally not a
+`monotonicity_weight` is serialized inside each filter spec in `get_config()`
+and in the training contract emitted by `export_params()`. It is intentionally
+not part of `get_weight_contract()` because regularization changes training
+behavior, not inference weight compatibility. It is also intentionally not a
 top-level layer option.

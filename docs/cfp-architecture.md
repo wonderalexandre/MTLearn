@@ -9,6 +9,10 @@ This page documents the developer-facing design of
 `mtlearn.layers.cfp`.
 
 For scoring-specific details, see [CFP Scoring Design](cfp-scoring-design.md).
+For score-constraint-specific details, see
+[CFP Score Constraint Design](cfp-score-constraint-design.md).
+For regularization-specific details, see
+[CFP Regularization Design](cfp-regularization-design.md).
 
 The public user import remains:
 
@@ -28,7 +32,7 @@ The CFP layer is organized so these concerns can evolve independently:
 - normalized node features used for scoring;
 - node scoring models;
 - score constraints applied before reconstruction;
-- valuation projections, which choose the node signal to reconstruct;
+- fixed altitude residues, which are the node signal reconstructed by CFP;
 - training regularizers;
 - serialization contracts for configs, checkpoints, and exported parameters.
 
@@ -57,10 +61,8 @@ input image channel
  -> AttributeNormalizer
  -> ScoringModel
  -> ScoreConstraint(s)
- -> ValuationProjection.node_signal
- -> score * node_signal
+ -> score * altitude residues
  -> TreeReconstructionFunction
- -> ValuationProjection.project
  -> output image channel
 ```
 
@@ -71,8 +73,7 @@ The tree payload contains:
 
 - `info`: dense tree tensors and metadata;
 - `base_attrs`: raw scalar attributes by attribute key;
-- `norm_attrs`: normalized scalar attributes by attribute key;
-- `valuation_increments`: cached node signals by valuation key.
+- `norm_attrs`: normalized scalar attributes by attribute key.
 
 The `info` mapping currently contains:
 
@@ -96,19 +97,18 @@ Use this map when deciding where a change belongs:
 | --- | --- |
 | `connected_filter_preprocessing_layer.py` | Public layer methods, compatibility properties, and orchestration hooks. |
 | `scoring/` | `ScoringModel`, `LinearSigmoidScorer`, `MLPScorer`, and legacy linear parameter initialization. |
-| `valuation/` | `CFPValuation`, `ValuationProjection`, altitude, top-hat, and node-attribute projections. |
 | `constraints/` | Score post-processing constraints such as root preservation. |
-| `regularization/` | Training penalties such as monotone-score regularization. |
+| `regularization/` | Training penalties such as edge, path, and attribute-order score monotonicity. |
 | `normalization/` | Attribute normalization and normalization-stat serialization. |
 | `specs/` | Filter-spec dataclasses, validation, normalization, and generic `SpecRegistry`. |
 | `runtime/` | Batch input handling, cached dataloaders, forward execution, tree payloads, reconstruction, context, and inspection. |
 | `serialization/` | Layer configs, deserialization, checkpoints, saved stats, and parameter exports. |
-| `component_registries.py` | Cross-family default registries for scoring, valuation, constraints, and regularizers. |
+| `component_registries.py` | Cross-family default registries for scoring, constraints, and regularizers. |
 
 Compatibility shim modules remain at the top of `mtlearn.layers.cfp` for the old
-file names, for example `mlp_scorer.py`, `valuation_projection.py`, and
-`tree_payload_provider.py`. New code should import from the grouped packages
-or from the aggregate `mtlearn.layers.cfp` namespace.
+file names, for example `mlp_scorer.py` and `tree_payload_provider.py`. New
+code should import from the grouped packages or from the aggregate
+`mtlearn.layers.cfp` namespace.
 
 The intended package layout is:
 
@@ -117,7 +117,6 @@ cfp/
   connected_filter_preprocessing_layer.py
   component_registries.py
   scoring/
-  valuation/
   constraints/
   regularization/
   normalization/
@@ -142,7 +141,7 @@ CFPContext(
 )
 ```
 
-Current modes are `"forward"` and `"monotonicity_penalty"`.
+Current modes are `"forward"` and `"regularization_penalty"`.
 
 ## Extension Stability
 
@@ -153,7 +152,6 @@ The extension mechanisms are not all at the same maturity level:
 | `ScoringModel` | Registry-backed and config-roundtrippable. Safe extension point. |
 | `ScoreConstraint` | Registry-backed and config-roundtrippable. Safe extension point. |
 | `Regularizer` | Registry-backed and config-roundtrippable. Safe extension point. |
-| `ValuationProjection` | Registry-backed internally, but the public `CFPValuation` facade, validator, and deserializer must also know new valuation kinds. Treat new valuation kinds as a coordinated API change. |
 | `TreePayloadProvider` and `TreeReconstructionFunction` | Internal architecture boundaries. Extend with tests and benchmarks when changing tree semantics or reconstruction. |
 
 ## Scoring Models
@@ -231,6 +229,12 @@ SCORING_MODEL_REGISTRY.register(
 )
 ```
 
+Scorers that have a meaningful neutral state should also implement
+`init_identity(beta_f=..., p0=...)`. The layer calls this method from
+`layer.init_identity(...)` so each scorer can decide how to make
+`score(node) ~= p0`. If a scorer cannot define this state, keep the base method
+so strict initialization fails explicitly.
+
 Then specs can use:
 
 ```python
@@ -294,7 +298,7 @@ nonlinear_shape_spec = {
         "activation": "tanh",
     },
     "constraints": [{"kind": "preserve_root"}],
-    "regularizers": [{"kind": "monotone_scores", "weight": 0.05}],
+    "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.05}],
 }
 
 layer = ConnectedFilterPreprocessingLayer(
@@ -316,9 +320,9 @@ For small training sets, keep the model intentionally shallow and add stability
 controls:
 
 - prefer one hidden layer and small hidden widths such as `[4]` or `[8]`;
-- use `clamp` to bound `beta_f * logits` before the sigmoid;
+- use `clamp` to bound `score_sharpness * logits` before the sigmoid;
 - use optimizer weight decay for MLP parameters;
-- add `monotone_scores` when parent-child score monotonicity is expected;
+- add `edge_score_monotonicity` when parent-child score monotonicity is expected;
 - preserve the root when removing the root contribution would change the image
   baseline in an undesirable way.
 
@@ -328,68 +332,43 @@ Training code should add the registered regularizers explicitly:
 optimizer = torch.optim.AdamW(layer.parameters(), lr=1e-3, weight_decay=1e-4)
 
 pred = layer(inputs)
-loss = task_loss(pred, targets) + layer.monotonicity_penalty(inputs)
+loss = task_loss(pred, targets) + layer.regularization_penalty(inputs)
 loss.backward()
 optimizer.step()
 ```
 
-## Valuation Projections
+## Altitude Signal
 
-A valuation projection chooses the scalar node signal that is filtered and
-defines how the reconstructed image is projected into the final output.
+CFP now reconstructs a fixed altitude signal. For each tree node, the backend
+provides `info["residues"]`; the scorer only learns how strongly each residue
+contributes to reconstruction:
 
-Subclass `ValuationProjection` when adding a new valuation:
-
-```python
-from dataclasses import dataclass
-
-import torch
-
-from mtlearn.layers.cfp.valuation import ValuationProjection
-
-
-@dataclass(frozen=True)
-class SquaredAttributeValuation(ValuationProjection):
-    attribute: object
-    kind: str = "squared_attribute"
-
-    def key(self):
-        name = getattr(self.attribute, "name", str(self.attribute))
-        return f"{self.kind}:{name}"
-
-    def required_attributes(self):
-        return (self.attribute,)
-
-    def compute_node_signal(self, tree, tree_info, *, morphology_module, attribute_dtype, device):
-        attr_np = morphology_module.compute_attributes(
-            tree,
-            [self.attribute],
-            dtype=attribute_dtype,
-        )[1]
-        values = torch.as_tensor(attr_np, device=device).squeeze(1)
-        return values.square()
+```text
+filtered_increment(node) = residue(node) * score(node)
+output = reconstruct(filtered_increment)
 ```
 
-Valuation rules:
+This keeps the layer aligned with the classical connected-filter interpretation
+and keeps the differentiable boundary clear:
 
-- `key()` must be stable because it indexes cached `valuation_increments`;
-- `required_attributes()` must include every scalar attribute needed to compute
-  the node signal;
-- `compute_node_signal()` returns one scalar per tree node;
-- use `requires_unfiltered_image()` and `project()` when the output depends on
-  both filtered and unfiltered reconstructions, as top-hat projections do;
-- validate whether the valuation is meaningful for max-tree, min-tree, and
-  tree-of-shapes before exposing it publicly.
+```text
+score parameters -> scores -> residues * scores -> reconstruction -> loss
+```
 
-Adding a new valuation kind currently requires coordinated updates:
+Tree construction, topology, quantization, and residue extraction remain
+outside the autograd path. The residues are constants with respect to scorer
+parameters during one forward pass. The gradient that reaches a score is still
+scaled by the residue it controls:
 
-- register a factory in `VALUATION_PROJECTION_REGISTRY`;
-- add or extend a `CFPValuation` constructor/constant;
-- update `validate_valuation_for_tree_type`;
-- update `ConfigDeserializer.valuation_from_config`;
-- update `ConfigSerializer` if the valuation needs config fields beyond
-  `kind` and `attribute`;
-- add round-trip and forward tests.
+```text
+dL/dscore(node) = residue(node) * dL/dfiltered_increment(node)
+```
+
+Do not model alternative output projections, top-hat outputs, or attribute
+reconstructions as CFP extension points in Python. If a future method needs a
+surrogate derivative or another morphology signal, design it as a separate
+research component with its own forward/backward contract instead of hiding it
+inside the filter spec.
 
 ## Score Constraints
 
@@ -464,8 +443,8 @@ Register regularizers with `REGULARIZER_REGISTRY` and reference them in specs:
 }
 ```
 
-The public method is still named `monotonicity_penalty(x)` for compatibility,
-but internally it sums the registered regularizers for each active spec.
+The public method is `regularization_penalty(x)`. Internally, the method sums
+the registered regularizers for each active spec.
 
 Regularizer rules:
 
@@ -482,7 +461,6 @@ Regularizer rules:
 - input channels;
 - filter specs;
 - scoring config;
-- valuation config;
 - score constraints;
 - training regularizers;
 - normalization settings;
@@ -505,7 +483,6 @@ Preserve these compatibility points unless the project intentionally makes a
 breaking change:
 
 - `from mtlearn.layers import ConnectedFilterPreprocessingLayer`;
-- `from mtlearn.layers import CFPValuation`;
 - `ConnectedFilterPreprocessingImplicitJacobianFunction`;
 - default linear parameter names `_weights.<spec_name>` and
   `_biases.<spec_name>`;
@@ -541,6 +518,6 @@ python -m sphinx -b html docs/source /tmp/mtlearn-docs-build
 git diff --check
 ```
 
-Use gradcheck when reconstruction, valuation signals, or scorer differentiability
-changes. Use notebook validation when a change affects published experiments or
-paper-facing examples.
+Use gradcheck when reconstruction or scorer differentiability changes. Use
+notebook validation when a change affects published experiments or paper-facing
+examples.

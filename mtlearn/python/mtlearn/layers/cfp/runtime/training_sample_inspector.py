@@ -17,7 +17,7 @@ class TrainingSampleInspector:
         idx: int | None = None,
         build_if_missing: bool = True,
     ):
-        """Return cached or direct attributes, valuations, and parameters per spec."""
+        """Return cached or direct attributes, altitude increments, and parameters per spec."""
         if img.dim() == 2:
             img_chw = img.unsqueeze(0)
         elif img.dim() == 3:
@@ -64,10 +64,10 @@ class TrainingSampleInspector:
                 "tree_type": spec.tree_type,
                 "attributes": spec.attributes,
                 "scoring_model": layer._scoring_models[spec.key],
-                "valuation": spec.valuation,
+                "score_sharpness": spec.score_sharpness,
                 "base_attrs": torch.cat(cols_raw, dim=1),
                 "norm_attrs": torch.cat(cols_norm, dim=1),
-                "valuation_increments": payload["valuation_increments"][spec.valuation_key],
+                "altitude_increments": payload["info"]["residues"],
             }
             if spec.key in layer._weights:
                 spec_payload["weight"] = layer._weights[spec.key]

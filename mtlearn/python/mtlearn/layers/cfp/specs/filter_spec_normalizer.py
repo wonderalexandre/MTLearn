@@ -12,12 +12,10 @@ from ..._helpers import (
     normalize_attributes_spec,
     validate_attributes_for_tree_type,
 )
-from ..valuation import CFPValuation
 from ..component_registries import (
     normalize_constraint_configs,
     normalize_regularizer_configs,
     normalize_scoring_model,
-    valuation_projection_from_valuation,
 )
 from .normalized_filter_spec import NormalizedFilterSpec
 
@@ -25,23 +23,6 @@ from .normalized_filter_spec import NormalizedFilterSpec
 def enum_name(value: Any) -> str:
     """Return an enum name when available, otherwise a string representation."""
     return getattr(value, "name", str(value))
-
-
-def _is_altitude_attribute(value: Any) -> bool:
-    return enum_name(value) in {"ALTITUDE", "LEVEL"}
-
-
-def normalize_valuation(value: Any) -> CFPValuation:
-    """Normalize legacy valuation aliases into a CFP valuation object."""
-    if value is None:
-        return CFPValuation.ALTITUDE
-    if isinstance(value, CFPValuation):
-        if value.kind == "node_attribute" and _is_altitude_attribute(value.attribute):
-            return CFPValuation.ALTITUDE
-        return value
-    if _is_altitude_attribute(value):
-        return CFPValuation.ALTITUDE
-    return CFPValuation.node_attribute(value)
 
 
 def normalize_nonnegative_scalar(value: Any, name: str) -> float:
@@ -54,6 +35,16 @@ def normalize_nonnegative_scalar(value: Any, name: str) -> float:
     return scalar
 
 
+def normalize_positive_scalar(value: Any, name: str) -> float:
+    """Normalize and validate a positive finite scalar."""
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} must be a positive finite scalar.")
+    scalar = float(value)
+    if not math.isfinite(scalar) or scalar <= 0.0:
+        raise ValueError(f"{name} must be a positive finite scalar.")
+    return scalar
+
+
 def filter_spec_tree_key(
     tree_type,
     tos_interpolation,
@@ -63,17 +54,6 @@ def filter_spec_tree_key(
     """Return the cache key for a morphology tree configuration."""
     interpolation_name = enum_name(tos_interpolation) if tos_interpolation is not None else "None"
     return f"{tree_type}|{interpolation_name}|{tos_infinity_seed_row}|{tos_infinity_seed_col}"
-
-
-def validate_valuation_for_tree_type(valuation: CFPValuation, tree_type: str) -> None:
-    """Validate that a valuation can be computed for a tree type."""
-    if valuation.kind in {"altitude", "altitude_tophat"}:
-        return
-    if valuation.kind != "node_attribute":
-        raise ValueError(f"unknown CFP valuation kind: {valuation.kind!r}")
-    if isinstance(valuation.attribute, morphology.AttributeGroup):
-        raise ValueError("CFPValuation.node_attribute expects one scalar attribute, not an AttributeGroup.")
-    validate_attributes_for_tree_type([valuation.attribute], tree_type)
 
 
 _FILTER_SPEC_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -105,6 +85,7 @@ def normalize_filter_specs(
     default_tos_interpolation,
     default_tos_infinity_seed_row: int,
     default_tos_infinity_seed_col: int,
+    default_score_sharpness: float = 1.0,
 ) -> tuple[NormalizedFilterSpec, ...]:
     """Normalize user filter spec mappings into internal CFP specs."""
     if filter_specs is None:
@@ -120,7 +101,11 @@ def normalize_filter_specs(
         if "attributes" not in raw_spec:
             raise ValueError("Each filter spec must define attributes.")
         if "output_mode" in raw_spec:
-            raise ValueError("output_mode was removed; use CFPValuation.ALTITUDE_TOPHAT for top-hat output.")
+            raise ValueError("output_mode was removed. CFP now reconstructs fixed altitude residues.")
+        if "valuation" in raw_spec:
+            raise ValueError("valuation was removed. CFP now reconstructs fixed altitude residues.")
+        if "beta_f" in raw_spec:
+            raise ValueError("filter spec beta_f was renamed to score_sharpness.")
 
         spec_name = _normalize_filter_spec_name(raw_spec.get("name", None), index, seen_names)
         tree_type = morphology.normalize_tree_type(raw_spec["tree_type"])
@@ -132,10 +117,11 @@ def normalize_filter_specs(
         attributes = normalize_attributes_spec([raw_group], tree_type)[0][0]
         validate_attributes_for_tree_type(attributes, tree_type)
         scoring_model = normalize_scoring_model(raw_spec.get("scoring", None), len(attributes))
+        score_sharpness = normalize_positive_scalar(
+            raw_spec.get("score_sharpness", default_score_sharpness),
+            "score_sharpness",
+        )
 
-        valuation = normalize_valuation(raw_spec.get("valuation", None))
-        validate_valuation_for_tree_type(valuation, tree_type)
-        valuation_projection = valuation_projection_from_valuation(valuation)
         constraint_configs = normalize_constraint_configs(raw_spec.get("constraints", None))
         preserve_root = bool(raw_spec.get("preserve_root", False)) or any(
             config["kind"] == "preserve_root" for config in constraint_configs
@@ -166,9 +152,7 @@ def normalize_filter_specs(
                 tree_key=tree_key,
                 attributes=tuple(attributes),
                 scoring_model=scoring_model,
-                valuation=valuation,
-                valuation_projection=valuation_projection,
-                valuation_key=valuation_projection.key(),
+                score_sharpness=score_sharpness,
                 preserve_root=preserve_root,
                 monotonicity_weight=monotonicity_weight,
                 constraint_configs=constraint_configs,

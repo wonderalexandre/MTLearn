@@ -258,51 +258,23 @@ def test_implicit_jacobian_function_gradcheck_tree_of_shapes():
     ],
 )
 @pytest.mark.parametrize(
-    ("tree_type", "valuation"),
+    "tree_type",
     [
         pytest.param(
             morphology.TreeType.MAX_TREE,
-            None,
             id="max-filtered-altitude",
         ),
         pytest.param(
-            morphology.TreeType.MAX_TREE,
-            mtlearn.layers.CFPValuation.ALTITUDE_TOPHAT,
-            id="max-tophat-altitude",
-        ),
-        pytest.param(
             morphology.TreeType.MIN_TREE,
-            None,
             id="min-filtered-altitude",
         ),
         pytest.param(
-            morphology.TreeType.MIN_TREE,
-            mtlearn.layers.CFPValuation.ALTITUDE_TOPHAT,
-            id="min-tophat-altitude",
-        ),
-        pytest.param(
             morphology.TreeType.TREE_OF_SHAPES,
-            None,
             id="tos-filtered-altitude",
-        ),
-        pytest.param(
-            morphology.TreeType.TREE_OF_SHAPES,
-            mtlearn.layers.CFPValuation.ALTITUDE_TOPHAT,
-            id="tos-tophat-altitude",
-        ),
-        pytest.param(
-            morphology.TreeType.MAX_TREE,
-            mtlearn.layers.CFPValuation.node_attribute(morphology.AttributeType.AREA),
-            id="max-filtered-area-valuation",
-        ),
-        pytest.param(
-            morphology.TreeType.MAX_TREE,
-            mtlearn.layers.CFPValuation.node_attribute(morphology.AttributeType.VARIANCE_LEVEL),
-            id="max-filtered-variance-valuation",
         ),
     ],
 )
-def test_filter_specs_layer_gradcheck(tree_type, valuation, clamp):
+def test_filter_specs_layer_gradcheck(tree_type, clamp):
     spec = {
         "tree_type": tree_type,
         "attributes": (
@@ -311,8 +283,6 @@ def test_filter_specs_layer_gradcheck(tree_type, valuation, clamp):
         ),
         **_tos_spec_kwargs(tree_type),
     }
-    if valuation is not None:
-        spec["valuation"] = valuation
 
     layer = mtlearn.layers.ConnectedFilterPreprocessingLayer(
         in_channels=1,

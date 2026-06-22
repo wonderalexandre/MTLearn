@@ -51,8 +51,7 @@ class LegacyLinearParameterInitializer:
     @staticmethod
     def logit(p: float) -> float:
         """Return a numerically clipped logit."""
-        p = max(min(float(p), 1.0 - 1e-6), 1e-6)
-        return math.log(p / (1.0 - p))
+        return LinearSigmoidScorer.identity_logit(p)
 
     def init_identity_with_bias(
         self,
@@ -64,13 +63,16 @@ class LegacyLinearParameterInitializer:
         p0: float = 0.995,
     ) -> None:
         """Set legacy linear scorers close to identity using positive bias."""
-        logit_value = self.logit(p0) / float(beta_f)
         with torch.no_grad():
             for spec in filter_specs:
                 if spec.key not in weights:
                     continue
-                weights[spec.key].zero_()
-                biases[spec.key].fill_(logit_value)
+                spec.scoring_model.init_identity(
+                    beta_f=beta_f,
+                    p0=p0,
+                    weight=weights[spec.key],
+                    bias=biases[spec.key],
+                )
 
     def init_identity_bias_zero(
         self,
@@ -78,17 +80,18 @@ class LegacyLinearParameterInitializer:
         weights: torch.nn.ParameterDict,
         biases: torch.nn.ParameterDict,
         *,
-        beta_f: float,
+        beta_f: float | None = None,
         hybrid_floor_a: float,
         p0: float = 0.99,
     ) -> None:
         """Set legacy linear scorers close to identity with zero bias."""
         floor = max(min(float(hybrid_floor_a), 1.0), 1e-6)
-        logit_value = self.logit(p0) / float(beta_f)
         with torch.no_grad():
             for spec in filter_specs:
                 if spec.key not in weights:
                     continue
+                sharpness = float(spec.score_sharpness if beta_f is None else beta_f)
+                logit_value = self.logit(p0) / sharpness
                 value = logit_value / (len(spec.attributes) * floor)
                 weights[spec.key].fill_(value)
                 biases[spec.key].zero_()

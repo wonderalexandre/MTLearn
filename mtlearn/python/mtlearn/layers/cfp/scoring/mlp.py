@@ -56,6 +56,30 @@ class MLPScorer(ScoringModel):
         layers.append(torch.nn.Linear(in_features, 1, device=device, dtype=dtype))
         self.network = torch.nn.Sequential(*layers)
 
+    def init_identity(
+        self,
+        *,
+        beta_f: float,
+        p0: float = 0.995,
+        output_weight_scale: float = 1e-3,
+    ) -> None:
+        """Initialize the MLP so scores start close to ``p0`` for all nodes."""
+        beta = float(beta_f)
+        if beta == 0.0:
+            raise ValueError("identity initialization requires beta_f != 0.")
+        output_weight_scale = float(output_weight_scale)
+        if output_weight_scale < 0.0:
+            raise ValueError("output_weight_scale must be non-negative.")
+
+        linear_layers = [module for module in self.network if isinstance(module, torch.nn.Linear)]
+        if not linear_layers:
+            raise RuntimeError("MLPScorer identity initialization requires at least one Linear layer.")
+
+        with torch.no_grad():
+            final_layer = linear_layers[-1]
+            torch.nn.init.normal_(final_layer.weight, mean=0.0, std=output_weight_scale)
+            final_layer.bias.fill_(self.identity_logit(p0) / beta)
+
     @staticmethod
     def _normalize_hidden_channels(hidden_channels: Sequence[int]) -> tuple[int, ...]:
         if isinstance(hidden_channels, numbers.Integral) and not isinstance(hidden_channels, bool):

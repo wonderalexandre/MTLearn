@@ -100,9 +100,75 @@ def test_dataset_split_indices_match_expected_sizes():
     assert test_idx.tolist() == [7, 8, 9]
 
 
+def test_paired_image_dataset_reads_matching_pairs(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    from mtlearn.datasets import PairedImageDataset
+
+    assert PairedImageDataset.__module__ == "mtlearn.datasets"
+
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    target = np.array([[0, 255], [255, 0]], dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "01_in.png"), image)
+    assert cv2.imwrite(str(tmp_path / "01_target.png"), target)
+    assert cv2.imwrite(str(tmp_path / "02_in.png"), image)
+
+    dataset = PairedImageDataset(
+        str(tmp_path),
+        invert_in=True,
+        suffix_in="_in",
+        suffix_target="_target",
+    )
+
+    tensor_in, tensor_target, name = dataset[0]
+
+    assert len(dataset) == 1
+    assert name == "01_in.png"
+    assert tensor_in.shape == (1, 2, 2)
+    assert tensor_target.shape == (1, 2, 2)
+    assert tensor_in.dtype == torch.float32
+    assert tensor_target.dtype == torch.float32
+    expected_in = torch.from_numpy(255 - image).to(torch.float32).unsqueeze(0) / 255.0
+    expected_target = torch.from_numpy(target).to(torch.float32).unsqueeze(0) / 255.0
+    assert torch.allclose(tensor_in, expected_in)
+    assert torch.allclose(tensor_target, expected_target)
+
+
+def test_generated_target_image_dataset_applies_callable(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    from mtlearn.datasets import GeneratedTargetImageDataset
+
+    assert GeneratedTargetImageDataset.__module__ == "mtlearn.datasets"
+
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    ignored = np.full((2, 2), 255, dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "sample_in.png"), image)
+    assert cv2.imwrite(str(tmp_path / "sample_target.png"), ignored)
+
+    dataset = GeneratedTargetImageDataset(
+        str(tmp_path),
+        4,
+        4,
+        target_fn=lambda img: np.where(img > 127, 255, 0).astype(np.uint8),
+        suffix_in="_in",
+    )
+
+    tensor_in, tensor_target, name = dataset[0]
+
+    assert len(dataset) == 1
+    assert name == "sample_in.png"
+    assert tensor_in.shape == (1, 4, 4)
+    assert tensor_target.shape == (1, 4, 4)
+    assert tensor_in.dtype == torch.float32
+    assert tensor_target.dtype == torch.float32
+    assert 0.0 <= float(tensor_in.min()) <= float(tensor_in.max()) <= 1.0
+    assert set(torch.unique(tensor_target).tolist()).issubset({0.0, 1.0})
+
+
 def test_attribute_filter_dataset_accepts_tree_of_shapes_options(tmp_path):
     cv2 = pytest.importorskip("cv2")
     from mtlearn.datasets import AttributeFilterDataset
+
+    assert AttributeFilterDataset.__module__ == "mtlearn.datasets"
 
     img = np.array([[1, 2], [3, 4]], dtype=np.uint8)
     path = tmp_path / "sample.png"
@@ -233,8 +299,12 @@ def test_connected_filter_preprocessing_public_aliases():
         is mtlearn.layers.ConnectedFilterPreprocessingImplicitJacobianFunction
     )
     assert hasattr(mtlearn.layers.cfp, "LinearSigmoidScorer")
-    assert hasattr(mtlearn.layers.cfp, "AltitudeValuation")
-    assert hasattr(mtlearn.layers.cfp, "MonotoneScoresRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "PathScoreMonotonicityRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "AttributeOrderScoreMonotonicityRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "EdgeScoreMonotonicityRegularizer")
+    assert not hasattr(mtlearn.layers.cfp, "AncestorConsistencyRegularizer")
+    assert not hasattr(mtlearn.layers.cfp, "AttributeOrderMonotonicityRegularizer")
+    assert not hasattr(mtlearn.layers.cfp, "MonotoneScoresRegularizer")
     assert hasattr(mtlearn.layers.cfp, "PreserveRootConstraint")
     assert hasattr(mtlearn.layers.cfp, "TreeReconstructionFunction")
     assert (
@@ -251,9 +321,7 @@ def test_connected_filter_preprocessing_public_aliases():
     )
     assert mtlearn.layers.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
     assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingLayerLegacy")
-    assert hasattr(mtlearn.layers, "CFPValuation")
-    assert hasattr(mtlearn.layers.CFPValuation, "ALTITUDE")
-    assert hasattr(mtlearn.layers.CFPValuation, "ALTITUDE_TOPHAT")
+    assert not hasattr(mtlearn.layers, "CFPValuation")
     assert hasattr(mtlearn.layers, "collect_cfp_configs")
     assert hasattr(mtlearn.layers, "save_checkpoint")
     assert hasattr(mtlearn.layers, "load_checkpoint")

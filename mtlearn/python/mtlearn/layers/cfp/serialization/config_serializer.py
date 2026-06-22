@@ -35,10 +35,6 @@ class ConfigSerializer:
     def _enum_name(value: Any) -> str:
         return getattr(value, "name", str(value))
 
-    @staticmethod
-    def _uses_altitude_signal(valuation) -> bool:
-        return valuation.kind in {"altitude", "altitude_tophat"}
-
     def filter_spec_config(self, spec, *, include_training: bool = True) -> dict[str, Any]:
         """Return the serializable architecture config for one normalized spec."""
         tos_interpolation = None if spec.tos_interpolation is None else self._enum_name(spec.tos_interpolation)
@@ -47,10 +43,7 @@ class ConfigSerializer:
             "tree_type": spec.tree_type,
             "attributes": [self._enum_name(attr) for attr in spec.attributes],
             "scoring": spec.scoring_model.to_config(),
-            "valuation": {
-                "kind": spec.valuation.kind,
-                "attribute": None if self._uses_altitude_signal(spec.valuation) else self._enum_name(spec.valuation.attribute),
-            },
+            "score_sharpness": spec.score_sharpness,
             "preserve_root": spec.preserve_root,
             "tos_interpolation": tos_interpolation,
             "tos_infinity_seed_row": spec.tos_infinity_seed_row,
@@ -67,7 +60,6 @@ class ConfigSerializer:
     def filter_spec_metadata(self, spec) -> dict[str, Any]:
         """Return inspection/export metadata for one normalized spec."""
         tos_interpolation = None if spec.tos_interpolation is None else self._enum_name(spec.tos_interpolation)
-        valuation_attribute = "ALTITUDE" if self._uses_altitude_signal(spec.valuation) else self._enum_name(spec.valuation.attribute)
         return {
             "index": spec.index,
             "key": spec.key,
@@ -76,11 +68,7 @@ class ConfigSerializer:
             "tree_key": spec.tree_key,
             "attributes": [self._enum_name(attr) for attr in spec.attributes],
             "scoring": spec.scoring_model.to_config(),
-            "valuation": {
-                "kind": spec.valuation.kind,
-                "attribute": valuation_attribute,
-            },
-            "valuation_key": spec.valuation_key,
+            "score_sharpness": spec.score_sharpness,
             "preserve_root": spec.preserve_root,
             "monotonicity_weight": spec.monotonicity_weight,
             "constraints": [dict(config) for config in spec.constraint_configs],
@@ -100,7 +88,7 @@ class ConfigSerializer:
             ],
             "scale_mode": layer.scale_mode,
             "eps": layer.eps,
-            "beta_f": layer.beta_f,
+            "score_sharpness": layer.beta_f,
             "clamp": None if layer.clamp is None else list(layer.clamp),
             "hybrid_k": layer.hybrid_k,
             "hybrid_floor_a": layer.hybrid_floor_a,
@@ -133,7 +121,7 @@ class ConfigSerializer:
             ],
             "scale_mode": layer.scale_mode,
             "eps": layer.eps,
-            "beta_f": layer.beta_f,
+            "score_sharpness": layer.beta_f,
             "clamp": None if layer.clamp is None else list(layer.clamp),
             "hybrid_k": layer.hybrid_k,
             "hybrid_floor_a": layer.hybrid_floor_a,
@@ -172,7 +160,6 @@ class ConfigSerializer:
         spec: Mapping[str, Any],
         *,
         attribute_from_name,
-        valuation_from_config,
         tos_interpolation_from_name,
         normalize_nonnegative_scalar,
     ) -> dict[str, Any]:
@@ -190,8 +177,12 @@ class ConfigSerializer:
             restored["name"] = spec["name"]
         if "scoring" in spec:
             restored["scoring"] = spec["scoring"]
+        if "score_sharpness" in spec:
+            restored["score_sharpness"] = float(spec["score_sharpness"])
+        if "beta_f" in spec:
+            raise ValueError("serialized filter spec beta_f was renamed to score_sharpness.")
         if "valuation" in spec:
-            restored["valuation"] = valuation_from_config(spec["valuation"])
+            raise ValueError("serialized valuation configs are no longer supported.")
         if "preserve_root" in spec:
             restored["preserve_root"] = bool(spec["preserve_root"])
         if "constraints" in spec:
@@ -217,7 +208,6 @@ class ConfigSerializer:
         config: Mapping[str, Any],
         *,
         attribute_from_name,
-        valuation_from_config,
         tos_interpolation_from_name,
         normalize_nonnegative_scalar,
     ) -> dict[str, Any]:
@@ -233,7 +223,6 @@ class ConfigSerializer:
                 self.deserialize_filter_spec_config(
                     spec,
                     attribute_from_name=attribute_from_name,
-                    valuation_from_config=valuation_from_config,
                     tos_interpolation_from_name=tos_interpolation_from_name,
                     normalize_nonnegative_scalar=normalize_nonnegative_scalar,
                 )
@@ -241,7 +230,7 @@ class ConfigSerializer:
             ],
             "scale_mode": config.get("scale_mode", "hybrid"),
             "eps": float(config.get("eps", 1e-6)),
-            "beta_f": float(config.get("beta_f", 1.0)),
+            "beta_f": float(config.get("score_sharpness", config.get("beta_f", 1.0))),
             "clamp": config.get("clamp", None),
             "hybrid_k": float(config.get("hybrid_k", 3.0)),
             "hybrid_floor_a": float(config.get("hybrid_floor_a", 0.05)),

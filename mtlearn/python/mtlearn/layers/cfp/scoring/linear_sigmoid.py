@@ -59,6 +59,28 @@ class LinearSigmoidScorer(ScoringModel):
             raise ValueError("LinearSigmoidScorer requires weight and bias parameters.")
         return features @ weight.view(-1) + bias
 
+    def init_identity(
+        self,
+        *,
+        beta_f: float,
+        p0: float = 0.995,
+        weight=None,
+        bias=None,
+    ) -> None:
+        """Set linear weights to zero and bias so scores are close to ``p0``."""
+        if weight is None:
+            weight = self.weight
+        if bias is None:
+            bias = self.bias
+        if weight is None or bias is None:
+            raise ValueError("LinearSigmoidScorer identity initialization requires weight and bias parameters.")
+        beta = float(beta_f)
+        if beta == 0.0:
+            raise ValueError("identity initialization requires beta_f != 0.")
+        with torch.no_grad():
+            weight.zero_()
+            bias.fill_(self.identity_logit(p0) / beta)
+
     def forward(
         self,
         features: torch.Tensor,

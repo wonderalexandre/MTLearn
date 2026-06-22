@@ -20,6 +20,7 @@ from mtlearn.layers import (
     load_checkpoint,
     save_checkpoint,
 )
+from mtlearn.layers.cfp import CFPCacheInputError
 from mtlearn.layers._helpers import IndexedDatasetWrapper
 
 pytestmark = pytest.mark.integration
@@ -35,6 +36,11 @@ def _tiny_dataset_loader(batch_size=2):
     )
     y = torch.tensor([0, 1], dtype=torch.long)
     return DataLoader(TensorDataset(x, y), batch_size=batch_size, shuffle=False)
+
+
+def _loader_from_x(x):
+    y = torch.arange(x.shape[0], dtype=torch.long)
+    return DataLoader(TensorDataset(x, y), batch_size=x.shape[0], shuffle=False)
 
 
 def _clone_stats(stats):
@@ -125,6 +131,24 @@ def test_build_dataloader_cached_populates_primary_layer_cache():
     assert x.shape == (2, 1, 3, 3)
     assert idx.tolist() == [0, 1]
     assert y.tolist() == [0, 1]
+
+
+@pytest.mark.parametrize(
+    ("x", "match"),
+    [
+        (torch.zeros((2, 3, 3), dtype=torch.float32), r"\(B, C, H, W\)"),
+        (torch.zeros((2, 2, 3, 3), dtype=torch.float32), "expected C=1"),
+        (torch.full((2, 1, 3, 3), -0.1, dtype=torch.float32), "non-negative"),
+        (torch.full((2, 1, 3, 3), float("nan"), dtype=torch.float32), "finite"),
+        (torch.full((2, 1, 3, 3), 1.2, dtype=torch.float32), "ambiguous"),
+        (torch.full((2, 1, 3, 3), 300, dtype=torch.int16), r"\[0, 255\]"),
+    ],
+)
+def test_build_dataloader_cached_rejects_non_cacheable_image_batches(x, match):
+    layer = _single_area_layer(scale_mode="minmax01")
+
+    with pytest.raises(CFPCacheInputError, match=match):
+        layer.build_dataloader_cached(_loader_from_x(x))
 
 
 def test_indexed_dataset_wrapper_applies_index_offset():

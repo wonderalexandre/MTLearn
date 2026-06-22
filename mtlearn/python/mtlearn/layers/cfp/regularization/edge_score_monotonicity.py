@@ -1,4 +1,4 @@
-"""Monotone score regularization on tree edges."""
+"""Edge score monotonicity regularization."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import torch
 from .base import Regularizer
 
 
-class MonotoneScoresRegularizer(Regularizer):
+class EdgeScoreMonotonicityRegularizer(Regularizer):
     """Penalize child scores that exceed parent scores."""
 
     def __init__(self, weight: float = 1.0):

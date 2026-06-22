@@ -6,57 +6,13 @@ import numbers
 from typing import Any, Mapping
 
 from .constraints import PreserveRootConstraint
-from .regularization import MonotoneScoresRegularizer
+from .regularization import (
+    AttributeOrderScoreMonotonicityRegularizer,
+    EdgeScoreMonotonicityRegularizer,
+    PathScoreMonotonicityRegularizer,
+)
 from .scoring import LinearSigmoidScorer, MLPScorer, ScoringModel
 from .specs import SpecRegistry
-from .valuation import (
-    AltitudeTopHatValuation,
-    AltitudeValuation,
-    CFPValuation,
-    NodeAttributeValuation,
-    ValuationProjection,
-)
-
-
-def _create_altitude_valuation(**options) -> AltitudeValuation:
-    unsupported = set(options)
-    if unsupported:
-        names = ", ".join(sorted(unsupported))
-        raise ValueError(f"unsupported altitude valuation options: {names}")
-    return AltitudeValuation()
-
-
-def _create_altitude_tophat_valuation(**options) -> AltitudeTopHatValuation:
-    unsupported = set(options)
-    if unsupported:
-        names = ", ".join(sorted(unsupported))
-        raise ValueError(f"unsupported altitude_tophat valuation options: {names}")
-    return AltitudeTopHatValuation()
-
-
-def _create_node_attribute_valuation(*, attribute, **options) -> NodeAttributeValuation:
-    unsupported = set(options)
-    if unsupported:
-        names = ", ".join(sorted(unsupported))
-        raise ValueError(f"unsupported node_attribute valuation options: {names}")
-    return NodeAttributeValuation(attribute)
-
-
-VALUATION_PROJECTION_REGISTRY = SpecRegistry()
-VALUATION_PROJECTION_REGISTRY.register("altitude", _create_altitude_valuation)
-VALUATION_PROJECTION_REGISTRY.register("altitude_tophat", _create_altitude_tophat_valuation)
-VALUATION_PROJECTION_REGISTRY.register("node_attribute", _create_node_attribute_valuation)
-
-
-def valuation_projection_from_valuation(valuation: CFPValuation) -> ValuationProjection:
-    """Build a valuation projection component from a normalized valuation."""
-    config = {"kind": valuation.kind}
-    if valuation.kind == "node_attribute":
-        config["attribute"] = valuation.attribute
-    try:
-        return VALUATION_PROJECTION_REGISTRY.create(config)
-    except KeyError as exc:
-        raise ValueError(f"unknown CFP valuation kind: {valuation.kind!r}") from exc
 
 
 def _normalize_hidden_channels(value: Any) -> tuple[int, ...]:
@@ -152,12 +108,47 @@ def _create_preserve_root_constraint(**options) -> PreserveRootConstraint:
     return PreserveRootConstraint()
 
 
-def _create_monotone_scores_regularizer(*, weight: float = 1.0, **options) -> MonotoneScoresRegularizer:
+def _create_edge_score_monotonicity_regularizer(
+    *, weight: float = 1.0, **options
+) -> EdgeScoreMonotonicityRegularizer:
     unsupported = set(options)
     if unsupported:
         names = ", ".join(sorted(unsupported))
-        raise ValueError(f"unsupported monotone_scores regularizer options: {names}")
-    return MonotoneScoresRegularizer(weight=weight)
+        raise ValueError(f"unsupported edge_score_monotonicity regularizer options: {names}")
+    return EdgeScoreMonotonicityRegularizer(weight=weight)
+
+
+def _create_attribute_order_score_monotonicity_regularizer(
+    *,
+    weight: float = 1.0,
+    feature_index: int = 0,
+    direction: str = "increasing",
+    min_gap: float = 0.0,
+    **options,
+) -> AttributeOrderScoreMonotonicityRegularizer:
+    unsupported = set(options)
+    if unsupported:
+        names = ", ".join(sorted(unsupported))
+        raise ValueError(f"unsupported attribute_order_score_monotonicity regularizer options: {names}")
+    return AttributeOrderScoreMonotonicityRegularizer(
+        weight=weight,
+        feature_index=feature_index,
+        direction=direction,
+        min_gap=min_gap,
+    )
+
+
+def _create_path_score_monotonicity_regularizer(
+    *,
+    weight: float = 1.0,
+    max_depth: int | None = None,
+    **options,
+) -> PathScoreMonotonicityRegularizer:
+    unsupported = set(options)
+    if unsupported:
+        names = ", ".join(sorted(unsupported))
+        raise ValueError(f"unsupported path_score_monotonicity regularizer options: {names}")
+    return PathScoreMonotonicityRegularizer(weight=weight, max_depth=max_depth)
 
 
 SCORE_CONSTRAINT_REGISTRY = SpecRegistry()
@@ -165,9 +156,16 @@ SCORE_CONSTRAINT_REGISTRY.register("preserve_root", _create_preserve_root_constr
 
 REGULARIZER_REGISTRY = SpecRegistry()
 REGULARIZER_REGISTRY.register(
-    "monotone_scores",
-    _create_monotone_scores_regularizer,
-    aliases=("monotone-scores",),
+    "edge_score_monotonicity",
+    _create_edge_score_monotonicity_regularizer,
+)
+REGULARIZER_REGISTRY.register(
+    "attribute_order_score_monotonicity",
+    _create_attribute_order_score_monotonicity_regularizer,
+)
+REGULARIZER_REGISTRY.register(
+    "path_score_monotonicity",
+    _create_path_score_monotonicity_regularizer,
 )
 
 
@@ -236,7 +234,7 @@ def regularizer_configs_for_spec(spec) -> tuple[dict[str, Any], ...]:
     """Return effective regularizer configs for one normalized filter spec."""
     configs = []
     if spec.monotonicity_weight > 0.0:
-        configs.append({"kind": "monotone_scores", "weight": spec.monotonicity_weight})
+        configs.append({"kind": "edge_score_monotonicity", "weight": spec.monotonicity_weight})
     configs.extend(spec.regularizer_configs)
     return tuple(configs)
 

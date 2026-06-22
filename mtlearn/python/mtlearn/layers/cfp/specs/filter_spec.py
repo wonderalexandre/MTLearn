@@ -17,20 +17,15 @@ class FilterSpec:
     tree: TreeSpec
     features: FeatureSpec
     scoring: Any
-    valuation: Any
+    score_sharpness: float = 1.0
     constraints: tuple[Any, ...] = field(default_factory=tuple)
     regularizers: tuple[Any, ...] = field(default_factory=tuple)
 
     def all_required_attributes(self) -> tuple[Any, ...]:
-        """Return scoring and valuation attributes without duplicates."""
+        """Return scoring attributes without duplicates."""
         seen: set[Any] = set()
         required: list[Any] = []
         for attr in self.features.attributes:
-            if attr not in seen:
-                seen.add(attr)
-                required.append(attr)
-        valuation_required = getattr(self.valuation, "required_attributes", lambda: ())()
-        for attr in valuation_required:
             if attr not in seen:
                 seen.add(attr)
                 required.append(attr)
