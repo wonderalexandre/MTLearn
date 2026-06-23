@@ -1,8 +1,8 @@
 # CFP Regularization Design
 
-This standalone developer guide describes how CFP training regularizers are
-designed, configured, and extended in `mtlearn.layers.cfp`. It focuses on
-regularization as a training-only mechanism. For scoring-specific details, see
+This guide describes how CFP training regularizers are designed, configured,
+and extended in `mtlearn.layers.cfp`. It focuses on regularization as a
+training-only mechanism. For scoring-specific details, see
 [CFP Scoring Design](cfp-scoring-design.md). For score post-processing details,
 see [CFP Score Constraint Design](cfp-score-constraint-design.md). For the
 broader package layout, see [CFP Architecture](cfp-architecture.md).
@@ -71,7 +71,9 @@ Current regularizer requirements:
 - return a scalar tensor;
 - keep the result differentiable with respect to scorer parameters;
 - keep tensors on compatible devices;
-- accept `tree_info`, `features`, and `context` even when unused;
+- accept the complete CFP `tree_info` mapping, including `parent`, `tpre`, and
+  `tpost`;
+- accept `features` and `context` even when unused;
 - return zero in a gradient-preserving way when no valid edges or terms exist.
 
 The `scores` passed to a regularizer are already post-constraint scores. For
@@ -93,8 +95,8 @@ penalty without building tree payloads.
 penalty = weight * mean(relu(score(child) - score(parent))^2)
 ```
 
-Only valid parent-child edges are considered. When traversal timestamps are
-available, inactive nodes are ignored through the alive-node mask.
+Only valid parent-child edges are considered. Inactive nodes are ignored through
+the alive-node mask derived from `tpost > tpre`.
 
 Config:
 
@@ -106,22 +108,6 @@ regularized_spec = {
     "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.1}],
 }
 ```
-
-The legacy shortcut is still accepted:
-
-```python
-regularized_spec = {
-    "name": "monotone_area",
-    "tree_type": morphology.TreeType.MAX_TREE,
-    "attributes": [morphology.AttributeType.AREA],
-    "monotonicity_weight": 0.1,
-}
-```
-
-Internally, `monotonicity_weight > 0` creates an effective
-`edge_score_monotonicity` regularizer. Avoid using both `monotonicity_weight` and an
-explicit `edge_score_monotonicity` config on the same spec unless the intended behavior
-is additive.
 
 Use `edge_score_monotonicity` when the expected learned filter should become more
 selective along tree edges: if a parent component is rejected, descendants
@@ -192,7 +178,8 @@ Config:
 Use it when a whole branch should behave like a coherent pruning. With
 `max_depth=1`, this is close to parent-child monotonicity. Larger depths impose
 consistency with more distant ancestors. `max_depth=None` checks all ancestors
-and is more expensive on deep trees.
+and is more expensive on deep trees. As with edge monotonicity, inactive nodes
+are ignored through the alive-node mask derived from `tpost > tpre`.
 
 ## Loss Integration
 
@@ -231,7 +218,7 @@ This makes it clear when the regularizer is negligible, dominant, or saturated.
 
 One experiment notebook shows regularization as a training-objective term:
 
-- [`CFP_regularization_screws_experiment.ipynb`](../notebooks/experiments/CFP_regularization_screws_experiment.ipynb)
+- [`CFP_score_regularization_screws.ipynb`](../notebooks/experiments/CFP_score_regularization_screws.ipynb)
   trains two CFP layers on the screws dataset: one with only reconstruction
   loss and one with an `edge_score_monotonicity` regularizer added through
   `regularization_penalty(...)`.
@@ -313,38 +300,26 @@ configs. Use the registry path when a regularizer must round-trip through
 
 ## Serialization And Contracts
 
-Regularizers are training-only contract entries.
-
-`get_config()` includes training regularization settings. With the legacy
-shortcut, the spec carries `monotonicity_weight`:
+Regularizers are training-only contract entries. `get_config()` includes
+registry-backed regularization settings under `regularizers`:
 
 ```python
 {
     "name": "monotone_area",
-    "monotonicity_weight": 0.1,
-}
-```
-
-With explicit registry-backed regularizers, the spec carries `regularizers`:
-
-```python
-{
-    "name": "monotone_area",
-    "monotonicity_weight": 0.0,
     "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.1}],
 }
 ```
 
 `get_training_contract()` also reports training-only settings. The inference
-and weight contracts intentionally do not include regularizers:
+contract intentionally does not include regularizers:
 
 ```text
 regularizer change -> training behavior changes
 regularizer change -> inference contract unchanged
-regularizer change -> checkpoint weight compatibility unchanged
+regularizer change -> checkpoint inference compatibility unchanged
 ```
 
-This means a model checkpoint can remain weight-compatible even when training
+This means a model checkpoint can remain inference-compatible even when training
 regularization settings change. It does not mean the trained parameters will be
 scientifically comparable across experiments; record regularizer configs in
 experiment metadata.
@@ -392,8 +367,9 @@ penalty must depend on output pixels, keep it as a task-side loss outside CFP
 regularizers.
 
 Attribute normalization affects any regularizer that uses `features`. Document
-whether the regularizer assumes `minmax01`, `hybrid`, `none`, or a
-normalization-independent formulation.
+whether the regularizer assumes `dataset_minmax01`, `dataset_clipped_zscore01`,
+raw attributes from `scale_mode="none"`, or a normalization-independent
+formulation.
 
 ## Extension Checklist
 
@@ -406,7 +382,7 @@ When adding a regularizer, verify:
 - device compatibility for CPU, CUDA, and MPS tensors when available;
 - config validation and registry rejection of unknown options;
 - `get_config()` and `from_config()` round trip;
-- absence from `get_weight_contract()` and inference contract;
+- absence from `get_inference_contract()`;
 - interaction with `preserve_root` when tree-edge logic is involved;
 - behavior with cached dataloaders and direct image tensors.
 
@@ -421,36 +397,16 @@ git diff --check
 Use notebook smoke tests when regularization changes experiment workflows or
 paper-facing examples.
 
-## Appendix: Implementation Notes
+## Implementation Notes
 
-The regularization implementation lives under:
+Regularization code lives under:
 
 ```text
 mtlearn/python/mtlearn/layers/cfp/regularization/
-  __init__.py
   path_score_monotonicity.py
   attribute_order_score_monotonicity.py
   base.py
   edge_score_monotonicity.py
-```
-
-The default registry lives in:
-
-```text
-mtlearn/python/mtlearn/layers/cfp/component_registries.py
-```
-
-The legacy flat base-module shim remains importable:
-
-```text
-mtlearn/python/mtlearn/layers/cfp/regularizer.py
-```
-
-The execution path is implemented by:
-
-```text
-mtlearn/python/mtlearn/layers/cfp/runtime/forward_executor.py
-ConnectedFilterPreprocessingLayer.regularization_penalty(...)
 ```
 
 ## Current Boundaries

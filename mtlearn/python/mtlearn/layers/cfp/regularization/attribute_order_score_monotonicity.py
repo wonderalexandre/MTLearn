@@ -7,6 +7,7 @@ import numbers
 
 import torch
 
+from ._tree_info import require_complete_tree_info
 from .base import Regularizer
 
 
@@ -54,10 +55,8 @@ class AttributeOrderScoreMonotonicityRegularizer(Regularizer):
         if self.feature_index >= features.size(1):
             raise ValueError(f"feature_index={self.feature_index} is out of range for {features.size(1)} features.")
 
+        _, active = require_complete_tree_info(scores, tree_info)
         values = features[:, self.feature_index].to(device=scores.device, dtype=scores.dtype)
-        active = torch.ones(scores.numel(), dtype=torch.bool, device=scores.device)
-        if "tpre" in tree_info and "tpost" in tree_info:
-            active = (tree_info["tpost"] > tree_info["tpre"]).to(device=scores.device)
 
         if int(active.sum().item()) < 2:
             return scores.sum() * 0.0

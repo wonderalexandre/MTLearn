@@ -7,6 +7,7 @@ import numbers
 
 import torch
 
+from ._tree_info import require_complete_tree_info
 from .base import Regularizer
 
 
@@ -34,24 +35,16 @@ class PathScoreMonotonicityRegularizer(Regularizer):
         self.max_depth = max_depth
 
     def forward(self, scores: torch.Tensor, tree_info, features=None, context=None) -> torch.Tensor:
-        if scores.dim() != 1:
-            raise ValueError(f"expected scores with shape (num_nodes,), got {tuple(scores.shape)}")
-        parent = tree_info["parent"].to(device=scores.device)
-        if parent.numel() != scores.numel():
-            raise ValueError("parent and scores must have the same number of nodes.")
-
+        parent, active = require_complete_tree_info(scores, tree_info)
         node_ids = torch.arange(parent.numel(), device=scores.device)
-        alive = torch.ones(parent.numel(), dtype=torch.bool, device=scores.device)
-        if "tpre" in tree_info and "tpost" in tree_info:
-            alive = (tree_info["tpost"] > tree_info["tpre"]).to(device=scores.device)
-
+        # ``parent.numel()`` is a safe upper bound for "all ancestors".
         max_steps = parent.numel() if self.max_depth is None else self.max_depth
         current_ancestor = parent.clone()
-        active_descendant = alive.clone()
+        active_descendant = active.clone()
         violations = []
 
         for _ in range(int(max_steps)):
-            valid = active_descendant & alive[current_ancestor] & (current_ancestor != node_ids)
+            valid = active_descendant & active[current_ancestor] & (current_ancestor != node_ids)
             if not bool(valid.any().item()):
                 break
             violations.append(torch.relu(scores[valid] - scores[current_ancestor[valid]]))

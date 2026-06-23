@@ -13,41 +13,166 @@ except Exception as exc:  # pragma: no cover
 
 from mtlearn import morphology
 from mtlearn.layers import cfp
-from mtlearn.layers.cfp.filter_spec_normalizer import normalize_filter_specs
+from mtlearn.layers.cfp.normalization import AttributeNormalizer, StatsSerializer
+from mtlearn.layers.cfp.runtime import (
+    BatchInputNormalizer,
+    CachedDataLoaderBuilder,
+    CFPCacheInputError,
+    CFPContext,
+    TreePayloadCache,
+    TreeReconstructor,
+    validate_cfp_cache_batch_x,
+)
+from mtlearn.layers.cfp.serialization import ConfigDeserializer, ConfigSerializer
+from mtlearn.layers.cfp.specs.filter_spec_normalizer import normalize_filter_specs
 
 pytestmark = pytest.mark.integration
 
 
 def test_grouped_cfp_subpackages_preserve_public_component_identity():
+    import mtlearn.layers.cfp.normalization as normalization
+
     from mtlearn.layers.cfp.constraints import PreserveRootConstraint
-    from mtlearn.layers.cfp.mlp_scorer import MLPScorer as LegacyMLPScorer
-    from mtlearn.layers.cfp.normalization import AttributeNormalizer
     from mtlearn.layers.cfp.regularization import (
         PathScoreMonotonicityRegularizer,
         AttributeOrderScoreMonotonicityRegularizer,
         EdgeScoreMonotonicityRegularizer,
     )
-    from mtlearn.layers.cfp.runtime import TreeReconstructor
     from mtlearn.layers.cfp.scoring import MLPScorer
-    from mtlearn.layers.cfp.serialization import ConfigSerializer
     from mtlearn.layers.cfp.specs import FilterSpec
 
     assert MLPScorer is cfp.MLPScorer
-    assert LegacyMLPScorer is cfp.MLPScorer
     assert PreserveRootConstraint is cfp.PreserveRootConstraint
     assert PathScoreMonotonicityRegularizer is cfp.PathScoreMonotonicityRegularizer
     assert AttributeOrderScoreMonotonicityRegularizer is cfp.AttributeOrderScoreMonotonicityRegularizer
     assert EdgeScoreMonotonicityRegularizer is cfp.EdgeScoreMonotonicityRegularizer
-    assert AttributeNormalizer is cfp.AttributeNormalizer
-    assert TreeReconstructor is cfp.TreeReconstructor
-    assert cfp.validate_cfp_cache_batch_x.__name__ == "validate_cfp_cache_batch_x"
-    assert cfp.CFPCacheInputError.__name__ == "CFPCacheInputError"
-    assert ConfigSerializer is cfp.ConfigSerializer
     assert FilterSpec is cfp.FilterSpec
+    assert TreeReconstructor.__name__ == "TreeReconstructor"
+    assert validate_cfp_cache_batch_x.__name__ == "validate_cfp_cache_batch_x"
+    assert CFPCacheInputError.__name__ == "CFPCacheInputError"
+    assert ConfigSerializer.__name__ == "ConfigSerializer"
+    assert AttributeNormalizer.__name__ == "AttributeNormalizer"
+    assert not hasattr(cfp, "AttributeNormalizer")
+    assert not hasattr(cfp, "BatchInputNormalizer")
+    assert not hasattr(cfp, "CFPCacheInputError")
+    assert not hasattr(cfp, "ConfigSerializer")
+    assert not hasattr(cfp, "TreePayloadCache")
+    assert not hasattr(cfp, "TreeReconstructor")
+    assert not hasattr(cfp, "validate_cfp_cache_batch_x")
+    assert not hasattr(cfp.ConnectedFilterPreprocessingLayer, "get_params")
+    assert not hasattr(cfp.ConnectedFilterPreprocessingLayer, "init_identity_bias_zero")
+    assert not hasattr(normalization, "normalize_dataset_clipped_zscore01")
+    assert not hasattr(normalization, "update_attribute_stats")
+    with pytest.raises((ModuleNotFoundError, FileNotFoundError)):
+        __import__("mtlearn.layers.cfp.mlp_scorer")
+
+
+@pytest.mark.parametrize(
+    "kwargs, match",
+    [
+        ({"scale_mode": "bad"}, "scale_mode"),
+        ({"eps": 0.0}, "eps"),
+        ({"eps": True}, "eps"),
+        ({"clipped_zscore_radius": 0.0}, "clipped_zscore_radius"),
+        ({"clipped_zscore_radius": True}, "clipped_zscore_radius"),
+        ({"clipped_zscore_floor": -0.1}, "clipped_zscore_floor"),
+        ({"clipped_zscore_floor": 1.1}, "clipped_zscore_floor"),
+        ({"clipped_zscore_floor": True}, "clipped_zscore_floor"),
+    ],
+)
+def test_attribute_normalizer_rejects_invalid_options(kwargs, match):
+    with pytest.raises((TypeError, ValueError), match=match):
+        AttributeNormalizer(**kwargs)
+
+
+def test_attribute_normalizer_updates_and_freezes_statistics():
+    normalizer = AttributeNormalizer(scale_mode="dataset_minmax01")
+    values = torch.tensor([2.0, 5.0, 3.0], dtype=torch.float32)
+
+    assert normalizer.update("area", values) is True
+    assert normalizer.stats_epoch == 1
+    assert torch.equal(normalizer.ds_stats["area"]["amin"], torch.tensor(2.0))
+    assert torch.equal(normalizer.ds_stats["area"]["amax"], torch.tensor(5.0))
+
+    normalizer.freeze()
+    assert normalizer.update("area", torch.tensor([0.0, 10.0], dtype=torch.float32)) is False
+    assert normalizer.stats_epoch == 1
+    assert torch.equal(normalizer.ds_stats["area"]["amin"], torch.tensor(2.0))
+    assert torch.equal(normalizer.ds_stats["area"]["amax"], torch.tensor(5.0))
+
+
+def test_attribute_normalizer_clipped_zscore_uses_float64_statistics_and_positive_range():
+    normalizer = AttributeNormalizer(
+        scale_mode="dataset_clipped_zscore01",
+        clipped_zscore_radius=2.0,
+        clipped_zscore_floor=0.1,
+    )
+    values = torch.tensor([1.0, 3.0, 5.0], dtype=torch.float32)
+
+    assert normalizer.update("area", values) is True
+    assert normalizer.ds_stats["area"]["sum"].dtype == torch.float64
+
+    normalized = normalizer.normalize("area", values)
+
+    assert normalized.dtype == values.dtype
+    assert torch.all((normalized >= 0.1) & (normalized <= 1.0))
+    assert torch.isfinite(normalized).all()
+
+
+def test_attribute_normalizer_clipped_zscore_supports_mps_stats():
+    if not getattr(torch.backends, "mps", None) or not torch.backends.mps.is_available():
+        pytest.skip("MPS is not available")
+
+    normalizer = AttributeNormalizer(scale_mode="dataset_clipped_zscore01")
+    values = torch.tensor([1.0, 3.0, 5.0], dtype=torch.float32, device="mps")
+
+    assert normalizer.update("area", values) is True
+    normalized = normalizer.normalize("area", values)
+
+    assert normalizer.ds_stats["area"]["sum"].device.type == "cpu"
+    assert normalizer.ds_stats["area"]["sum"].dtype == torch.float64
+    assert normalized.device.type == "mps"
+    assert normalized.dtype == values.dtype
+    assert torch.isfinite(normalized).all()
+
+
+def test_attribute_normalizer_minmax_supports_mps_stats():
+    if not getattr(torch.backends, "mps", None) or not torch.backends.mps.is_available():
+        pytest.skip("MPS is not available")
+
+    normalizer = AttributeNormalizer(scale_mode="dataset_minmax01")
+    values = torch.tensor([2.0, 5.0, 3.0], dtype=torch.float32, device="mps")
+
+    assert normalizer.update("area", values) is True
+    normalized = normalizer.normalize("area", values)
+
+    assert normalizer.ds_stats["area"]["amin"].device.type == "cpu"
+    assert normalizer.ds_stats["area"]["amax"].device.type == "cpu"
+    assert normalized.device.type == "mps"
+    assert normalized.dtype == values.dtype
+    assert torch.isfinite(normalized).all()
+
+
+@pytest.mark.parametrize("scale_mode", ["dataset_minmax01", "dataset_zscore", "dataset_clipped_zscore01"])
+def test_attribute_normalizer_statistical_modes_require_offline_stats(scale_mode):
+    normalizer = AttributeNormalizer(scale_mode=scale_mode)
+    values = torch.tensor([7.0], dtype=torch.float32)
+
+    with pytest.raises(RuntimeError, match=f"scale_mode='{scale_mode}' requires dataset statistics"):
+        normalizer.normalize("missing", values)
+
+
+def test_attribute_normalizer_none_does_not_require_stats():
+    normalizer = AttributeNormalizer(scale_mode="none")
+    values = torch.tensor([7.0], dtype=torch.float32)
+
+    normalized = normalizer.normalize("missing", values)
+
+    assert normalized is values
 
 
 def test_linear_sigmoid_scorer_matches_explicit_formula():
-    scorer = cfp.LinearSigmoidScorer(num_features=2, beta_f=2.0)
+    scorer = cfp.LinearSigmoidScorer(num_features=2, score_sharpness=2.0)
     with torch.no_grad():
         scorer.weight.copy_(torch.tensor([1.0, -1.0]))
         scorer.bias.zero_()
@@ -60,12 +185,12 @@ def test_linear_sigmoid_scorer_matches_explicit_formula():
 
 
 def test_linear_sigmoid_scorer_accepts_external_parameters():
-    scorer = cfp.LinearSigmoidScorer(num_features=2, beta_f=1.0, owns_parameters=False)
+    scorer = cfp.LinearSigmoidScorer(num_features=2, score_sharpness=1.0, owns_parameters=False)
     features = torch.tensor([[1.0, 0.0], [0.0, 1.0]], dtype=torch.float32)
     weight = torch.tensor([2.0, -2.0], dtype=torch.float32, requires_grad=True)
     bias = torch.tensor([0.0], dtype=torch.float32, requires_grad=True)
 
-    scores = scorer(features, weight=weight, bias=bias, beta_f=0.5)
+    scores = scorer(features, weight=weight, bias=bias, score_sharpness=0.5)
     scores.sum().backward()
 
     assert torch.allclose(scores, torch.sigmoid(torch.tensor([1.0, -1.0])))
@@ -80,10 +205,10 @@ def test_linear_sigmoid_scorer_requires_parameters_when_stateless():
 
 
 def test_linear_sigmoid_scorer_initializes_identity_with_owned_parameters():
-    scorer = cfp.LinearSigmoidScorer(num_features=2, beta_f=2.0)
+    scorer = cfp.LinearSigmoidScorer(num_features=2, score_sharpness=2.0)
     features = torch.tensor([[0.0, 1.0], [2.0, -3.0]], dtype=torch.float32)
 
-    scorer.init_identity(beta_f=2.0, p0=0.8)
+    scorer.init_identity(score_sharpness=2.0, p0=0.8)
     scores = scorer(features)
 
     assert torch.allclose(scorer.weight, torch.zeros(2))
@@ -96,15 +221,15 @@ def test_linear_sigmoid_scorer_initializes_identity_with_external_parameters():
     bias = torch.zeros(1, dtype=torch.float32)
     features = torch.tensor([[0.0, 1.0], [2.0, -3.0]], dtype=torch.float32)
 
-    scorer.init_identity(beta_f=2.0, p0=0.8, weight=weight, bias=bias)
-    scores = scorer(features, weight=weight, bias=bias, beta_f=2.0)
+    scorer.init_identity(score_sharpness=2.0, p0=0.8, weight=weight, bias=bias)
+    scores = scorer(features, weight=weight, bias=bias, score_sharpness=2.0)
 
     assert torch.allclose(weight, torch.zeros(2))
     assert torch.allclose(scores, torch.full((2,), 0.8))
 
 
 def test_mlp_scorer_forward_backpropagates():
-    scorer = cfp.MLPScorer(num_features=2, hidden_channels=(3,), activation="tanh", beta_f=1.5)
+    scorer = cfp.MLPScorer(num_features=2, hidden_units=(3,), activation="tanh", score_sharpness=1.5)
     features = torch.tensor(
         [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]],
         dtype=torch.float32,
@@ -117,7 +242,7 @@ def test_mlp_scorer_forward_backpropagates():
     assert torch.all((scores >= 0.0) & (scores <= 1.0))
     assert scorer.to_config() == {
         "kind": "mlp",
-        "hidden_channels": [3],
+        "hidden_units": [3],
         "activation": "tanh",
     }
     gradients = [parameter.grad for parameter in scorer.parameters()]
@@ -127,13 +252,13 @@ def test_mlp_scorer_forward_backpropagates():
 
 def test_mlp_scorer_initializes_close_to_identity_without_cutting_gradients():
     torch.manual_seed(0)
-    scorer = cfp.MLPScorer(num_features=2, hidden_channels=(3,), activation="tanh", beta_f=1.5)
+    scorer = cfp.MLPScorer(num_features=2, hidden_units=(3,), activation="tanh", score_sharpness=1.5)
     features = torch.tensor(
         [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]],
         dtype=torch.float32,
     )
 
-    scorer.init_identity(beta_f=1.5, p0=0.9)
+    scorer.init_identity(score_sharpness=1.5, p0=0.9)
     scores = scorer(features)
     scores.sum().backward()
 
@@ -181,6 +306,34 @@ def test_edge_score_monotonicity_regularizer_rejects_invalid_weight(weight):
         cfp.EdgeScoreMonotonicityRegularizer(weight=weight)
 
 
+def test_edge_score_monotonicity_regularizer_rejects_invalid_tree_shapes():
+    regularizer = cfp.EdgeScoreMonotonicityRegularizer()
+    tree_info = {
+        "parent": torch.tensor([0, 0, 1], dtype=torch.long),
+        "tpre": torch.tensor([0, 1, 2], dtype=torch.long),
+        "tpost": torch.tensor([3, 3, 3], dtype=torch.long),
+    }
+
+    with pytest.raises(ValueError, match="scores"):
+        regularizer(torch.ones(1, 3), tree_info)
+
+    with pytest.raises(ValueError, match="same number of nodes"):
+        regularizer(torch.ones(2), tree_info)
+
+    with pytest.raises(ValueError, match="tree_info must contain"):
+        regularizer(torch.ones(3), {"parent": torch.tensor([0, 0, 1], dtype=torch.long)})
+
+    with pytest.raises(ValueError, match="parent, tpre, tpost, and scores"):
+        regularizer(
+            torch.ones(3),
+            {
+                "parent": torch.tensor([0, 0, 1], dtype=torch.long),
+                "tpre": torch.tensor([0, 1], dtype=torch.long),
+                "tpost": torch.tensor([3, 2, 3], dtype=torch.long),
+            },
+        )
+
+
 def test_attribute_order_score_monotonicity_regularizer_penalizes_score_inversions():
     regularizer = cfp.AttributeOrderScoreMonotonicityRegularizer(weight=2.0)
     scores = torch.tensor([0.2, 0.7, 0.4, 0.9], dtype=torch.float32, requires_grad=True)
@@ -206,7 +359,11 @@ def test_attribute_order_score_monotonicity_regularizer_supports_decreasing_dire
     )
     scores = torch.tensor([0.9, 0.7, 0.8], dtype=torch.float32, requires_grad=True)
     features = torch.tensor([[0.1], [0.2], [0.3]], dtype=torch.float32)
-    tree_info = {"parent": torch.tensor([0, 0, 1], dtype=torch.long)}
+    tree_info = {
+        "parent": torch.tensor([0, 0, 1], dtype=torch.long),
+        "tpre": torch.tensor([0, 1, 2], dtype=torch.long),
+        "tpost": torch.tensor([3, 3, 3], dtype=torch.long),
+    }
 
     penalty = regularizer(scores, tree_info, features=features)
 
@@ -246,6 +403,21 @@ def test_path_score_monotonicity_regularizer_penalizes_descendant_above_ancestor
     assert scores.grad.abs().sum().item() > 0.0
 
 
+def test_path_score_monotonicity_regularizer_checks_all_ancestors_by_default():
+    regularizer = cfp.PathScoreMonotonicityRegularizer()
+    scores = torch.tensor([0.0, 0.8, 0.9], dtype=torch.float32, requires_grad=True)
+    tree_info = {
+        "parent": torch.tensor([0, 0, 1], dtype=torch.long),
+        "tpre": torch.tensor([0, 1, 2], dtype=torch.long),
+        "tpost": torch.tensor([3, 3, 3], dtype=torch.long),
+    }
+
+    penalty = regularizer(scores, tree_info)
+
+    expected = (0.8**2 + 0.1**2 + 0.9**2) / 3.0
+    assert penalty.item() == pytest.approx(expected)
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -260,8 +432,23 @@ def test_path_score_monotonicity_regularizer_rejects_invalid_options(kwargs):
         cfp.PathScoreMonotonicityRegularizer(**kwargs)
 
 
+@pytest.mark.parametrize(
+    "regularizer, kwargs",
+    [
+        (cfp.EdgeScoreMonotonicityRegularizer(), {}),
+        (cfp.PathScoreMonotonicityRegularizer(), {}),
+        (cfp.AttributeOrderScoreMonotonicityRegularizer(), {"features": torch.ones(3, 1)}),
+    ],
+)
+def test_regularizers_require_complete_tree_info(regularizer, kwargs):
+    scores = torch.ones(3)
+
+    with pytest.raises(ValueError, match="tree_info must contain parent, tpre, and tpost"):
+        regularizer(scores, {"parent": torch.tensor([0, 0, 1], dtype=torch.long)}, **kwargs)
+
+
 def test_tree_payload_cache_stores_payloads_by_sample_and_tree_key():
-    cache = cfp.TreePayloadCache()
+    cache = TreePayloadCache()
     payload = {"info": object()}
 
     cache.set("sample-0", "max-tree|None|0|0", payload)
@@ -278,10 +465,10 @@ def test_batch_input_normalizer_handles_plain_list_and_cached_forms():
     idx = torch.tensor([10, 11], dtype=torch.long)
     list_batch = [tensor[0], tensor[1]]
 
-    plain = cfp.BatchInputNormalizer.normalize(tensor)
-    stacked = cfp.BatchInputNormalizer.normalize(list_batch)
-    cached_tuple = cfp.BatchInputNormalizer.normalize((tensor, idx))
-    cached_list = cfp.BatchInputNormalizer.normalize([tensor, idx])
+    plain = BatchInputNormalizer.normalize(tensor)
+    stacked = BatchInputNormalizer.normalize(list_batch)
+    cached_tuple = BatchInputNormalizer.normalize((tensor, idx))
+    cached_list = BatchInputNormalizer.normalize([tensor, idx])
 
     assert plain.tensor is tensor
     assert plain.index.tolist() == [0, 1]
@@ -304,7 +491,7 @@ def test_cached_dataloader_builder_wraps_dataset_with_stable_indices():
     )
     loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
-    wrapped = cfp.CachedDataLoaderBuilder.wrap_dataloader(loader, index_offset=50)
+    wrapped = CachedDataLoaderBuilder.wrap_dataloader(loader, index_offset=50)
     (x, idx), y = next(iter(wrapped))
 
     assert wrapped.batch_size == 2
@@ -322,7 +509,7 @@ def test_stats_serializer_roundtrips_tensors_to_requested_device():
             "label": "area",
         }
     }
-    serializer = cfp.StatsSerializer()
+    serializer = StatsSerializer()
 
     payload = serializer.serialize(stats)
     restored = serializer.deserialize(payload, device=torch.device("cpu"))
@@ -334,7 +521,7 @@ def test_stats_serializer_roundtrips_tensors_to_requested_device():
 
 
 def test_config_deserializer_resolves_serialized_layer_kwargs():
-    deserializer = cfp.ConfigDeserializer()
+    deserializer = ConfigDeserializer()
     kwargs = deserializer.deserialize_layer_config(
         {
             "in_channels": 1,
@@ -344,7 +531,7 @@ def test_config_deserializer_resolves_serialized_layer_kwargs():
                     "tree_type": "tree-of-shapes",
                     "attributes": ["BOUNDARY"],
                     "tos_interpolation": "Min8cMax4c",
-                    "monotonicity_weight": 0.25,
+                    "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.25}],
                 }
             ],
             "scale_mode": "none",
@@ -358,7 +545,7 @@ def test_config_deserializer_resolves_serialized_layer_kwargs():
     assert spec["name"] == "tos_mean"
     assert spec["attributes"] == (morphology.AttributeGroup.BOUNDARY,)
     assert spec["tos_interpolation"] == morphology.ToSInterpolation.Min8cMax4c
-    assert spec["monotonicity_weight"] == pytest.approx(0.25)
+    assert spec["regularizers"] == [{"kind": "edge_score_monotonicity", "weight": 0.25}]
 
 
 def test_filter_spec_collects_scoring_attributes_once():
@@ -403,12 +590,15 @@ def test_filter_spec_normalizer_builds_internal_spec_contract():
     assert spec.tree_key == "tree-of-shapes|Min8cMax4c|1|2"
     assert morphology.AttributeType.MAX_DIST not in spec.attributes
     assert isinstance(spec.scoring_model, cfp.LinearSigmoidScorer)
-    assert spec.preserve_root is True
     assert spec.constraint_configs == ({"kind": "preserve_root"},)
     assert spec.regularizer_configs == ({"kind": "edge_score_monotonicity", "weight": 0.25},)
 
 
-def test_legacy_linear_parameter_initializer_only_creates_legacy_parameters():
+def test_layer_owned_linear_parameter_initializer_only_creates_layer_owned_parameters():
+    from mtlearn.layers.cfp.scoring._layer_owned_linear_parameter_initializer import (
+        LayerOwnedLinearParameterInitializer,
+    )
+
     specs = normalize_filter_specs(
         [
             {
@@ -416,28 +606,28 @@ def test_legacy_linear_parameter_initializer_only_creates_legacy_parameters():
                 "tree_type": morphology.TreeType.MAX_TREE,
                 "attributes": (morphology.AttributeType.AREA,),
             },
-            {
-                "name": "mlp_area",
-                "tree_type": morphology.TreeType.MAX_TREE,
-                "attributes": (morphology.AttributeType.AREA,),
-                "scoring": {"kind": "mlp", "hidden_channels": [2]},
-            },
-        ],
+                {
+                    "name": "mlp_area",
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "scoring": {"kind": "mlp", "hidden_units": [2]},
+                },
+            ],
         default_tos_interpolation=None,
         default_tos_infinity_seed_row=0,
         default_tos_infinity_seed_col=0,
     )
-    initializer = cfp.LegacyLinearParameterInitializer()
+    initializer = LayerOwnedLinearParameterInitializer()
 
     weights, biases = initializer.create_parameter_dicts(specs, device="cpu")
     initializer.init_identity_with_bias(
         specs,
         weights,
         biases,
-        beta_f=2.0,
+        score_sharpness=2.0,
         p0=0.8,
     )
-    expected_bias = cfp.LegacyLinearParameterInitializer.logit(0.8) / 2.0
+    expected_bias = LayerOwnedLinearParameterInitializer.logit(0.8) / 2.0
 
     assert set(weights) == {"linear_area"}
     assert set(biases) == {"linear_area"}
@@ -446,41 +636,29 @@ def test_legacy_linear_parameter_initializer_only_creates_legacy_parameters():
     assert torch.allclose(weights["linear_area"], torch.zeros(1))
     assert torch.allclose(biases["linear_area"], torch.tensor([expected_bias]))
 
-    initializer.init_identity_bias_zero(
-        specs,
-        weights,
-        biases,
-        beta_f=2.0,
-        hybrid_floor_a=0.5,
-        p0=0.8,
-    )
 
-    assert torch.allclose(weights["linear_area"], torch.tensor([cfp.LegacyLinearParameterInitializer.logit(0.8)]))
-    assert torch.allclose(biases["linear_area"], torch.zeros(1))
-
-
-def test_spec_registry_creates_components_with_aliases_and_context():
+def test_spec_registry_creates_components_with_context():
     registry = cfp.SpecRegistry()
 
     def make_component(*, num_features, gain=1):
         return {"num_features": num_features, "gain": gain}
 
-    registry.register("demo", make_component, aliases=("demo-alias",))
-    serializer = cfp.ConfigSerializer(registry)
+    registry.register("demo", make_component)
+    serializer = ConfigSerializer(registry)
 
     component = serializer.from_config(
-        {"kind": "demo-alias", "gain": 2},
+        {"kind": "demo", "gain": 2},
         num_features=3,
     )
 
     assert component == {"num_features": 3, "gain": 2}
-    assert registry.registered_kinds() == ("demo", "demo-alias")
+    assert registry.registered_kinds() == ("demo",)
     with pytest.raises(ValueError, match="already registered"):
         registry.register("demo", make_component)
 
 
 def test_default_component_registries_expose_extension_kinds():
-    scorer = cfp.SCORING_MODEL_REGISTRY.create({"kind": "linear-sigmoid"}, num_features=2)
+    scorer = cfp.SCORING_MODEL_REGISTRY.create({"kind": "linear_sigmoid"}, num_features=2)
     constraint = cfp.SCORE_CONSTRAINT_REGISTRY.create({"kind": "preserve_root"})
     regularizer = cfp.REGULARIZER_REGISTRY.create(
         {
@@ -507,10 +685,16 @@ def test_default_component_registries_expose_extension_kinds():
     assert isinstance(attribute_regularizer, cfp.AttributeOrderScoreMonotonicityRegularizer)
     assert isinstance(path_regularizer, cfp.PathScoreMonotonicityRegularizer)
     assert "mlp" in cfp.SCORING_MODEL_REGISTRY.registered_kinds()
+    with pytest.raises(KeyError, match="unknown CFP component kind"):
+        cfp.SCORING_MODEL_REGISTRY.create({"kind": "linear-sigmoid"}, num_features=2)
+    with pytest.raises(ValueError, match="unsupported mlp scoring options"):
+        cfp.SCORING_MODEL_REGISTRY.create({"kind": "mlp", "hidden": [2]}, num_features=2)
+    with pytest.raises(ValueError, match="unsupported mlp scoring options"):
+        cfp.SCORING_MODEL_REGISTRY.create({"kind": "mlp", "hidden_channels": [2]}, num_features=2)
 
 
 @pytest.mark.parametrize(
-    "old_kind",
+    "unknown_kind",
     [
         "monotone_scores",
         "monotone-scores",
@@ -520,6 +704,6 @@ def test_default_component_registries_expose_extension_kinds():
         "ancestor-consistency",
     ],
 )
-def test_regularizer_registry_rejects_old_names_without_aliases(old_kind):
+def test_regularizer_registry_rejects_unregistered_names(unknown_kind):
     with pytest.raises(KeyError, match="unknown CFP component kind"):
-        cfp.REGULARIZER_REGISTRY.create({"kind": old_kind})
+        cfp.REGULARIZER_REGISTRY.create({"kind": unknown_kind})
