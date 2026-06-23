@@ -60,9 +60,9 @@ pip install "mtlearn[notebooks]"
 ```
 
 The `notebooks` extra installs `ipykernel`, `matplotlib`, `nbformat`,
-`papermill`, `pandas`, `scikit-learn`, `scipy`, and
-`segmentation-models-pytorch`. JupyterLab is optional and only needed for
-interactive notebook editing:
+`papermill`, `pandas`, `scikit-learn`, `scipy`,
+`segmentation-models-pytorch`, and `tqdm`. JupyterLab is optional and only
+needed for interactive notebook editing:
 
 ```bash
 pip install jupyterlab
@@ -72,7 +72,7 @@ Notebook files are not installed with the PyPI package. Clone the repository to
 run the public notebooks. The main public example is:
 
 ```text
-notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_filtering.ipynb
+notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_segmentation.ipynb
 ```
 
 Repository notebooks can download public registered datasets with the dataset

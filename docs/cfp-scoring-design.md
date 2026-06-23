@@ -342,15 +342,12 @@ loss = task_loss(layer(inputs), targets) + layer.regularization_penalty(inputs)
 
 ## Notebook Examples
 
-Two experiment notebooks compare the built-in linear and MLP scorers:
+One experiment notebook compares the built-in linear and MLP scorers:
 
-- [`CFP_linear_vs_mlp_scoring_screws_filtering.ipynb`](../notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_filtering.ipynb)
-  uses the original screws image/mask pairs as a filtering-style target and
-  keeps the CFP layer fixed except for the scoring family.
 - [`CFP_linear_vs_mlp_scoring_screws_segmentation.ipynb`](../notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_segmentation.ipynb)
   uses the original screws segmentation masks and reports calibrated and
-  fixed-threshold segmentation metrics for the same linear-vs-MLP scoring
-  comparison.
+  fixed-threshold segmentation metrics while keeping the CFP layer fixed
+  except for the scoring family.
 
 Two additional notebooks show the same simple custom scorer in two tasks:
 
