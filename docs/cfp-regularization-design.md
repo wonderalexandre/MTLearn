@@ -240,9 +240,9 @@ This makes it clear when the regularizer is negligible, dominant, or saturated.
 One experiment notebook shows regularization as a training-objective term:
 
 - [`CFP_score_regularization_screws.ipynb`](../notebooks/experiments/CFP_score_regularization_screws.ipynb)
-  trains two CFP layers on the screws dataset: one with only reconstruction
-  loss and one with an `edge_score_monotonicity` regularizer added through
-  `regularization_penalty(...)`.
+  trains two CFP layers on the screws segmentation dataset: one with only
+  segmentation loss and one with an `edge_score_monotonicity` regularizer
+  added through `regularization_penalty(...)`.
 
 This notebook is a pedagogical regularization example. It is not a benchmark.
 It is intended to make the regularizer config, the training-loop addition, and
