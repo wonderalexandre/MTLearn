@@ -72,7 +72,7 @@ Notebook files are not installed with the PyPI package. Clone the repository to
 run the public notebooks. The main public example is:
 
 ```text
-notebooks/experiments/Example_screws_filtering.ipynb
+notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_filtering.ipynb
 ```
 
 Repository notebooks can download public registered datasets with the dataset

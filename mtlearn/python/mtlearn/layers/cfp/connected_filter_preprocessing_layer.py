@@ -7,9 +7,8 @@ apply the equivalent operations with linear memory in the number of nodes and
 pixels.
 
 Tree construction and attribute computation are performed through
-``mtlearn.morphology`` and are intentionally outside the autograd path. The
-learnable parameters are the per-attribute-group weight vectors and biases that
-produce the node-wise sigmoid filtering criterion.
+``mtlearn.morphology`` and are intentionally outside the autograd path. Scoring
+models provide the learnable node-wise filtering criterion.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ import numpy as np
 from .._helpers import (
     to_numpy_u8,
 )
-from .normalization import AttributeNormalizer, StatsSerializer
+from .normalization import AttributeNormalizer, DEFAULT_SCALE_MODE, StatsSerializer
 from .runtime import (
     BatchInputNormalizer,
     CachedDataLoaderBuilder,
@@ -34,7 +33,7 @@ from .runtime import (
     TreePayloadProvider,
     TreeReconstructionFunction,
 )
-from .scoring import LegacyLinearParameterInitializer
+from .scoring._layer_owned_linear_parameter_initializer import LayerOwnedLinearParameterInitializer
 from .serialization import ConfigDeserializer, ConfigSerializer, PersistentStateManager
 from .specs import NormalizedFilterSpec as _NormalizedFilterSpec
 from .component_registries import (
@@ -47,7 +46,6 @@ from .specs.filter_spec_normalizer import (
     enum_name,
     filter_spec_tree_key,
     normalize_filter_specs,
-    normalize_nonnegative_scalar,
     normalize_positive_scalar,
 )
 
@@ -77,10 +75,6 @@ def _normalize_clamp(value: Any) -> tuple[float, float] | None:
     raise TypeError("clamp must be None, a positive scalar, or a (min, max) pair.")
 
 
-def _normalize_nonnegative_scalar(value: Any, name: str) -> float:
-    return normalize_nonnegative_scalar(value, name)
-
-
 def _normalize_attribute_dtype(value: Any) -> np.dtype:
     if value is None:
         return np.dtype(np.float32)
@@ -106,9 +100,9 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
     morphology tree, scoring attributes, and reconstructed altitude signal.
     ``clamp`` optionally bounds ``score_sharpness * logits`` before the sigmoid.
 
-    Tree construction and attribute computation happen outside autograd. The
-    trainable parameters are the per-filter weight vectors and scalar biases
-    that produce node-wise sigmoid gates from normalized attributes.
+    Tree construction and attribute computation happen outside autograd. Scoring
+    models provide the trainable node-wise sigmoid gates from normalized
+    attributes.
     """
 
     def __init__(
@@ -117,12 +111,12 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         filter_specs,
         *,
         device="cpu",
-        scale_mode: str = "hybrid",
+        scale_mode: str = DEFAULT_SCALE_MODE,
         eps: float = 1e-6,
-        beta_f: float = 1.0,
+        score_sharpness: float = 1.0,
         clamp=None,
-        hybrid_k: float = 3.0,
-        hybrid_floor_a: float = 0.05,
+        clipped_zscore_radius: float = 3.0,
+        clipped_zscore_floor: float = 0.05,
         attribute_dtype=None,
         tos_interpolation=None,
         tos_infinity_seed_row: int = 0,
@@ -134,32 +128,33 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             in_channels: Number of input image channels expected by ``forward``.
             filter_specs: Iterable of mappings. Each mapping must define
                 ``tree_type`` and ``attributes`` and may define ``name``,
-                ``preserve_root``, ``monotonicity_weight``,
-                ``tos_interpolation``, ``tos_infinity_seed_row``, and
-                ``tos_infinity_seed_col``.
+                ``constraints``, ``regularizers``, ``tos_interpolation``,
+                ``tos_infinity_seed_row``, and ``tos_infinity_seed_col``.
                 One output channel is produced for each input channel and each
                 filter spec.
             device: Device used for CFP tensors and trainable parameters.
                 Morphology-tree construction itself runs in the native CPU
                 backend.
-            scale_mode: Attribute normalization mode. ``"hybrid"`` uses
-                dataset-level z-score statistics followed by clipping/rescaling;
-                ``"minmax01"``, ``"zscore_tree"``, and ``"none"`` are also
-                supported by the shared normalization helpers.
+            scale_mode: Attribute normalization mode. ``"dataset_clipped_zscore01"``
+                uses dataset-level z-score statistics followed by clipping and
+                rescaling; ``"dataset_minmax01"`` and ``"dataset_zscore"`` use
+                other dataset-statistic normalizers; ``"none"`` passes raw
+                attributes through unchanged. All statistical modes require statistics from
+                ``build_dataloader_cached(...)`` or ``load_stats(...)`` before
+                regular forward passes.
             eps: Numerical floor used by normalization.
-            beta_f: Default score sharpness used by specs that do not define
-                ``score_sharpness``. Kept as a constructor name for historical
-                compatibility.
+            score_sharpness: Default score sharpness used by specs that do not
+                define ``score_sharpness``.
             clamp: Optional bound applied to ``score_sharpness * logits`` before the
                 sigmoid. Use ``None`` for no clamp, a positive scalar for
                 symmetric bounds, or ``(min, max)`` for explicit bounds.
-            hybrid_k: Clipping radius used by ``scale_mode="hybrid"``.
-            hybrid_floor_a: Lower endpoint used by hybrid rescaling.
+            clipped_zscore_radius: Clipping radius used by ``scale_mode="dataset_clipped_zscore01"``.
+            clipped_zscore_floor: Lower endpoint used by clipped z-score rescaling.
             attribute_dtype: Floating dtype used for morphology attribute
                 extraction, cache storage, and normalization. Accepts
                 ``np.float32``, ``np.float64``, ``torch.float32``,
                 ``torch.float64``, and equivalent NumPy dtype strings. ``None``
-                keeps the historical ``np.float32`` default.
+                uses ``np.float32``.
             tos_interpolation: Default tree-of-shapes interpolation for specs
                 that do not override it.
             tos_infinity_seed_row: Default tree-of-shapes infinity seed row.
@@ -171,13 +166,13 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         """
         super().__init__()
 
-        self.hybrid_k = float(hybrid_k)
-        self.hybrid_floor_a = float(hybrid_floor_a)
+        self.clipped_zscore_radius = float(clipped_zscore_radius)
+        self.clipped_zscore_floor = float(clipped_zscore_floor)
         self.in_channels = int(in_channels)
         self.device = torch.device(device)
         self.scale_mode = str(scale_mode)
         self.eps = float(eps)
-        self.beta_f = normalize_positive_scalar(beta_f, "beta_f")
+        self.score_sharpness = normalize_positive_scalar(score_sharpness, "score_sharpness")
         self.clamp = _normalize_clamp(clamp)
         self.attribute_dtype = _normalize_attribute_dtype(attribute_dtype)
 
@@ -225,8 +220,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self._attribute_normalizer = AttributeNormalizer(
             self.scale_mode,
             self.eps,
-            hybrid_k=self.hybrid_k,
-            hybrid_floor_a=self.hybrid_floor_a,
+            clipped_zscore_radius=self.clipped_zscore_radius,
+            clipped_zscore_floor=self.clipped_zscore_floor,
         )
         self._tree_payload_provider = TreePayloadProvider(
             tree_spec_by_key=self._tree_spec_by_key,
@@ -243,12 +238,12 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self._training_sample_inspector = TrainingSampleInspector()
         self._config_serializer = ConfigSerializer()
         self._stats_serializer = StatsSerializer()
-        self._legacy_parameter_initializer = LegacyLinearParameterInitializer()
+        self._linear_parameter_initializer = LayerOwnedLinearParameterInitializer()
         self._persistent_state_manager = PersistentStateManager()
         self._active_context = None
         self._score_sharpness_override = None
 
-        self._weights, self._biases = self._legacy_parameter_initializer.create_parameter_dicts(
+        self._weights, self._biases = self._linear_parameter_initializer.create_parameter_dicts(
             self.filter_specs,
             device=self.device,
         )
@@ -275,7 +270,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             default_tos_interpolation=default_tos_interpolation,
             default_tos_infinity_seed_row=default_tos_infinity_seed_row,
             default_tos_infinity_seed_col=default_tos_infinity_seed_col,
-            default_score_sharpness=self.beta_f,
+            default_score_sharpness=self.score_sharpness,
         )
 
     def _stat_key(self, tree_key: str, attr_type: Any) -> str:
@@ -306,38 +301,12 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self._attribute_normalizer.stats_frozen = bool(value)
 
     @property
-    def _tree_info(self):
-        return self._tree_payload_cache.tree_info()
-
-    @property
-    def _base_attrs(self):
-        return self._tree_payload_cache.base_attrs()
-
-    @property
-    def _norm_attrs(self):
-        return self._tree_payload_cache.norm_attrs()
-
-    @property
     def _norm_epoch_by_key(self):
         return self._tree_payload_cache.norm_epoch_by_key
 
-    def _to_numpy_u8(self, img2d_t: torch.Tensor) -> np.ndarray:
-        return to_numpy_u8(img2d_t)
-
-    def _build_tree(self, img_np: np.ndarray, spec: _NormalizedFilterSpec):
-        return self._tree_payload_provider.build_tree(img_np, spec)
-
-    def _compute_tree_info(self, tree, spec: _NormalizedFilterSpec):
-        return self._tree_payload_provider.compute_tree_info(tree, spec)
-
-    def _update_ds_stats(self, stat_key, a_raw_1d: torch.Tensor):
-        self._attribute_normalizer.update(stat_key, a_raw_1d)
-
-    def _normalize_with_ds_stats(self, stat_key, a_raw_1d: torch.Tensor) -> torch.Tensor:
-        return self._attribute_normalizer.normalize(stat_key, a_raw_1d)
-
-    def _compute_tree_payload(self, img_np: np.ndarray, tree_key: str, *, update_stats: bool):
-        return self._tree_payload_provider.compute_payload(img_np, tree_key, update_stats=update_stats)
+    def cached_sample_count(self) -> int:
+        """Return the number of cached sample/channel entries."""
+        return self._tree_payload_cache.sample_count()
 
     def _ensure_tree_payload_cached(
         self,
@@ -350,8 +319,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         if self._tree_payload_cache.has(base_key, tree_key):
             return
 
-        img_np = self._to_numpy_u8(img_t.detach())
-        payload = self._compute_tree_payload(img_np, tree_key, update_stats=update_stats)
+        img_np = to_numpy_u8(img_t.detach())
+        payload = self._tree_payload_provider.compute_payload(img_np, tree_key, update_stats=update_stats)
         self._tree_payload_cache.set(base_key, tree_key, payload)
         self._tree_payload_cache.set_epoch(base_key, self._stats_epoch)
 
@@ -388,7 +357,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             per_attr_raw = payload["base_attrs"]
             for attr_type, a_raw_2d in per_attr_raw.items():
                 stat_key = self._stat_key(tree_key, attr_type)
-                refreshed[tree_key][attr_type] = self._normalize_with_ds_stats(stat_key, a_raw_2d.view(-1))
+                refreshed[tree_key][attr_type] = self._attribute_normalizer.normalize(stat_key, a_raw_2d.view(-1))
         self._tree_payload_cache.replace_norm_attrs(base_key, refreshed)
         self._tree_payload_cache.set_epoch(base_key, self._stats_epoch)
 
@@ -441,11 +410,11 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 context=context,
                 weight=self._weights[spec.key],
                 bias=self._biases[spec.key],
-                beta_f=score_sharpness,
+                score_sharpness=score_sharpness,
                 clamp=self.clamp,
             )
         else:
-            scores = scoring_model(A_norm, info, context=context, beta_f=score_sharpness, clamp=self.clamp)
+            scores = scoring_model(A_norm, info, context=context, score_sharpness=score_sharpness, clamp=self.clamp)
         scores = scores.view(-1)
         num_nodes = int(info["tpre"].numel())
         if scores.numel() != num_nodes:
@@ -482,8 +451,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             return payload["info"], payload["norm_attrs"]
 
         if spec.tree_key not in direct_payloads:
-            img_np = self._to_numpy_u8(img_ch.detach())
-            direct_payloads[spec.tree_key] = self._compute_tree_payload(
+            img_np = to_numpy_u8(img_ch.detach())
+            direct_payloads[spec.tree_key] = self._tree_payload_provider.compute_payload(
                 img_np,
                 spec.tree_key,
                 update_stats=False,
@@ -512,8 +481,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             info["tpost"],
             info["parent"],
             info["node_of_pixel"],
-            info["numRows"],
-            info["numCols"],
+            info["num_rows"],
+            info["num_cols"],
             info["order_forward"],
             info["order_backward"],
         )
@@ -521,7 +490,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         return y_ch
 
     def _batch_input(self, x):
-        return self._batch_input_normalizer.normalize(x).as_tuple()
+        return self._batch_input_normalizer.normalize(x)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply all filter specs and return ``(B, C * specs, H, W)``.
@@ -547,27 +516,22 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self,
         x: torch.Tensor,
         score_sharpness: float = 1000.0,
-        *,
-        beta_f: float | None = None,
     ) -> torch.Tensor:
         """Run inference with a caller-provided score sharpness.
 
         The method temporarily switches the module to evaluation mode, runs
         ``forward`` under ``torch.no_grad()``, restores per-spec sharpness, and
-        restores the previous training/eval state. ``beta_f`` is accepted as a
-        legacy keyword alias.
+        restores the previous training/eval state.
         """
-        if beta_f is not None:
-            score_sharpness = beta_f
         was_training = self.training
         self.eval()
-        old_override = self._score_sharpness_override
+        previous_override = self._score_sharpness_override
         self._score_sharpness_override = normalize_positive_scalar(score_sharpness, "score_sharpness")
         try:
             with torch.no_grad():
                 result = self.forward(x)
         finally:
-            self._score_sharpness_override = old_override
+            self._score_sharpness_override = previous_override
             self.train(was_training)
         return result
 
@@ -636,7 +600,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
 
         The returned dictionary is serializable and accepted by
         ``from_config``. It describes layer structure, filter specs,
-        normalization mode, sigmoid gain, clamp bounds, and hybrid
+        normalization mode, sigmoid gain, clamp bounds, and clipped z-score
         normalization constants. It does not include trainable weights or
         dataset statistics.
         """
@@ -658,10 +622,6 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         """Return named CFP contracts for parameters, inference, and training."""
         return self._config_serializer.contracts(self)
 
-    def get_weight_contract(self) -> dict[str, Any]:
-        """Compatibility alias for the inference contract used by checkpoints."""
-        return self.get_inference_contract()
-
     @staticmethod
     def _training_contract_for_spec(spec: _NormalizedFilterSpec) -> dict[str, Any]:
         return ConfigSerializer.training_contract_for_spec(spec)
@@ -677,7 +637,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
     def get_extra_state(self) -> dict[str, Any]:
         """Embed persistent CFP state in PyTorch checkpoints.
 
-        This includes the weight contract and dataset normalization statistics.
+        This includes the inference contract and dataset normalization statistics.
         Per-sample tree/attribute caches are intentionally not persisted.
         """
         return self._persistent_state_manager.extra_state(self)
@@ -693,10 +653,6 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         ``mtlearn.layers.save_checkpoint`` for full PyTorch models.
         """
         self._persistent_state_manager.export_params(self, path)
-
-    def save_params(self, path: str):
-        """Compatibility alias for ``export_params``."""
-        self.export_params(path)
 
     @staticmethod
     def _attribute_from_name(value: Any) -> Any:
@@ -732,14 +688,6 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
     def _serialize_filter_spec(spec: _NormalizedFilterSpec) -> dict[str, Any]:
         return ConfigSerializer().filter_spec_metadata(spec)
 
-    def get_params(self):
-        """Return CPU clones of the per-spec weight and bias tensors."""
-        return self._persistent_state_manager.get_params(self)
-
-    @staticmethod
-    def _logit(p: float) -> float:
-        return LegacyLinearParameterInitializer.logit(p)
-
     @torch.no_grad()
     def init_identity(self, p0: float = 0.995, *, strict: bool = True) -> tuple[str, ...]:
         """Initialize scoring models so CFP outputs start close to identity.
@@ -752,7 +700,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         skipped = []
         for spec in self.filter_specs:
             scoring_model = self._scoring_models[spec.key]
-            kwargs = {"beta_f": self._score_sharpness_for_spec(spec), "p0": p0}
+            kwargs = {"score_sharpness": self._score_sharpness_for_spec(spec), "p0": p0}
             if spec.key in self._weights:
                 kwargs.update(
                     {
@@ -770,31 +718,6 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                     ) from exc
                 skipped.append(spec.key)
         return tuple(skipped)
-
-    @torch.no_grad()
-    def init_identity_with_bias(self, p0: float = 0.995):
-        """Compatibility wrapper for ``init_identity``.
-
-        The old name reflected the default linear scorer strategy. New scoring
-        models define their own identity-like initialization.
-        """
-        return self.init_identity(p0=p0, strict=False)
-
-    @torch.no_grad()
-    def init_identity_bias_zero(self, p0: float = 0.99):
-        """Initialize filters close to identity with zero bias.
-
-        This initialization assumes hybrid-normalized attributes with a
-        positive floor. Each weight receives the same positive value and biases
-        are set to zero.
-        """
-        self._legacy_parameter_initializer.init_identity_bias_zero(
-            self.filter_specs,
-            self._weights,
-            self._biases,
-            hybrid_floor_a=self.hybrid_floor_a,
-            p0=p0,
-        )
 
     def build_dataloader_cached(self, dataloader):
         """Wrap a DataLoader and precompute CFP caches/statistics.
@@ -829,11 +752,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             index_offset=index_offset,
         )
 
-
-CFPLayer = ConnectedFilterPreprocessingLayer
-
 __all__ = [
     'ConnectedFilterPreprocessingImplicitJacobianFunction',
     'ConnectedFilterPreprocessingLayer',
-    'CFPLayer',
 ]

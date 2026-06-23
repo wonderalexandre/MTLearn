@@ -58,16 +58,15 @@ attributes after expansion.
 layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
     filter_specs=[mixed_spec],
-    scale_mode="minmax01",
 )
 
-weights, biases = layer.get_params()
-print(weights["shape_plus_depth"].shape)
+parameter_contract = layer.get_parameter_contract()
+print(parameter_contract["weights"]["shape_plus_depth"])
 ```
 
 ## Naming Specs
 
-Use explicit names. They become keys in parameter dictionaries, exported
+Use explicit names. They become keys in parameter contracts, exported
 metadata, checkpoint contracts, and inspection output.
 
 ```python
@@ -125,7 +124,7 @@ restored = ConnectedFilterPreprocessingLayer.from_config(config)
 
 This is the same config shape used by checkpoint helpers. It records tree type,
 attributes, scoring model, constraints, regularizers, normalization mode, clamp
-bounds, and hybrid normalization constants.
+bounds, and clipped z-score normalization constants.
 
 ## Practical Checklist
 
@@ -133,5 +132,5 @@ bounds, and hybrid normalization constants.
 - Name every spec before training.
 - Keep max-tree and min-tree specs separate when polarity matters.
 - Use tree-of-shapes when polarity should not matter.
-- For `"hybrid"` normalization, build or load dataset stats before training.
+- For `"dataset_clipped_zscore01"` normalization, build or load dataset stats before training.
 - Inspect one sample before large experiments to confirm attributes and gates.

@@ -14,13 +14,11 @@ except Exception as exc:  # pragma: no cover
 from mtlearn import morphology
 from mtlearn.layers import (
     ConnectedFilterPreprocessingLayer,
-    ConnectedFilterPreprocessingLayerWithCPUTreeTraversal,
-    ConnectedFilterPreprocessingLayerWithExplicitJacobian,
     collect_cfp_configs,
     load_checkpoint,
     save_checkpoint,
 )
-from mtlearn.layers.cfp import CFPCacheInputError
+from mtlearn.layers.cfp.runtime import CFPCacheInputError
 from mtlearn.layers._helpers import IndexedDatasetWrapper
 
 pytestmark = pytest.mark.integration
@@ -53,29 +51,19 @@ def _clone_stats(stats):
     }
 
 
-def _single_area_layer(layer_cls=ConnectedFilterPreprocessingLayer, *, scale_mode="minmax01"):
-    if layer_cls is ConnectedFilterPreprocessingLayer:
-        return layer_cls(
-            in_channels=1,
-            filter_specs=[
-                {
-                    "tree_type": morphology.TreeType.MAX_TREE,
-                    "attributes": (morphology.AttributeType.AREA,),
-                }
-            ],
-            device="cpu",
-            scale_mode=scale_mode,
-            beta_f=1.0,
-            clamp=None,
-        )
-    return layer_cls(
+def _single_area_layer(*, scale_mode="dataset_minmax01"):
+    return ConnectedFilterPreprocessingLayer(
         in_channels=1,
-        attributes_spec=[(morphology.AttributeType.AREA,)],
-        tree_type="max-tree",
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
         device="cpu",
         scale_mode=scale_mode,
-        beta_f=1.0,
-        clamp_logits=False,
+        score_sharpness=1.0,
+        clamp=None,
     )
 
 
@@ -97,7 +85,7 @@ class _TwoCfpBackbone(torch.nn.Module):
         self.branch.cfp = second_cfp
 
 
-def _named_primary_layer(name, attribute, *, scale_mode="minmax01"):
+def _named_primary_layer(name, attribute, *, scale_mode="dataset_minmax01"):
     return ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -109,21 +97,28 @@ def _named_primary_layer(name, attribute, *, scale_mode="minmax01"):
         ],
         device="cpu",
         scale_mode=scale_mode,
-        beta_f=1.0,
+        score_sharpness=1.0,
         clamp=None,
     )
 
 
 def test_build_dataloader_cached_populates_primary_layer_cache():
-    layer = _single_area_layer(scale_mode="minmax01")
+    layer = _single_area_layer(scale_mode="dataset_minmax01")
     loader = _tiny_dataset_loader()
 
     cached_loader = layer.build_dataloader_cached(loader)
 
     assert layer._stats_frozen is True
-    assert set(layer._tree_info) == {"0_0", "1_0"}
-    assert set(layer._base_attrs) == {"0_0", "1_0"}
-    assert set(layer._norm_attrs) == {"0_0", "1_0"}
+    assert set(layer._tree_payload_cache.sample_keys()) == {"0_0", "1_0"}
+    for sample_key in ("0_0", "1_0"):
+        payloads = layer._tree_payload_cache.sample_payloads(sample_key)
+        assert set(payloads) == {layer.filter_specs[0].tree_key}
+        payload = payloads[layer.filter_specs[0].tree_key]
+        assert set(payload) >= {"info", "base_attrs", "norm_attrs"}
+        assert "num_rows" in payload["info"]
+        assert "num_cols" in payload["info"]
+        assert "numRows" not in payload["info"]
+        assert "numCols" not in payload["info"]
     assert layer._stats_epoch > 0
     assert all(epoch == layer._stats_epoch for epoch in layer._norm_epoch_by_key.values())
 
@@ -145,7 +140,7 @@ def test_build_dataloader_cached_populates_primary_layer_cache():
     ],
 )
 def test_build_dataloader_cached_rejects_non_cacheable_image_batches(x, match):
-    layer = _single_area_layer(scale_mode="minmax01")
+    layer = _single_area_layer(scale_mode="dataset_minmax01")
 
     with pytest.raises(CFPCacheInputError, match=match):
         layer.build_dataloader_cached(_loader_from_x(x))
@@ -163,7 +158,7 @@ def test_indexed_dataset_wrapper_applies_index_offset():
 
 
 def test_build_dataloader_cached_fixed_stats_keeps_stats_unchanged():
-    layer = _single_area_layer(scale_mode="minmax01")
+    layer = _single_area_layer(scale_mode="dataset_minmax01")
     layer.build_dataloader_cached(_tiny_dataset_loader())
     stats_epoch = layer._stats_epoch
     stats_before = _clone_stats(layer._ds_stats)
@@ -174,7 +169,7 @@ def test_build_dataloader_cached_fixed_stats_keeps_stats_unchanged():
     )
 
     assert layer._stats_epoch == stats_epoch
-    assert set(layer._tree_info) == {"0_0", "1_0", "100_0", "101_0"}
+    assert set(layer._tree_payload_cache.sample_keys()) == {"0_0", "1_0", "100_0", "101_0"}
     assert layer._norm_epoch_by_key["100_0"] == stats_epoch
     assert layer._norm_epoch_by_key["101_0"] == stats_epoch
 
@@ -193,7 +188,7 @@ def test_build_dataloader_cached_fixed_stats_keeps_stats_unchanged():
 
 
 def test_build_dataloader_cached_fixed_stats_rejects_missing_stats():
-    layer = _single_area_layer(scale_mode="minmax01")
+    layer = _single_area_layer(scale_mode="dataset_minmax01")
 
     with pytest.raises(RuntimeError, match="fixed dataset statistics"):
         layer.build_dataloader_cached_fixed_stats(_tiny_dataset_loader(), index_offset=100)
@@ -216,74 +211,64 @@ def test_cached_forward_matches_uncached_forward_with_same_parameters():
 
 
 def test_freeze_and_unfreeze_dataset_stats_controls_stat_updates():
-    layer = _single_area_layer(scale_mode="minmax01")
+    layer = _single_area_layer(scale_mode="dataset_minmax01")
     attr = morphology.AttributeType.AREA
     stat_key = layer._stat_key(layer.filter_specs[0].tree_key, attr)
 
-    layer._update_ds_stats(stat_key, torch.tensor([2.0, 4.0]))
+    layer._attribute_normalizer.update(stat_key, torch.tensor([2.0, 4.0]))
     initial_epoch = layer._stats_epoch
     initial_min = layer._ds_stats[stat_key]["amin"].clone()
 
     layer.freeze_ds_stats()
-    layer._update_ds_stats(stat_key, torch.tensor([0.0, 10.0]))
+    layer._attribute_normalizer.update(stat_key, torch.tensor([0.0, 10.0]))
 
     assert layer._stats_epoch == initial_epoch
     assert torch.equal(layer._ds_stats[stat_key]["amin"], initial_min)
 
     layer.unfreeze_ds_stats()
-    layer._update_ds_stats(stat_key, torch.tensor([0.0, 10.0]))
+    layer._attribute_normalizer.update(stat_key, torch.tensor([0.0, 10.0]))
 
     assert layer._stats_epoch == initial_epoch + 1
     assert layer._ds_stats[stat_key]["amin"].item() == 0.0
 
 
 def test_refresh_cached_normalization_uses_latest_stats():
-    layer = _single_area_layer(scale_mode="minmax01")
+    layer = _single_area_layer(scale_mode="dataset_minmax01")
     layer.build_dataloader_cached(_tiny_dataset_loader())
 
     attr = morphology.AttributeType.AREA
     tree_key = layer.filter_specs[0].tree_key
     stat_key = layer._stat_key(tree_key, attr)
-    before = layer._norm_attrs["0_0"][tree_key][attr].clone()
+    before = layer._tree_payload_cache.sample_payloads("0_0")[tree_key]["norm_attrs"][attr].clone()
 
     layer._ds_stats[stat_key]["amin"] = torch.tensor(0.0)
     layer._ds_stats[stat_key]["amax"] = torch.tensor(100.0)
     layer._stats_epoch += 1
     layer.refresh_cached_normalization()
 
-    after = layer._norm_attrs["0_0"][tree_key][attr]
+    after = layer._tree_payload_cache.sample_payloads("0_0")[tree_key]["norm_attrs"][attr]
     assert not torch.allclose(after, before)
     assert layer._norm_epoch_by_key["0_0"] == layer._stats_epoch
 
 
-@pytest.mark.parametrize(
-    "layer_cls",
-    [
-        ConnectedFilterPreprocessingLayer,
-        ConnectedFilterPreprocessingLayerWithExplicitJacobian,
-        ConnectedFilterPreprocessingLayerWithCPUTreeTraversal,
-    ],
-)
-def test_load_stats_roundtrip_after_save(tmp_path, layer_cls):
-    source = _single_area_layer(layer_cls, scale_mode="minmax01")
+def test_load_stats_roundtrip_after_save(tmp_path):
+    source = _single_area_layer(scale_mode="dataset_minmax01")
     source.build_dataloader_cached(_tiny_dataset_loader())
     stats_path = tmp_path / "stats.pt"
 
     source.save_stats(str(stats_path))
 
-    target = _single_area_layer(layer_cls, scale_mode="minmax01")
+    target = _single_area_layer(scale_mode="dataset_minmax01")
     target.load_stats(str(stats_path))
 
     assert target._ds_stats.keys() == source._ds_stats.keys()
-    attr = morphology.AttributeType.AREA
-    if layer_cls is ConnectedFilterPreprocessingLayer:
-        attr = source._stat_key(source.filter_specs[0].tree_key, attr)
+    attr = source._stat_key(source.filter_specs[0].tree_key, morphology.AttributeType.AREA)
     assert torch.equal(target._ds_stats[attr]["amin"], source._ds_stats[attr]["amin"])
     assert torch.equal(target._ds_stats[attr]["amax"], source._ds_stats[attr]["amax"])
 
 
 def test_primary_layer_state_dict_extra_state_roundtrip_inside_backbone(tmp_path):
-    source_cfp = _single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="minmax01")
+    source_cfp = _single_area_layer(scale_mode="dataset_minmax01")
     source_cfp.build_dataloader_cached(_tiny_dataset_loader())
     source_model = _TinyBackbone(source_cfp)
     with torch.no_grad():
@@ -312,7 +297,7 @@ def test_primary_layer_state_dict_extra_state_roundtrip_inside_backbone(tmp_path
 
 
 def test_primary_layer_state_dict_rejects_incompatible_extra_state():
-    source = _single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="minmax01")
+    source = _single_area_layer(scale_mode="dataset_minmax01")
     incompatible = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -322,15 +307,15 @@ def test_primary_layer_state_dict_rejects_incompatible_extra_state():
             }
         ],
         device="cpu",
-        scale_mode="minmax01",
+        scale_mode="dataset_minmax01",
     )
 
-    with pytest.raises(RuntimeError, match="checkpoint weight contract is incompatible"):
+    with pytest.raises(RuntimeError, match="checkpoint inference contract is incompatible"):
         incompatible.load_state_dict(source.state_dict())
 
 
 def test_checkpoint_helpers_roundtrip_model_with_cfp_factory(tmp_path):
-    source_cfp = _single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="minmax01")
+    source_cfp = _single_area_layer(scale_mode="dataset_minmax01")
     source_cfp.build_dataloader_cached(_tiny_dataset_loader())
     source_model = _TinyBackbone(source_cfp)
     with torch.no_grad():
@@ -363,7 +348,7 @@ def test_checkpoint_helpers_roundtrip_model_with_cfp_factory(tmp_path):
 
 
 def test_checkpoint_helpers_load_existing_model(tmp_path):
-    source_cfp = _single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="minmax01")
+    source_cfp = _single_area_layer(scale_mode="dataset_minmax01")
     source_model = _TinyBackbone(source_cfp)
     checkpoint_path = tmp_path / "model_checkpoint.pt"
     save_checkpoint(checkpoint_path, source_model)
@@ -381,7 +366,7 @@ def test_checkpoint_helpers_load_existing_model(tmp_path):
 
 
 def test_checkpoint_helpers_load_no_arg_factory(tmp_path):
-    source_cfp = _single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="minmax01")
+    source_cfp = _single_area_layer(scale_mode="dataset_minmax01")
     source_model = _TinyBackbone(source_cfp)
     with torch.no_grad():
         source_model.cfp._weights["spec_000"].fill_(0.4)
@@ -390,7 +375,7 @@ def test_checkpoint_helpers_load_no_arg_factory(tmp_path):
     save_checkpoint(checkpoint_path, source_model)
 
     def model_factory():
-        return _TinyBackbone(_single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="minmax01"))
+        return _TinyBackbone(_single_area_layer(scale_mode="dataset_minmax01"))
 
     loaded_model, _ = load_checkpoint(checkpoint_path, model_factory, device="cpu")
 
@@ -435,7 +420,7 @@ def test_checkpoint_helpers_roundtrip_multiple_cfps(tmp_path):
 
 
 def test_checkpoint_helpers_do_not_accept_optimizer_state(tmp_path):
-    model = _TinyBackbone(_single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="none"))
+    model = _TinyBackbone(_single_area_layer(scale_mode="none"))
     optimizer = torch.optim.SGD(model.parameters(), lr=0.2)
 
     with pytest.raises(TypeError, match="optimizer"):
@@ -449,8 +434,8 @@ def test_checkpoint_helpers_do_not_accept_optimizer_state(tmp_path):
 
 def test_collect_cfp_configs_discovers_primary_layers_only():
     model = torch.nn.Module()
-    model.cfp = _single_area_layer(ConnectedFilterPreprocessingLayer, scale_mode="none")
-    model.legacy = _single_area_layer(ConnectedFilterPreprocessingLayerWithExplicitJacobian, scale_mode="none")
+    model.cfp = _single_area_layer(scale_mode="none")
+    model.other = torch.nn.Identity()
 
     configs = collect_cfp_configs(model)
 

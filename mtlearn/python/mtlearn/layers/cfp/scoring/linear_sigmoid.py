@@ -16,7 +16,7 @@ class LinearSigmoidScorer(ScoringModel):
         self,
         num_features: int,
         *,
-        beta_f: float = 1.0,
+        score_sharpness: float = 1.0,
         clamp: tuple[float, float] | None = None,
         device=None,
         dtype: torch.dtype = torch.float32,
@@ -26,7 +26,7 @@ class LinearSigmoidScorer(ScoringModel):
         if int(num_features) < 1:
             raise ValueError("num_features must be positive.")
         self.num_features = int(num_features)
-        self.beta_f = float(beta_f)
+        self.score_sharpness = float(score_sharpness)
         self.clamp = None if clamp is None else (float(clamp[0]), float(clamp[1]))
         if self.clamp is not None and self.clamp[0] >= self.clamp[1]:
             raise ValueError("clamp bounds must satisfy min < max.")
@@ -62,7 +62,7 @@ class LinearSigmoidScorer(ScoringModel):
     def init_identity(
         self,
         *,
-        beta_f: float,
+        score_sharpness: float,
         p0: float = 0.995,
         weight=None,
         bias=None,
@@ -74,12 +74,12 @@ class LinearSigmoidScorer(ScoringModel):
             bias = self.bias
         if weight is None or bias is None:
             raise ValueError("LinearSigmoidScorer identity initialization requires weight and bias parameters.")
-        beta = float(beta_f)
-        if beta == 0.0:
-            raise ValueError("identity initialization requires beta_f != 0.")
+        sharpness = float(score_sharpness)
+        if sharpness == 0.0:
+            raise ValueError("identity initialization requires score_sharpness != 0.")
         with torch.no_grad():
             weight.zero_()
-            bias.fill_(self.identity_logit(p0) / beta)
+            bias.fill_(self.identity_logit(p0) / sharpness)
 
     def forward(
         self,
@@ -89,13 +89,13 @@ class LinearSigmoidScorer(ScoringModel):
         *,
         weight=None,
         bias=None,
-        beta_f: float | None = None,
+        score_sharpness: float | None = None,
         clamp: tuple[float, float] | None = None,
     ) -> torch.Tensor:
         """Return sigmoid scores for each tree node."""
-        beta = self.beta_f if beta_f is None else float(beta_f)
+        sharpness = self.score_sharpness if score_sharpness is None else float(score_sharpness)
         clamp_bounds = self.clamp if clamp is None else clamp
-        scaled = beta * self.logits(features, weight=weight, bias=bias)
+        scaled = sharpness * self.logits(features, weight=weight, bias=bias)
         if clamp_bounds is not None:
             scaled = torch.clamp(scaled, clamp_bounds[0], clamp_bounds[1])
         return torch.sigmoid(scaled)

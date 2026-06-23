@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import torch
 
+from ..._helpers import to_numpy_u8
+
 
 class TrainingSampleInspector:
     """Inspect cached or direct CFP tree payloads for one sample."""
@@ -41,9 +43,9 @@ class TrainingSampleInspector:
             layer._maybe_refresh_norm_for_key(base_key)
             payloads = dict(layer._tree_payload_cache.sample_payloads(base_key))
         else:
-            img_np = layer._to_numpy_u8(img_chw[channel_index].detach())
+            img_np = to_numpy_u8(img_chw[channel_index].detach())
             for tree_key in layer._tree_spec_by_key:
-                payloads[tree_key] = layer._compute_tree_payload(
+                payloads[tree_key] = layer._tree_payload_provider.compute_payload(
                     img_np,
                     tree_key,
                     update_stats=False,

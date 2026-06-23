@@ -15,10 +15,6 @@ class BatchInput:
     index: torch.Tensor
     use_cache: bool
 
-    def as_tuple(self):
-        """Return the historical ``(x, idx, use_cache)`` representation."""
-        return self.tensor, self.index, self.use_cache
-
 
 class BatchInputNormalizer:
     """Normalize CFP inputs to tensor, sample index, and cache flag."""

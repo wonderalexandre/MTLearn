@@ -1,10 +1,10 @@
 # CFP Score Constraint Design
 
-This standalone developer guide describes how CFP score constraints are
-designed, configured, and extended in `mtlearn.layers.cfp`. It focuses on score
-post-processing: transformations applied after a scoring model produces node
-scores and before reconstruction or regularization consumes those scores. For
-scoring-specific details, see [CFP Scoring Design](cfp-scoring-design.md). For
+This guide describes how CFP score constraints are designed, configured, and
+extended in `mtlearn.layers.cfp`. It focuses on score post-processing:
+transformations applied after a scoring model produces node scores and before
+reconstruction or regularization consumes those scores. For scoring-specific
+details, see [CFP Scoring Design](cfp-scoring-design.md). For
 regularization-specific details, see
 [CFP Regularization Design](cfp-regularization-design.md). For the broader
 package layout, see [CFP Architecture](cfp-architecture.md).
@@ -83,10 +83,8 @@ ScoringModel(...)
   -> constrained scores
 ```
 
-Constraints are applied in spec order. The legacy shortcut
-`preserve_root=True` inserts the built-in `preserve_root` constraint first. If
-`preserve_root` also appears inside the explicit `constraints` list, the
-duplicate is skipped.
+Constraints are applied in spec order. Configure them explicitly with the
+filter-spec `constraints` list.
 
 ## Built-In Constraint
 
@@ -109,17 +107,6 @@ spec = {
     "tree_type": morphology.TreeType.MAX_TREE,
     "attributes": [morphology.AttributeType.AREA],
     "constraints": [{"kind": "preserve_root"}],
-}
-```
-
-Legacy shortcut:
-
-```python
-spec = {
-    "name": "root_preserved_area",
-    "tree_type": morphology.TreeType.MAX_TREE,
-    "attributes": [morphology.AttributeType.AREA],
-    "preserve_root": True,
 }
 ```
 
@@ -203,7 +190,7 @@ and inference contracts:
 ```text
 constraint change -> get_config() changes
 constraint change -> get_inference_contract() changes
-constraint change -> get_weight_contract() changes
+constraint change -> checkpoint inference compatibility changes
 ```
 
 This is different from regularizers, which are training-only settings.
@@ -249,7 +236,7 @@ When adding a constraint, verify:
 - config creation through `SCORE_CONSTRAINT_REGISTRY`;
 - rejection of unknown or unsupported config fields;
 - `get_config()` and `from_config()` round trip;
-- presence in `get_inference_contract()` / `get_weight_contract()`;
+- presence in `get_inference_contract()`;
 - output shape, dtype, and device;
 - gradient flow through upstream scorer parameters when relevant;
 - interaction with `preserve_root` if root behavior matters;
@@ -265,23 +252,10 @@ git diff --check
 
 ## Implementation Notes
 
-The constraint implementation lives under:
+Constraint code lives under:
 
 ```text
 mtlearn/python/mtlearn/layers/cfp/constraints/
-  __init__.py
   base.py
   preserve_root.py
-```
-
-The default registry lives in:
-
-```text
-mtlearn/python/mtlearn/layers/cfp/component_registries.py
-```
-
-The execution path is implemented by:
-
-```text
-mtlearn/python/mtlearn/layers/cfp/connected_filter_preprocessing_layer.py
 ```

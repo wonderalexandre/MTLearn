@@ -1,10 +1,10 @@
 # CFP Scoring Design
 
-This standalone developer guide describes how CFP scoring models are designed,
-configured, trained, and extended in `mtlearn.layers.cfp`. It focuses on the
-scoring contract itself. For the broader package layout, see
-[CFP Architecture](cfp-architecture.md). For score post-processing details,
-see [CFP Score Constraint Design](cfp-score-constraint-design.md).
+This guide describes how CFP scoring models are designed, configured, trained,
+and extended in `mtlearn.layers.cfp`. It focuses on the scoring contract
+itself. For the broader package layout, see
+[CFP Architecture](cfp-architecture.md). For score post-processing details, see
+[CFP Score Constraint Design](cfp-score-constraint-design.md).
 
 ## What Scoring Does
 
@@ -36,7 +36,7 @@ the node signal; scores near `0` suppress it.
 | --- | --- | --- | --- | --- |
 | `ScoringModel` | normalized node attributes | one score per node | yes, when defined by the scorer | defines the soft rule |
 | `ScoreConstraint` | scores | adjusted scores | no | imposes score-space constraints |
-| `ScoreRegularizer` | scores, features, tree metadata | scalar penalty | no direct parameter ownership | stabilizes training |
+| `Regularizer` | scores, features, tree metadata | scalar penalty | no direct parameter ownership | stabilizes training |
 
 The scorer is the only component in this list that maps attributes to scores.
 Constraints and regularizers are adjacent mechanisms; they should not be used
@@ -65,7 +65,7 @@ class ScoringModel(torch.nn.Module):
     def required_features(self) -> tuple[object, ...]:
         return ()
 
-    def init_identity(self, *, beta_f: float, p0: float = 0.995, **kwargs):
+    def init_identity(self, *, score_sharpness: float, p0: float = 0.995, **kwargs):
         raise NotImplementedError
 
     def forward(self, features, tree_info=None, context=None, **kwargs):
@@ -79,13 +79,13 @@ Current scorer requirements:
 - keep scores differentiable with respect to trainable scorer parameters;
 - keep output tensors on the same device as the input features;
 - accept optional `tree_info` and `context`;
-- accept layer-provided keyword arguments such as `beta_f` and `clamp`;
+- accept layer-provided keyword arguments such as `score_sharpness` and
+  `clamp`;
 - define `init_identity(...)` when the scorer can start from an identity-like
   CFP state.
 
-At the filter-spec level, the public name for the sigmoid gain is
-`score_sharpness`. The low-level scorer keyword is still `beta_f` because it
-matches the mathematical notation used by the scorer implementations.
+At the filter-spec and scorer level, the sigmoid gain is named
+`score_sharpness`.
 
 The scorer receives normalized attributes only. It does not receive raw pixels,
 targets, or reconstructed images directly. Tree metadata is available through
@@ -156,13 +156,13 @@ class SingleAttributeSoftThresholdScorer(ScoringModel):
         self.initial_lambda = float(initial_lambda)
         self.lambda_ = torch.nn.Parameter(torch.tensor(self.initial_lambda, dtype=torch.float32))
 
-    def forward(self, features, tree_info=None, context=None, *, beta_f=None, clamp=None):
+    def forward(self, features, tree_info=None, context=None, *, score_sharpness=None, clamp=None):
         if features.dim() != 2 or features.size(1) != self.num_features:
             raise ValueError(f"expected features with shape (num_nodes, {self.num_features})")
 
-        beta = 1.0 if beta_f is None else float(beta_f)
+        sharpness = 1.0 if score_sharpness is None else float(score_sharpness)
         lambda_value = self.lambda_.to(dtype=features.dtype, device=features.device)
-        logits = beta * (features[:, 0] - lambda_value)
+        logits = sharpness * (features[:, 0] - lambda_value)
         if clamp is not None:
             logits = torch.clamp(logits, clamp[0], clamp[1])
         return torch.sigmoid(logits)
@@ -192,7 +192,7 @@ mlp_spec = {
     ],
     "scoring": {
         "kind": "mlp",
-        "hidden_channels": [8],
+        "hidden_units": [8],
         "activation": "tanh",
     },
     "score_sharpness": 1.0,
@@ -236,13 +236,13 @@ Parameter interpretation depends on the scorer family:
 
 | Scorer | Learned parameters | Direct threshold interpretation? | Original-scale projection |
 | --- | --- | --- | --- |
-| `single_attribute_soft_threshold` | `lambda_` | yes, for one normalized attribute | `a_min + lambda_ * (a_max - a_min)` for `minmax01` |
-| `linear_sigmoid` with one attribute | `w`, `b` | yes, if `w != 0` | `a_min + (-b / w) * (a_max - a_min)` for `minmax01` |
+| `single_attribute_soft_threshold` | `lambda_` | yes, for one normalized attribute | `a_min + lambda_ * (a_max - a_min)` for `dataset_minmax01` |
+| `linear_sigmoid` with one attribute | `w`, `b` | yes, if `w != 0` | `a_min + (-b / w) * (a_max - a_min)` for `dataset_minmax01` |
 | `linear_sigmoid` with many attributes | vector `w`, scalar `b` | no single attribute threshold | only projections along chosen directions |
 | `mlp` | network weights | no | usually not meaningful |
 
 Projection is a reporting tool, not a new model parameter. It depends on the
-normalization statistics used by the layer. For `minmax01`, the projection from
+normalization statistics used by the layer. For `dataset_minmax01`, the projection from
 normalized threshold `t` to original attribute scale is:
 
 ```text
@@ -258,12 +258,12 @@ Scoring specs are normalized by `normalize_scoring_model(value, num_features)`.
 The accepted forms are:
 
 ```python
-# Default legacy linear sigmoid.
+# Default layer-owned linear sigmoid.
 "scoring" not in spec
 
 # Explicit registry-backed scorer.
 "scoring": {"kind": "linear_sigmoid"}
-"scoring": {"kind": "mlp", "hidden_channels": [8], "activation": "tanh"}
+"scoring": {"kind": "mlp", "hidden_units": [8], "activation": "tanh"}
 
 # Direct scorer object, useful for experiments.
 "scoring": scorer_instance
@@ -321,8 +321,7 @@ For threshold-like scoring:
 
 - prefer the single-attribute soft threshold when the scientific question is
   explicitly "which threshold should this attribute learn?";
-- prefer linear sigmoid when attribute weighting matters or the legacy
-  checkpoint format is required;
+- prefer linear sigmoid when attribute weighting matters;
 - inspect learned parameters and score histograms, not only task loss;
 - set `score_sharpness` high enough to approximate a threshold but low enough to avoid
   immediate sigmoid saturation;
@@ -344,9 +343,19 @@ loss = task_loss(layer(inputs), targets) + layer.regularization_penalty(inputs)
 
 ## Notebook Examples
 
-Two experiment notebooks show the same simple scorer in two tasks:
+Two experiment notebooks compare the built-in linear and MLP scorers:
 
-- [`Example_screws_filtering_add_scoring.ipynb`](../notebooks/experiments/Example_screws_filtering_add_scoring.ipynb)
+- [`CFP_linear_vs_mlp_scoring_screws_filtering.ipynb`](../notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_filtering.ipynb)
+  uses the original screws image/mask pairs as a filtering-style target and
+  keeps the CFP layer fixed except for the scoring family.
+- [`CFP_linear_vs_mlp_scoring_screws_segmentation.ipynb`](../notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_segmentation.ipynb)
+  uses the original screws segmentation masks and reports calibrated and
+  fixed-threshold segmentation metrics for the same linear-vs-MLP scoring
+  comparison.
+
+Two additional notebooks show the same simple custom scorer in two tasks:
+
+- [`CFP_soft_threshold_scoring_screws_filtering.ipynb`](../notebooks/experiments/CFP_soft_threshold_scoring_screws_filtering.ipynb)
   uses `SingleAttributeSoftThresholdScorer` for a filtering/regression-style
   target. It learns `lambda_` and reports its projection to the original
   attribute scale.
@@ -382,7 +391,7 @@ git diff --check
 Use notebook smoke tests when the scorer changes paper-facing examples or
 experiment workflows.
 
-## Appendix: Adjacent Components
+## Adjacent Components
 
 Score constraints post-process scores before reconstruction. The current
 built-in constraint is `preserve_root`, which forces alive root nodes to score
@@ -402,34 +411,20 @@ mean(relu(score(child) - score(parent))^2)
 The reconstructed node signal is fixed to altitude residues. Changing this
 signal is not a current Python extension point.
 
-## Appendix: Implementation Notes
+## Implementation Notes
 
-The scoring implementation lives under:
+Scoring code lives under:
 
 ```text
 mtlearn/python/mtlearn/layers/cfp/scoring/
   base.py
   linear_sigmoid.py
   mlp.py
-  legacy_linear_parameter_initializer.py
 ```
-
-Related components live under:
-
-```text
-cfp/constraints/
-cfp/regularization/
-cfp/component_registries.py
-```
-
-Top-level compatibility shims such as `cfp/mlp_scorer.py` and
-`cfp/scoring_model.py` remain importable, but new implementation work should
-use the grouped packages.
 
 The default `linear_sigmoid` registry factory uses `owns_parameters=False`, so
-the layer keeps the trainable linear parameters in legacy `_weights` and
-`_biases` dictionaries. This preserves historical checkpoints and exported
-parameter contracts.
+the layer keeps the trainable linear parameters in `_weights` and `_biases`
+dictionaries. This keeps linear scorer parameters easy to inspect and export.
 
 ## Current Boundaries
 

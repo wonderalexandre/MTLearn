@@ -5,6 +5,33 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from ..normalization import DEFAULT_SCALE_MODE
+
+
+_FILTER_SPEC_CONFIG_KEYS = {
+    "attributes",
+    "constraints",
+    "name",
+    "regularizers",
+    "score_sharpness",
+    "scoring",
+    "tos_infinity_seed_col",
+    "tos_infinity_seed_row",
+    "tos_interpolation",
+    "tree_type",
+}
+_LAYER_CONFIG_KEYS = {
+    "attribute_dtype",
+    "clamp",
+    "eps",
+    "filter_specs",
+    "clipped_zscore_floor",
+    "clipped_zscore_radius",
+    "in_channels",
+    "scale_mode",
+    "score_sharpness",
+}
+
 
 class ConfigSerializer:
     """Convert simple CFP components to and from config dictionaries."""
@@ -44,7 +71,6 @@ class ConfigSerializer:
             "attributes": [self._enum_name(attr) for attr in spec.attributes],
             "scoring": spec.scoring_model.to_config(),
             "score_sharpness": spec.score_sharpness,
-            "preserve_root": spec.preserve_root,
             "tos_interpolation": tos_interpolation,
             "tos_infinity_seed_row": spec.tos_infinity_seed_row,
             "tos_infinity_seed_col": spec.tos_infinity_seed_col,
@@ -52,7 +78,6 @@ class ConfigSerializer:
         if spec.constraint_configs:
             spec_config["constraints"] = [dict(config) for config in spec.constraint_configs]
         if include_training:
-            spec_config["monotonicity_weight"] = spec.monotonicity_weight
             if spec.regularizer_configs:
                 spec_config["regularizers"] = [dict(config) for config in spec.regularizer_configs]
         return spec_config
@@ -69,8 +94,6 @@ class ConfigSerializer:
             "attributes": [self._enum_name(attr) for attr in spec.attributes],
             "scoring": spec.scoring_model.to_config(),
             "score_sharpness": spec.score_sharpness,
-            "preserve_root": spec.preserve_root,
-            "monotonicity_weight": spec.monotonicity_weight,
             "constraints": [dict(config) for config in spec.constraint_configs],
             "regularizers": [dict(config) for config in spec.regularizer_configs],
             "tos_interpolation": tos_interpolation,
@@ -88,10 +111,10 @@ class ConfigSerializer:
             ],
             "scale_mode": layer.scale_mode,
             "eps": layer.eps,
-            "score_sharpness": layer.beta_f,
+            "score_sharpness": layer.score_sharpness,
             "clamp": None if layer.clamp is None else list(layer.clamp),
-            "hybrid_k": layer.hybrid_k,
-            "hybrid_floor_a": layer.hybrid_floor_a,
+            "clipped_zscore_radius": layer.clipped_zscore_radius,
+            "clipped_zscore_floor": layer.clipped_zscore_floor,
             "attribute_dtype": layer.attribute_dtype.name,
         }
 
@@ -121,10 +144,10 @@ class ConfigSerializer:
             ],
             "scale_mode": layer.scale_mode,
             "eps": layer.eps,
-            "score_sharpness": layer.beta_f,
+            "score_sharpness": layer.score_sharpness,
             "clamp": None if layer.clamp is None else list(layer.clamp),
-            "hybrid_k": layer.hybrid_k,
-            "hybrid_floor_a": layer.hybrid_floor_a,
+            "clipped_zscore_radius": layer.clipped_zscore_radius,
+            "clipped_zscore_floor": layer.clipped_zscore_floor,
         }
 
     @staticmethod
@@ -132,7 +155,6 @@ class ConfigSerializer:
         """Return training-only settings for one normalized spec."""
         contract = {
             "name": spec.key,
-            "monotonicity_weight": spec.monotonicity_weight,
         }
         if spec.regularizer_configs:
             contract["regularizers"] = [dict(config) for config in spec.regularizer_configs]
@@ -161,13 +183,16 @@ class ConfigSerializer:
         *,
         attribute_from_name,
         tos_interpolation_from_name,
-        normalize_nonnegative_scalar,
     ) -> dict[str, Any]:
         """Deserialize one serialized CFP filter spec."""
         if "tree_type" not in spec:
             raise ValueError("serialized filter spec is missing tree_type.")
         if "attributes" not in spec:
             raise ValueError("serialized filter spec is missing attributes.")
+        unknown_keys = set(spec) - _FILTER_SPEC_CONFIG_KEYS
+        if unknown_keys:
+            names = ", ".join(sorted(str(key) for key in unknown_keys))
+            raise ValueError(f"unsupported serialized filter spec key(s): {names}")
 
         restored = {
             "tree_type": spec["tree_type"],
@@ -179,19 +204,8 @@ class ConfigSerializer:
             restored["scoring"] = spec["scoring"]
         if "score_sharpness" in spec:
             restored["score_sharpness"] = float(spec["score_sharpness"])
-        if "beta_f" in spec:
-            raise ValueError("serialized filter spec beta_f was renamed to score_sharpness.")
-        if "valuation" in spec:
-            raise ValueError("serialized valuation configs are no longer supported.")
-        if "preserve_root" in spec:
-            restored["preserve_root"] = bool(spec["preserve_root"])
         if "constraints" in spec:
             restored["constraints"] = spec["constraints"]
-        if "monotonicity_weight" in spec:
-            restored["monotonicity_weight"] = normalize_nonnegative_scalar(
-                spec["monotonicity_weight"],
-                "monotonicity_weight",
-            )
         if "regularizers" in spec:
             restored["regularizers"] = spec["regularizers"]
         tos_interpolation = spec.get("tos_interpolation", None)
@@ -209,13 +223,16 @@ class ConfigSerializer:
         *,
         attribute_from_name,
         tos_interpolation_from_name,
-        normalize_nonnegative_scalar,
     ) -> dict[str, Any]:
         """Deserialize a CFP layer config into constructor kwargs."""
         if not isinstance(config, Mapping):
             raise TypeError("ConnectedFilterPreprocessingLayer config must be a mapping.")
         if "config" in config and "filter_specs" not in config:
             config = config["config"]
+        unknown_keys = set(config) - _LAYER_CONFIG_KEYS
+        if unknown_keys:
+            names = ", ".join(sorted(str(key) for key in unknown_keys))
+            raise ValueError(f"unsupported serialized layer config key(s): {names}")
 
         return {
             "in_channels": int(config["in_channels"]),
@@ -224,15 +241,14 @@ class ConfigSerializer:
                     spec,
                     attribute_from_name=attribute_from_name,
                     tos_interpolation_from_name=tos_interpolation_from_name,
-                    normalize_nonnegative_scalar=normalize_nonnegative_scalar,
                 )
                 for spec in config["filter_specs"]
             ],
-            "scale_mode": config.get("scale_mode", "hybrid"),
+            "scale_mode": config.get("scale_mode", DEFAULT_SCALE_MODE),
             "eps": float(config.get("eps", 1e-6)),
-            "beta_f": float(config.get("score_sharpness", config.get("beta_f", 1.0))),
+            "score_sharpness": float(config.get("score_sharpness", 1.0)),
             "clamp": config.get("clamp", None),
-            "hybrid_k": float(config.get("hybrid_k", 3.0)),
-            "hybrid_floor_a": float(config.get("hybrid_floor_a", 0.05)),
+            "clipped_zscore_radius": float(config.get("clipped_zscore_radius", 3.0)),
+            "clipped_zscore_floor": float(config.get("clipped_zscore_floor", 0.05)),
             "attribute_dtype": config.get("attribute_dtype", None),
         }

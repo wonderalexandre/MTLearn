@@ -15,20 +15,20 @@ from .scoring import LinearSigmoidScorer, MLPScorer, ScoringModel
 from .specs import SpecRegistry
 
 
-def _normalize_hidden_channels(value: Any) -> tuple[int, ...]:
+def _normalize_hidden_units(value: Any) -> tuple[int, ...]:
     if isinstance(value, numbers.Integral) and not isinstance(value, bool):
         value = (value,)
     if not isinstance(value, (list, tuple)):
-        raise TypeError("MLP hidden_channels must be an integer or a sequence of positive integers.")
-    hidden_channels = []
-    for channel in value:
-        if isinstance(channel, bool) or not isinstance(channel, numbers.Integral):
-            raise TypeError("MLP hidden_channels must contain only positive integers.")
-        channel = int(channel)
-        if channel < 1:
-            raise ValueError("MLP hidden_channels must contain only positive integers.")
-        hidden_channels.append(channel)
-    return tuple(hidden_channels)
+        raise TypeError("MLP hidden_units must be an integer or a sequence of positive integers.")
+    hidden_units = []
+    for units in value:
+        if isinstance(units, bool) or not isinstance(units, numbers.Integral):
+            raise TypeError("MLP hidden_units must contain only positive integers.")
+        units = int(units)
+        if units < 1:
+            raise ValueError("MLP hidden_units must contain only positive integers.")
+        hidden_units.append(units)
+    return tuple(hidden_units)
 
 
 def _create_linear_sigmoid_scorer(*, num_features: int, **options) -> LinearSigmoidScorer:
@@ -42,8 +42,7 @@ def _create_linear_sigmoid_scorer(*, num_features: int, **options) -> LinearSigm
 def _create_mlp_scorer(
     *,
     num_features: int,
-    hidden=None,
-    hidden_channels=None,
+    hidden_units=None,
     activation: str = "relu",
     **options,
 ) -> MLPScorer:
@@ -51,14 +50,10 @@ def _create_mlp_scorer(
     if unsupported:
         names = ", ".join(sorted(unsupported))
         raise ValueError(f"unsupported mlp scoring options: {names}")
-    if hidden is not None and hidden_channels is not None:
-        raise ValueError("MLP scoring config must define only one of hidden or hidden_channels.")
-    normalized_hidden = _normalize_hidden_channels(
-        hidden_channels if hidden_channels is not None else (hidden if hidden is not None else (16,))
-    )
+    normalized_hidden = _normalize_hidden_units(hidden_units if hidden_units is not None else (16,))
     return MLPScorer(
         num_features,
-        hidden_channels=normalized_hidden,
+        hidden_units=normalized_hidden,
         activation=activation,
     )
 
@@ -67,7 +62,6 @@ SCORING_MODEL_REGISTRY = SpecRegistry()
 SCORING_MODEL_REGISTRY.register(
     "linear_sigmoid",
     _create_linear_sigmoid_scorer,
-    aliases=("linear-sigmoid",),
 )
 SCORING_MODEL_REGISTRY.register("mlp", _create_mlp_scorer)
 
@@ -90,14 +84,6 @@ def normalize_scoring_model(value: Any, num_features: int) -> ScoringModel:
             kind = config.get("kind")
             raise ValueError(f"unknown CFP scoring model kind: {kind!r}") from exc
     raise TypeError("scoring must be None, a ScoringModel, or a config mapping.")
-
-
-def uses_legacy_linear_parameters(scoring_model: ScoringModel) -> bool:
-    """Return whether a scorer should use the historical layer-owned tensors."""
-    return (
-        isinstance(scoring_model, LinearSigmoidScorer)
-        and not scoring_model.owns_parameters
-    )
 
 
 def _create_preserve_root_constraint(**options) -> PreserveRootConstraint:
@@ -217,26 +203,12 @@ def normalize_regularizer_configs(value: Any) -> tuple[dict[str, Any], ...]:
 
 def constraint_configs_for_spec(spec) -> tuple[dict[str, Any], ...]:
     """Return effective score-constraint configs for one normalized filter spec."""
-    configs = []
-    if spec.preserve_root:
-        configs.append({"kind": "preserve_root"})
-    seen_preserve_root = spec.preserve_root
-    for config in spec.constraint_configs:
-        if config["kind"] == "preserve_root" and seen_preserve_root:
-            continue
-        if config["kind"] == "preserve_root":
-            seen_preserve_root = True
-        configs.append(config)
-    return tuple(configs)
+    return tuple(spec.constraint_configs)
 
 
 def regularizer_configs_for_spec(spec) -> tuple[dict[str, Any], ...]:
     """Return effective regularizer configs for one normalized filter spec."""
-    configs = []
-    if spec.monotonicity_weight > 0.0:
-        configs.append({"kind": "edge_score_monotonicity", "weight": spec.monotonicity_weight})
-    configs.extend(spec.regularizer_configs)
-    return tuple(configs)
+    return tuple(spec.regularizer_configs)
 
 
 def create_score_constraint(config: Mapping[str, Any]):

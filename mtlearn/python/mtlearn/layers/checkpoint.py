@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import torch
 
-from .ConnectedFilterPreprocessingLayer import ConnectedFilterPreprocessingLayer
+from .cfp.connected_filter_preprocessing_layer import ConnectedFilterPreprocessingLayer
 
 
 def collect_cfp_configs(model: torch.nn.Module) -> dict[str, dict[str, Any]]:

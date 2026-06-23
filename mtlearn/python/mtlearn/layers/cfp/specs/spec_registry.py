@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from typing import Any
 
 
@@ -12,28 +12,17 @@ class SpecRegistry:
     def __init__(self):
         self._factories: dict[str, Callable[..., Any]] = {}
 
-    def register(
-        self,
-        kind: str,
-        factory: Callable[..., Any],
-        *,
-        aliases: Sequence[str] = (),
-    ) -> None:
-        """Register a component factory and optional aliases."""
+    def register(self, kind: str, factory: Callable[..., Any]) -> None:
+        """Register a component factory."""
         kind = str(kind)
         if not kind:
             raise ValueError("kind must be non-empty.")
         if not callable(factory):
             raise TypeError("factory must be callable.")
 
-        names = (kind, *(str(alias) for alias in aliases))
-        for name in names:
-            if not name:
-                raise ValueError("alias kind must be non-empty.")
-            if name in self._factories:
-                raise ValueError(f"CFP component kind is already registered: {name!r}")
-        for name in names:
-            self._factories[name] = factory
+        if kind in self._factories:
+            raise ValueError(f"CFP component kind is already registered: {kind!r}")
+        self._factories[kind] = factory
 
     def resolve(self, kind: str) -> Callable[..., Any]:
         """Return the factory registered for ``kind``."""

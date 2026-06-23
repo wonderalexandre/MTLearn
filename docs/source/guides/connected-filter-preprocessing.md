@@ -12,6 +12,8 @@ examples below use the default reconstructed signal.
 
 ```python
 import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 from mtlearn import morphology
 from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
@@ -27,11 +29,16 @@ layer = ConnectedFilterPreprocessingLayer(
             ],
         },
     ],
-    scale_mode="minmax01",
 )
 
 x = torch.rand(4, 1, 32, 32)
-y = layer(x)
+dataset = TensorDataset(x, torch.zeros(len(x)))
+loader = DataLoader(dataset, batch_size=4, shuffle=False)
+cached_loader = layer.build_dataloader_cached(loader)
+
+for batch_inputs, _ in cached_loader:
+    y = layer(batch_inputs)
+
 assert y.shape == (4, 1, 32, 32)
 ```
 
@@ -72,7 +79,7 @@ filter_specs = [
 ## Scoring Models
 
 Each spec has a scoring model that maps normalized node attributes to one score
-per tree node. The default is the legacy linear sigmoid gate:
+per tree node. The default is the layer-owned linear sigmoid gate:
 
 ```python
 linear_spec = {
@@ -83,9 +90,9 @@ linear_spec = {
 }
 ```
 
-The linear default keeps trainable parameters under the historical
-`_weights.<spec_name>` and `_biases.<spec_name>` names for checkpoint
-compatibility.
+The linear default keeps trainable parameters under `_weights.<spec_name>` and
+`_biases.<spec_name>`, which makes simple linear filters easy to inspect and
+export.
 
 Use an MLP scorer when the keep/discard criterion should combine attributes
 nonlinearly:
@@ -100,7 +107,7 @@ mlp_spec = {
     ],
     "scoring": {
         "kind": "mlp",
-        "hidden_channels": [8],
+        "hidden_units": [8],
         "activation": "tanh",
     },
 }
@@ -140,15 +147,9 @@ constrained_spec = {
 }
 ```
 
-The legacy shortcut is still accepted:
-
-```python
-constrained_spec["preserve_root"] = True
-```
-
 Regularizers add training penalties. They are not included in the inference
-contract, so changing a training regularizer does not invalidate checkpoint
-weight compatibility.
+contract, so changing a training regularizer does not change forward
+semantics.
 
 ```python
 regularized_spec = {
@@ -161,13 +162,11 @@ regularized_spec = {
 layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
     filter_specs=[regularized_spec],
-    scale_mode="none",
 )
 
-loss = task_loss + layer.regularization_penalty(x)
+# Use the same batch_inputs object yielded by build_dataloader_cached(...).
+loss = task_loss + layer.regularization_penalty(batch_inputs)
 ```
-
-The legacy shortcut `monotonicity_weight=0.1` is still accepted.
 
 Other registered morphological regularizers include
 `attribute_order_score_monotonicity`, which penalizes score inversions after sorting
@@ -208,17 +207,16 @@ parameters = contracts["parameter_contract"]
 training = contracts["training_contract"]
 ```
 
-`get_weight_contract()` is kept as a compatibility alias for the inference
-contract.
-
 ## Normalization and Caching
 
-The default `scale_mode` is `"hybrid"`. It uses dataset-level z-score
-statistics, clips values to `[-hybrid_k, hybrid_k]`, and rescales them into a
-positive interval controlled by `hybrid_floor_a`.
+The default `scale_mode` is `"dataset_clipped_zscore01"`. It uses dataset-level z-score
+statistics, clips values to `[-clipped_zscore_radius, clipped_zscore_radius]`, and rescales them into a
+positive interval controlled by `clipped_zscore_floor`.
 
-For `"hybrid"`, call `build_dataloader_cached` or `load_stats` before normal
-forward passes.
+For statistical modes (`"dataset_clipped_zscore01"`, `"dataset_minmax01"`, and `"dataset_zscore"`), fit or
+load normalization statistics before normal forward passes. Use
+`build_dataloader_cached` on the training split to estimate statistics and
+precompute tree payloads.
 
 ```python
 from torch.utils.data import DataLoader
@@ -230,14 +228,16 @@ for (x, idx), target in cached_loader:
     y = layer((x, idx))
 ```
 
-For quick experiments that should not require a stats prepass, use
-`scale_mode="minmax01"`, `"zscore_tree"`, or `"none"`.
+For smoke tests or diagnostics that intentionally avoid a stats prepass, use
+`scale_mode="none"` explicitly. In this mode, the scorer receives raw
+attributes and the caller is responsible for their scale. Do not use this as
+the default training setup for attribute-comparable experiments.
 
 ```python
 debug_layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
     filter_specs=filter_specs,
-    scale_mode="minmax01",
+    scale_mode="none",
 )
 ```
 
@@ -248,9 +248,6 @@ the input image.
 
 ```python
 layer.init_identity(p0=0.995)
-
-# Legacy linear-only alternative for hybrid-normalized attributes with positive floor.
-layer.init_identity_bias_zero(p0=0.99)
 ```
 
 Use an identity-like initialization when CFP is placed before a pretrained or
@@ -292,7 +289,6 @@ Dataset statistics are separate from ordinary model weights.
 layer.save_stats("cfp-stats.pt")
 layer.load_stats("cfp-stats.pt")
 
-weights, biases = layer.get_params()
 layer.export_params("cfp-params.pt")
 ```
 

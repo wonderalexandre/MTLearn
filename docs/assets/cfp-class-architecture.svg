@@ -32,7 +32,7 @@
 
   <rect class="layer" x="370" y="55" width="440" height="86" />
   <text class="label" x="590" y="84" text-anchor="middle">ConnectedFilterPreprocessingLayer</text>
-  <text class="small" x="590" y="106" text-anchor="middle">public API, compatibility wrappers, module state</text>
+  <text class="small" x="590" y="106" text-anchor="middle">public API, module state, orchestration</text>
   <text class="tiny" x="590" y="124" text-anchor="middle">owns specs and delegates execution, persistence, inspection</text>
 
   <rect class="panel" x="30" y="165" width="315" height="310" />
@@ -143,8 +143,8 @@
   <path class="calls" d="M 745 384 C 790 396 815 400 850 400" />
   <path class="calls" d="M 745 384 C 790 460 815 478 850 478" />
 
-  <path class="arrow" d="M 985 267 L 985 287" />
-  <path class="arrow" d="M 985 267 L 985 369" />
-  <path class="arrow" d="M 985 267 L 985 451" />
-  <path class="arrow" d="M 985 267 L 985 525" />
+  <path class="arrow" d="M 935 267 L 935 287" />
+  <path class="arrow" d="M 1120 231 L 1134 231 L 1134 361 L 1060 361 L 1060 369" />
+  <path class="arrow" d="M 1120 242 L 1140 242 L 1140 443 L 1060 443 L 1060 451" />
+  <path class="arrow" d="M 1120 253 L 1146 253 L 1146 517 L 1060 517 L 1060 525" />
 </svg>

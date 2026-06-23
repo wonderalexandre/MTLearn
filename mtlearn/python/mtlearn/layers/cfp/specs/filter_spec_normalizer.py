@@ -25,16 +25,6 @@ def enum_name(value: Any) -> str:
     return getattr(value, "name", str(value))
 
 
-def normalize_nonnegative_scalar(value: Any, name: str) -> float:
-    """Normalize and validate a non-negative finite scalar."""
-    if isinstance(value, bool) or not isinstance(value, numbers.Real):
-        raise TypeError(f"{name} must be a non-negative finite scalar.")
-    scalar = float(value)
-    if not math.isfinite(scalar) or scalar < 0.0:
-        raise ValueError(f"{name} must be a non-negative finite scalar.")
-    return scalar
-
-
 def normalize_positive_scalar(value: Any, name: str) -> float:
     """Normalize and validate a positive finite scalar."""
     if isinstance(value, bool) or not isinstance(value, numbers.Real):
@@ -57,6 +47,18 @@ def filter_spec_tree_key(
 
 
 _FILTER_SPEC_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FILTER_SPEC_KEYS = {
+    "attributes",
+    "constraints",
+    "name",
+    "regularizers",
+    "score_sharpness",
+    "scoring",
+    "tos_infinity_seed_col",
+    "tos_infinity_seed_row",
+    "tos_interpolation",
+    "tree_type",
+}
 
 
 def _normalize_filter_spec_name(value: Any, index: int, seen_names: set[str]) -> str:
@@ -100,12 +102,10 @@ def normalize_filter_specs(
             raise ValueError("Each filter spec must define tree_type.")
         if "attributes" not in raw_spec:
             raise ValueError("Each filter spec must define attributes.")
-        if "output_mode" in raw_spec:
-            raise ValueError("output_mode was removed. CFP now reconstructs fixed altitude residues.")
-        if "valuation" in raw_spec:
-            raise ValueError("valuation was removed. CFP now reconstructs fixed altitude residues.")
-        if "beta_f" in raw_spec:
-            raise ValueError("filter spec beta_f was renamed to score_sharpness.")
+        unknown_keys = set(raw_spec) - _FILTER_SPEC_KEYS
+        if unknown_keys:
+            names = ", ".join(sorted(str(key) for key in unknown_keys))
+            raise ValueError(f"unsupported filter spec key(s): {names}")
 
         spec_name = _normalize_filter_spec_name(raw_spec.get("name", None), index, seen_names)
         tree_type = morphology.normalize_tree_type(raw_spec["tree_type"])
@@ -123,13 +123,6 @@ def normalize_filter_specs(
         )
 
         constraint_configs = normalize_constraint_configs(raw_spec.get("constraints", None))
-        preserve_root = bool(raw_spec.get("preserve_root", False)) or any(
-            config["kind"] == "preserve_root" for config in constraint_configs
-        )
-        monotonicity_weight = normalize_nonnegative_scalar(
-            raw_spec.get("monotonicity_weight", 0.0),
-            "monotonicity_weight",
-        )
         regularizer_configs = normalize_regularizer_configs(raw_spec.get("regularizers", None))
 
         spec_tos_interpolation = raw_spec.get("tos_interpolation", default_tos_interpolation)
@@ -153,8 +146,6 @@ def normalize_filter_specs(
                 attributes=tuple(attributes),
                 scoring_model=scoring_model,
                 score_sharpness=score_sharpness,
-                preserve_root=preserve_root,
-                monotonicity_weight=monotonicity_weight,
                 constraint_configs=constraint_configs,
                 regularizer_configs=regularizer_configs,
                 tos_interpolation=spec_tos_interpolation,

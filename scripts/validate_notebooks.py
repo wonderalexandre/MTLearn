@@ -14,13 +14,10 @@ import papermill as pm
 
 
 GRADCHECK_NOTEBOOKS = (
-    "notebooks/gradchecks/GradCheck_Tree.ipynb",
-    "notebooks/gradchecks/GradCheck_Jacobian.ipynb",
     "notebooks/gradchecks/GradCheck_Implicit_Jacobian.ipynb",
-    "notebooks/gradchecks/GradCheck_TreeOfShapes.ipynb",
 )
 
-SCREWS_EXAMPLE_NOTEBOOK = "notebooks/experiments/Example_screws_filtering.ipynb"
+SCREWS_EXAMPLE_NOTEBOOK = "notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_filtering.ipynb"
 
 
 @dataclass(frozen=True)
@@ -148,7 +145,8 @@ def facade_assertion_cell(label: str) -> nbformat.NotebookNode:
         "assert morphology.AttributeType is morphology.Attribute.Type\n"
         "assert morphology.AttributeGroup is morphology.Attribute.Group\n"
         "assert morphology.NodeIdSpace.MORPHOLOGICAL_TREE.name == 'MORPHOLOGICAL_TREE'\n"
-        "assert mtlearn.layers.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer\n"
+        "assert hasattr(mtlearn.layers, 'ConnectedFilterPreprocessingLayer')\n"
+        "assert not hasattr(mtlearn.layers, 'CFPLayer')\n"
         "assert not hasattr(mtlearn.layers, 'ConnectedFilterLayerWithImplicitJacobian')\n"
         "assert not hasattr(mtlearn.layers, 'ConnectedFilterSingleThresholdLayer')\n"
         "image = np.array([[1, 2], [3, 4]], dtype=np.uint8)\n"
@@ -201,8 +199,8 @@ def make_screws_example_smoke(
             "    grayscale_in=True,\n"
             "    invert_in=True,\n"
             "    invert_target=True,\n"
-            "    numRows=int(1324 * 0.499),\n"
-            "    numCols=int(1177 * 0.5),\n"
+            "    num_rows=int(1324 * 0.499),\n"
+            "    num_cols=int(1177 * 0.5),\n"
             "    scale_in=False,\n"
             "    suffix_in='_in',\n"
             "    suffix_target='_target',\n"
@@ -215,7 +213,7 @@ def make_screws_example_smoke(
         ),
         facade_assertion_cell("screws example smoke"),
     ]
-    smoke_input = smoke_dir / "Example_screws_filtering_smoke.ipynb"
+    smoke_input = smoke_dir / "CFP_linear_vs_mlp_scoring_screws_filtering_smoke.ipynb"
     write_smoke_notebook(source, cells, smoke_input)
     return NotebookRun(
         source=smoke_input,

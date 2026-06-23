@@ -6,7 +6,6 @@ from typing import Any, Mapping
 
 from .... import morphology
 from .config_serializer import ConfigSerializer
-from ..specs.filter_spec_normalizer import normalize_nonnegative_scalar
 
 
 class ConfigDeserializer:
@@ -43,7 +42,6 @@ class ConfigDeserializer:
             spec,
             attribute_from_name=self.attribute_from_name,
             tos_interpolation_from_name=self.tos_interpolation_from_name,
-            normalize_nonnegative_scalar=normalize_nonnegative_scalar,
         )
 
     def deserialize_layer_config(self, config: Mapping[str, Any]) -> dict[str, Any]:
@@ -52,9 +50,8 @@ class ConfigDeserializer:
             config,
             attribute_from_name=self.attribute_from_name,
             tos_interpolation_from_name=self.tos_interpolation_from_name,
-            normalize_nonnegative_scalar=normalize_nonnegative_scalar,
         )
 
     def canonical_contract(self, config: Mapping[str, Any], *, layer_cls) -> dict[str, Any]:
         """Return the canonical inference contract represented by ``config``."""
-        return layer_cls(**self.deserialize_layer_config(config)).get_weight_contract()
+        return layer_cls(**self.deserialize_layer_config(config)).get_inference_contract()

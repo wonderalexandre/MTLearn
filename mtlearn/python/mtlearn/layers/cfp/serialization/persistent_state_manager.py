@@ -30,7 +30,7 @@ class PersistentStateManager:
     def extra_state(self, layer) -> dict[str, Any]:
         """Return CFP state embedded by PyTorch ``state_dict``."""
         return {
-            "weight_contract": layer.get_weight_contract(),
+            "inference_contract": layer.get_inference_contract(),
             "ds_stats": layer._serialize_ds_stats(),
             "stats_epoch": int(layer._stats_epoch),
             "stats_frozen": bool(layer._stats_frozen),
@@ -43,12 +43,12 @@ class PersistentStateManager:
         if not isinstance(state, Mapping):
             raise TypeError("ConnectedFilterPreprocessingLayer extra state must be a mapping.")
 
-        saved_contract = state.get("weight_contract", None)
+        saved_contract = state.get("inference_contract", None)
         if saved_contract is None and "config" in state:
             saved_contract = state["config"]
-        if saved_contract is not None and layer._canonical_contract(saved_contract) != layer.get_weight_contract():
+        if saved_contract is not None and layer._canonical_contract(saved_contract) != layer.get_inference_contract():
             raise RuntimeError(
-                "ConnectedFilterPreprocessingLayer checkpoint weight contract is incompatible "
+                "ConnectedFilterPreprocessingLayer checkpoint inference contract is incompatible "
                 "with the current layer. Recreate the layer with ConnectedFilterPreprocessingLayer.from_config(...)."
             )
 
@@ -78,15 +78,7 @@ class PersistentStateManager:
             "scale_mode": layer.scale_mode,
             "clamp": None if layer.clamp is None else list(layer.clamp),
             "config": layer.get_config(),
-            "weight_contract": layer.get_weight_contract(),
+            "inference_contract": layer.get_inference_contract(),
             "contracts": layer.get_contracts(),
             "filter_specs": [layer._serialize_filter_spec(spec) for spec in layer.filter_specs],
         }
-
-    @staticmethod
-    def get_params(layer):
-        """Return CPU clones of per-spec legacy weight and bias tensors."""
-        return (
-            {name: p.detach().cpu().clone() for name, p in layer._weights.items()},
-            {name: p.detach().cpu().clone() for name, p in layer._biases.items()},
-        )

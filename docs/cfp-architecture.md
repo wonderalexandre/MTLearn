@@ -1,18 +1,14 @@
 # CFP Architecture
 
-This standalone developer note is intentionally kept outside the Sphinx
-documentation tree. It documents internal CFP design and extension contracts
-without making them part of the official user-facing documentation site.
+This page documents the developer-facing architecture of
+`ConnectedFilterPreprocessingLayer` and the common definitions shared by the
+CFP guides.
 
-This page documents the developer-facing design of
-`ConnectedFilterPreprocessingLayer` and the extension points under
-`mtlearn.layers.cfp`.
+Component-specific implementation details live in separate guides:
 
-For scoring-specific details, see [CFP Scoring Design](cfp-scoring-design.md).
-For score-constraint-specific details, see
-[CFP Score Constraint Design](cfp-score-constraint-design.md).
-For regularization-specific details, see
-[CFP Regularization Design](cfp-regularization-design.md).
+- [CFP Scoring Design](cfp-scoring-design.md)
+- [CFP Score Constraint Design](cfp-score-constraint-design.md)
+- [CFP Regularization Design](cfp-regularization-design.md)
 
 The public user import remains:
 
@@ -20,9 +16,14 @@ The public user import remains:
 from mtlearn.layers import ConnectedFilterPreprocessingLayer
 ```
 
-The implementation lives in `mtlearn.layers.cfp`. The old
-`mtlearn.layers.ConnectedFilterPreprocessingLayer` module is a compatibility
-shim and should stay importable.
+The implementation lives under `mtlearn.layers.cfp`.
+
+## Scope
+
+Use this guide as the architecture map for CFP. It defines the shared runtime
+objects, package boundaries, data flow, public utilities, and state contracts.
+It intentionally avoids full custom component examples; those belong to the
+scoring, score-constraint, and regularization guides.
 
 ## Design Goals
 
@@ -31,7 +32,7 @@ The CFP layer is organized so these concerns can evolve independently:
 - tree construction and dense tree tensors;
 - normalized node features used for scoring;
 - node scoring models;
-- score constraints applied before reconstruction;
+- score post-processing constraints;
 - fixed altitude residues, which are the node signal reconstructed by CFP;
 - training regularizers;
 - serialization contracts for configs, checkpoints, and exported parameters.
@@ -40,6 +41,23 @@ New behavior should usually be added as a component under the relevant
 `mtlearn/python/mtlearn/layers/cfp/` subpackage, not by growing the layer class
 directly. Keep one public component class per file when the component is meant
 to be extended or imported by downstream code.
+
+## Common Definitions
+
+| Term | Meaning |
+| --- | --- |
+| Filter spec | One normalized CFP operator definition: tree type, attributes, scoring model, constraints, regularizers, and related settings. |
+| Tree payload | The per-sample, per-channel, per-spec data produced before scoring: tree metadata, raw attributes, and normalized attributes. |
+| `tree_info` | Dense tree tensors and metadata used by scoring, constraints, regularization, and reconstruction. |
+| Raw node attributes | Scalar morphology attributes computed on tree nodes before dataset normalization. |
+| Normalized node features | Tensor with shape `(num_nodes, K)`, where `K` is the number of attributes in the filter spec. |
+| Node scores | Differentiable tensor with shape `(num_nodes,)`; one score per tree node. |
+| Score constraints | Deterministic post-processing applied to scores before reconstruction. |
+| Altitude residues | Fixed backend-provided per-node increments reconstructed by CFP after multiplication by scores. |
+| Regularizers | Training-only penalties computed from scores, tree tensors, and optionally normalized features. |
+| `CFPContext` | Metadata passed to components during normal layer execution. It identifies sample, channel, spec, and execution mode. |
+| Inference contract | The part of the layer configuration that changes forward semantics. |
+| Training contract | Training-only settings, primarily regularization configuration. |
 
 ## Class Relationships
 
@@ -66,8 +84,10 @@ input image channel
  -> output image channel
 ```
 
-The output shape is `(B, C * num_specs, H, W)`. Output channels are ordered by
-input channel first and filter spec second.
+The output shape is `(B, C * num_specs, H, W)`, where `B` is batch size, `C` is
+the number of input channels, `num_specs` is the number of normalized filter
+specs, and `H` and `W` are image height and width. Output channels are ordered
+by input channel first and filter spec second.
 
 The tree payload contains:
 
@@ -81,7 +101,7 @@ The `info` mapping currently contains:
 - `tpre` and `tpost`: tree traversal entry and exit times;
 - `parent`: dense parent ids;
 - `node_of_pixel`: node id associated with each pixel;
-- `numRows` and `numCols`: image shape;
+- `num_rows` and `num_cols`: image shape;
 - `tree_type`: normalized tree type string;
 - `order_forward` and `order_backward`: traversal orders for reconstruction.
 
@@ -89,26 +109,28 @@ The differentiable reconstruction boundary is `TreeReconstructionFunction`.
 It reconstructs pixels from one scalar per tree node without materializing a
 dense region-pixel Jacobian.
 
-## Main Modules
+## Package Layout
 
 Use this map when deciding where a change belongs:
 
 | Package or module | Responsibility |
 | --- | --- |
-| `connected_filter_preprocessing_layer.py` | Public layer methods, compatibility properties, and orchestration hooks. |
-| `scoring/` | `ScoringModel`, `LinearSigmoidScorer`, `MLPScorer`, and legacy linear parameter initialization. |
-| `constraints/` | Score post-processing constraints such as root preservation. |
-| `regularization/` | Training penalties such as edge, path, and attribute-order score monotonicity. |
+| `connected_filter_preprocessing_layer.py` | Public layer methods and orchestration hooks. |
+| `scoring/` | Scoring base class and built-in scoring models. |
+| `constraints/` | Score post-processing constraints. |
+| `regularization/` | Training penalties over scores, tree tensors, and normalized features. |
 | `normalization/` | Attribute normalization and normalization-stat serialization. |
 | `specs/` | Filter-spec dataclasses, validation, normalization, and generic `SpecRegistry`. |
 | `runtime/` | Batch input handling, cached dataloaders, forward execution, tree payloads, reconstruction, context, and inspection. |
 | `serialization/` | Layer configs, deserialization, checkpoints, saved stats, and parameter exports. |
-| `component_registries.py` | Cross-family default registries for scoring, constraints, and regularizers. |
+| `component_registries.py` | Default registries for scoring, constraints, and regularizers. |
 
-Compatibility shim modules remain at the top of `mtlearn.layers.cfp` for the old
-file names, for example `mlp_scorer.py` and `tree_payload_provider.py`. New
-code should import from the grouped packages or from the aggregate
-`mtlearn.layers.cfp` namespace.
+New code should import public extension components from the aggregate
+`mtlearn.layers.cfp` namespace only when they are exported there: the layer,
+specs, scoring models, score constraints, regularizers, and registries. Runtime,
+normalization, and serialization infrastructure should be imported from their
+grouped packages (`cfp.runtime`, `cfp.normalization`, and `cfp.serialization`)
+when advanced or internal work needs them.
 
 The intended package layout is:
 
@@ -125,221 +147,137 @@ cfp/
   serialization/
 ```
 
+## Runtime Boundaries
+
+Tree construction, topology, attribute extraction, and altitude-residue
+computation are backend-side morphology operations. They are treated as fixed
+inputs to the differentiable PyTorch path for a given forward pass.
+
+The differentiable path is:
+
+```text
+scoring parameters
+ -> scores
+ -> constrained scores
+ -> residues * constrained scores
+ -> reconstruction
+ -> loss
+```
+
+The following are outside the autograd path:
+
+- tree construction;
+- tree topology;
+- image quantization used by tree construction;
+- raw attribute computation;
+- dataset normalization-stat estimation;
+- altitude-residue extraction.
+
+The following are inside the PyTorch computation graph when trainable
+parameters participate:
+
+- scoring logits and score tensors;
+- score constraints that use differentiable tensor operations;
+- `residues * scores`;
+- differentiable reconstruction;
+- regularization penalties.
+
 ## Runtime Context
 
 Scoring models, score constraints, and regularizers receive a `CFPContext`
 when the layer is running through its normal execution path. The context carries
 metadata only; it should not own tensors required for gradients.
 
-```python
-CFPContext(
-    sample_key="12_0",
-    batch_index=0,
-    channel_index=0,
-    spec_name="area_filter",
-    extras={"mode": "forward"},
-)
-```
+The context identifies:
+
+- `sample_key`;
+- `batch_index`;
+- `channel_index`;
+- `spec_name`;
+- `extras`, including the current execution mode.
 
 Current modes are `"forward"` and `"regularization_penalty"`.
 
-## Extension Stability
+## Extension Points
 
-The extension mechanisms are not all at the same maturity level:
+CFP has two extension levels. Python extension points customize the learnable
+model around an existing tree payload and reconstruction signal. Full-stack
+morphology extension points change what the backend computes or how the
+backend signal is exposed to the differentiable layer.
 
-| Extension point | Current status |
-| --- | --- |
-| `ScoringModel` | Registry-backed and config-roundtrippable. Safe extension point. |
-| `ScoreConstraint` | Registry-backed and config-roundtrippable. Safe extension point. |
-| `Regularizer` | Registry-backed and config-roundtrippable. Safe extension point. |
-| `TreePayloadProvider` and `TreeReconstructionFunction` | Internal architecture boundaries. Extend with tests and benchmarks when changing tree semantics or reconstruction. |
+### Python Extension Points
 
-## Scoring Models
+These points are registry-backed components. They are the preferred extension
+level when the tree type, node attributes, node payload, normalization semantics,
+and reconstructed signal are already sufficient.
 
-A scoring model maps normalized node features with shape `(num_nodes, K)` to one
-differentiable score per tree node with shape `(num_nodes,)`.
+| Extension point | Current status | Detailed guide |
+| --- | --- | --- |
+| `ScoringModel` | Registry-backed and config-roundtrippable. Safe extension point. | [CFP Scoring Design](cfp-scoring-design.md) |
+| `ScoreConstraint` | Registry-backed and config-roundtrippable. Safe extension point. | [CFP Score Constraint Design](cfp-score-constraint-design.md) |
+| `Regularizer` | Registry-backed and config-roundtrippable. Safe extension point. | [CFP Regularization Design](cfp-regularization-design.md) |
 
-Subclass `ScoringModel` when adding a new scorer:
+Registry-backed extension points share the same high-level rules:
 
-```python
-import torch
+- preserve tensor shape and device;
+- avoid in-place writes to tensors needed by autograd;
+- keep construction values serializable through config mappings;
+- reject unsupported options instead of silently ignoring them;
+- use `CFPContext` as metadata, not as a hidden tensor owner;
+- document tree-ordering assumptions when a component depends on them.
 
-from mtlearn.layers.cfp.scoring import ScoringModel
+`AttributeNormalizer` is shared normalization infrastructure, not a plugin
+surface like scoring, constraints, or regularization. Change it only when the
+global semantics of CFP attribute scaling should change, and cover the update
+with normalization-statistics tests.
 
+### Full-Stack Morphology Extension Points
 
-class SingleAttributeSoftThresholdScorer(ScoringModel):
-    kind = "single_attribute_soft_threshold"
+These points are not simple Python plugin surfaces. They change morphology
+semantics or the differentiable boundary and normally require coordinated
+changes in backend C++, pybind bindings, the Python facade, CFP runtime code,
+tests, and developer documentation.
 
-    def __init__(
-        self,
-        num_features: int,
-        *,
-        initial_lambda: float = 0.5,
-    ):
-        super().__init__()
-        if int(num_features) != 1:
-            raise ValueError("single_attribute_soft_threshold requires exactly one feature.")
-        self.num_features = int(num_features)
-        self.initial_lambda = float(initial_lambda)
-        self.lambda_ = torch.nn.Parameter(torch.tensor(self.initial_lambda, dtype=torch.float32))
+| Extension point | What changes | Typical affected layers |
+| --- | --- | --- |
+| New morphology attribute | Add a scalar node attribute such as a shape, contrast, topology, or proper-part attribute. | Backend attribute computer, public `AttributeType`, pybind bindings, `mtlearn.morphology`, filter-spec validation, normalization, CFP tests. |
+| New tree type or construction mode | Add a hierarchy or construction variant such as a new self-dual tree, connectivity, boundary rule, or quantization policy. | Backend tree factory, public `TreeType` or construction options, bindings, Python facade, spec normalization, `TreePayloadProvider`, C++ and Python tests. |
+| New node payload or topology tensor | Expose additional per-node structure such as depth, ancestors, descendants, contours, ownership, or traversal metadata. | Backend tensor export, `tree_tensors.hpp`, bindings, `tree_info`, consuming scorers/constraints/regularizers, serialization and tests. |
+| New reconstructed signal | Replace or complement the current altitude-residue signal with another morphology signal. | Backend signal export, `TreeReconstructionFunction`, backward semantics, inference contract, gradcheck, notebooks that inspect learned parameters. |
+| New reconstruction or derivative rule | Change how node scores are mapped back to pixels or how gradients are propagated. | Backend traversal assumptions, `tree_traversal.hpp`, `TreeReconstructionFunction.forward/backward`, C++ tests, Python gradcheck tests, benchmarks. |
+| New hard morphology operator | Expose a classical operator that may not be trained through CFP, such as pruning, merge variants, contours, UAO, or another connected filter. | Backend operator, public C++ API, bindings, Python facade, user docs, examples, and regression tests. |
 
-    def forward(self, features, tree_info=None, context=None, *, beta_f=None, clamp=None):
-        if features.dim() != 2:
-            raise ValueError(f"expected features with shape (num_nodes, K), got {tuple(features.shape)}")
-        if features.size(1) != self.num_features:
-            raise ValueError(f"expected {self.num_features} features, got {features.size(1)}")
-        attribute = features[:, 0]
-        lambda_value = self.lambda_.to(dtype=features.dtype, device=features.device)
-        logits = attribute - lambda_value
-        beta = 1.0 if beta_f is None else float(beta_f)
-        scaled = beta * logits
-        if clamp is not None:
-            scaled = torch.clamp(scaled, clamp[0], clamp[1])
-        return torch.sigmoid(scaled)
+Full-stack morphology extensions should define the mathematical invariant first:
+tree type, node-id space, altitude ordering, payload shape, differentiability
+assumption, and whether the change affects inference semantics. Do not hide a
+new reconstructed signal inside a scorer; if the node signal or derivative
+changes, it needs an explicit forward and backward contract.
 
-    def to_config(self):
-        return {
-            "kind": self.kind,
-            "initial_lambda": self.initial_lambda,
-        }
-```
+## Component Boundaries
 
-Register config-backed scorers in `component_registries.py`. Put the scorer
-implementation itself under `scoring/`:
+Scoring decides one score per node from normalized node features. It should not
+build trees, recompute morphology attributes, or inspect target labels.
 
-```python
-def _create_single_attribute_soft_threshold_scorer(
-    *,
-    num_features: int,
-    initial_lambda: float = 0.5,
-    **options,
-) -> SingleAttributeSoftThresholdScorer:
-    if options:
-        names = ", ".join(sorted(options))
-        raise ValueError(f"unsupported single_attribute_soft_threshold scoring options: {names}")
-    return SingleAttributeSoftThresholdScorer(
-        num_features,
-        initial_lambda=initial_lambda,
-    )
+Score constraints post-process scores before reconstruction. They are part of
+inference semantics and therefore belong in the inference contract.
 
+Regularizers compute training penalties. They do not change the forward output
+unless the training loop explicitly adds `layer.regularization_penalty(x)` to
+the task loss.
 
-SCORING_MODEL_REGISTRY.register(
-    "single_attribute_soft_threshold",
-    _create_single_attribute_soft_threshold_scorer,
-)
-```
+Normalization converts raw node attributes into stable feature tensors. It is
+shared infrastructure used before scoring and regularization. Statistical
+normalization modes (`dataset_clipped_zscore01`, `dataset_minmax01`, and `dataset_zscore`) require
+dataset-level statistics fit before training or loaded before inference.
+`scale_mode="none"` is the explicit opt-out for tests, diagnostics, or
+externally scaled attributes.
 
-Scorers that have a meaningful neutral state should also implement
-`init_identity(beta_f=..., p0=...)`. The layer calls this method from
-`layer.init_identity(...)` so each scorer can decide how to make
-`score(node) ~= p0`. If a scorer cannot define this state, keep the base method
-so strict initialization fails explicitly.
-
-Then specs can use:
-
-```python
-{
-    "name": "minor_axis_soft_threshold",
-    "tree_type": "max-tree",
-    "attributes": [morphology.AttributeType.LENGTH_MINOR_AXIS],
-    "scoring": {
-        "kind": "single_attribute_soft_threshold",
-        "initial_lambda": 0.5,
-    },
-}
-```
-
-Scorer rules:
-
-- validate `features.dim() == 2` and `features.size(1) == num_features`;
-- return exactly one score per tree node;
-- keep returned scores on the same device as `features`;
-- keep operations differentiable when the scorer is trainable;
-- implement `to_config` with JSON-like values if `from_config` must recreate
-  the layer;
-- reject unsupported factory options instead of silently ignoring them.
-
-The legacy `linear_sigmoid` scorer is special: by default it uses layer-owned
-`_weights.<spec_name>` and `_biases.<spec_name>` parameters for checkpoint
-compatibility. New scorers should normally own their parameters as normal
-`torch.nn.Module` submodules. Those parameters appear in
-`get_parameter_contract()["scoring_models"]`.
-
-### Example: nonlinear attribute scoring
-
-Nonlinear attribute scoring keeps the CFP decision local to each tree node, but
-replaces the directly interpretable linear gate with a small differentiable map:
-
-```text
-Score(node) = sigmoid(g_theta(AttributeVector(node)))
-```
-
-In the current implementation, `g_theta` can be expressed with the built-in
-`mlp` scorer. The MLP receives only the normalized attributes of the current
-node; it does not see pixels, neighboring nodes, or the target image.
-
-```python
-from mtlearn import morphology
-from mtlearn.layers import ConnectedFilterPreprocessingLayer
-
-
-nonlinear_shape_spec = {
-    "name": "shape_nonlinear",
-    "tree_type": morphology.TreeType.MAX_TREE,
-    "attributes": [
-        morphology.AttributeType.AREA,
-        morphology.AttributeType.COMPACTNESS,
-        morphology.AttributeType.CIRCULARITY,
-        morphology.AttributeType.GRAY_HEIGHT,
-    ],
-    "scoring": {
-        "kind": "mlp",
-        "hidden_channels": [8],
-        "activation": "tanh",
-    },
-    "constraints": [{"kind": "preserve_root"}],
-    "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.05}],
-}
-
-layer = ConnectedFilterPreprocessingLayer(
-    in_channels=1,
-    filter_specs=[nonlinear_shape_spec],
-    scale_mode="hybrid",
-    clamp=8.0,
-)
-```
-
-This scorer can model interactions such as "large and compact" or "small but
-high contrast" without adding hand-written composite attributes. That extra
-expressiveness changes the interpretation of the learned filter: with a
-single-attribute linear sigmoid, the weight and bias can often be read as a soft
-attribute threshold; with an MLP, the decision boundary is a learned nonlinear
-surface in normalized attribute space.
-
-For small training sets, keep the model intentionally shallow and add stability
-controls:
-
-- prefer one hidden layer and small hidden widths such as `[4]` or `[8]`;
-- use `clamp` to bound `score_sharpness * logits` before the sigmoid;
-- use optimizer weight decay for MLP parameters;
-- add `edge_score_monotonicity` when parent-child score monotonicity is expected;
-- preserve the root when removing the root contribution would change the image
-  baseline in an undesirable way.
-
-Training code should add the registered regularizers explicitly:
-
-```python
-optimizer = torch.optim.AdamW(layer.parameters(), lr=1e-3, weight_decay=1e-4)
-
-pred = layer(inputs)
-loss = task_loss(pred, targets) + layer.regularization_penalty(inputs)
-loss.backward()
-optimizer.step()
-```
+Serialization preserves reproducible layer construction, checkpoint parameter
+names, normalization statistics, and exported parameter artifacts.
 
 ## Altitude Signal
 
-CFP now reconstructs a fixed altitude signal. For each tree node, the backend
+CFP reconstructs a fixed altitude signal. For each tree node, the backend
 provides `info["residues"]`; the scorer only learns how strongly each residue
 contributes to reconstruction:
 
@@ -348,113 +286,20 @@ filtered_increment(node) = residue(node) * score(node)
 output = reconstruct(filtered_increment)
 ```
 
-This keeps the layer aligned with the classical connected-filter interpretation
-and keeps the differentiable boundary clear:
-
-```text
-score parameters -> scores -> residues * scores -> reconstruction -> loss
-```
-
-Tree construction, topology, quantization, and residue extraction remain
-outside the autograd path. The residues are constants with respect to scorer
-parameters during one forward pass. The gradient that reaches a score is still
-scaled by the residue it controls:
+This keeps the layer aligned with the classical connected-filter
+interpretation and keeps the differentiable boundary clear. The gradient that
+reaches a score is scaled by the residue it controls:
 
 ```text
 dL/dscore(node) = residue(node) * dL/dfiltered_increment(node)
 ```
 
-Do not model alternative output projections, top-hat outputs, or attribute
-reconstructions as CFP extension points in Python. If a future method needs a
-surrogate derivative or another morphology signal, design it as a separate
-research component with its own forward/backward contract instead of hiding it
-inside the filter spec.
+Alternative output projections, top-hat outputs, or attribute reconstructions
+are not current CFP extension points in Python. A future method that changes
+the reconstructed morphology signal should define its own forward and backward
+contract instead of hiding that behavior inside a filter spec.
 
-## Score Constraints
-
-A score constraint post-processes the score vector before reconstruction. It is
-useful for non-parametric invariants such as root preservation.
-
-```python
-import torch
-
-from mtlearn.layers.cfp.constraints import ScoreConstraint
-
-
-class ClampMinimumScore(ScoreConstraint):
-    def __init__(self, minimum: float = 0.0):
-        super().__init__()
-        self.minimum = float(minimum)
-
-    def forward(self, scores, tree_info, context=None):
-        return torch.clamp(scores, min=self.minimum)
-```
-
-Register constraints with `SCORE_CONSTRAINT_REGISTRY`. The factory receives only
-the serialized config fields, so store all required construction values in the
-spec mapping:
-
-```python
-{
-    "constraints": [
-        {"kind": "clamp_minimum_score", "minimum": 0.05},
-    ],
-}
-```
-
-Constraint rules:
-
-- preserve shape and device;
-- avoid in-place writes to tensors needed by autograd;
-- do not recompute attributes or trees;
-- keep deterministic behavior from `scores`, `tree_info`, and `context`.
-
-## Regularizers
-
-A regularizer computes a scalar training penalty from scores, tree tensors, and
-optionally normalized features. Regularizers are training-only contract entries:
-changing a regularizer does not change the inference contract.
-
-```python
-import torch
-
-from mtlearn.layers.cfp.regularization import Regularizer
-
-
-class ScoreEntropyRegularizer(Regularizer):
-    def __init__(self, weight: float = 1.0, eps: float = 1e-6):
-        super().__init__()
-        self.weight = float(weight)
-        self.eps = float(eps)
-
-    def forward(self, scores, tree_info, features=None, context=None):
-        p = scores.clamp(self.eps, 1.0 - self.eps)
-        entropy = -(p * p.log() + (1.0 - p) * (1.0 - p).log())
-        return self.weight * entropy.mean()
-```
-
-Register regularizers with `REGULARIZER_REGISTRY` and reference them in specs:
-
-```python
-{
-    "regularizers": [
-        {"kind": "score_entropy", "weight": 0.01},
-    ],
-}
-```
-
-The public method is `regularization_penalty(x)`. Internally, the method sums
-the registered regularizers for each active spec.
-
-Regularizer rules:
-
-- return a scalar tensor on the model device;
-- return a differentiable zero when no edges or nodes are applicable;
-- do not mutate scores, features, or tree metadata;
-- document whether the regularizer assumes max-tree, min-tree, or
-  tree-of-shapes ordering.
-
-## Configs and Contracts
+## Configs, Contracts, and State
 
 `get_config()` returns the architecture needed by `from_config()`. It includes:
 
@@ -472,25 +317,35 @@ Regularizer rules:
 - `inference_contract`: settings that define forward semantics;
 - `training_contract`: training-only penalties.
 
-`get_weight_contract()` is a compatibility alias for the inference contract.
-
 Do not put caches, dataset statistics, or runtime tensors in `get_config()`.
 Use `save_stats()` and `load_stats()` for normalization statistics.
 
-## Compatibility Rules
+The layer cache is a runtime optimization, not serialized state. Use
+`cached_sample_count()` for inspection rather than depending on cache internals.
 
-Preserve these compatibility points unless the project intentionally makes a
-breaking change:
+## Public API and Utilities
 
-- `from mtlearn.layers import ConnectedFilterPreprocessingLayer`;
-- `ConnectedFilterPreprocessingImplicitJacobianFunction`;
-- default linear parameter names `_weights.<spec_name>` and
-  `_biases.<spec_name>`;
-- `build_dataloader_cached`;
-- `inspect_training_sample`;
-- `get_weight_contract`;
-- `export_params` and `save_params`;
-- legacy shortcuts `preserve_root=True` and `monotonicity_weight=...`.
+Preserve these public entry points unless the project intentionally makes a
+breaking API change:
+
+| Entry point | Purpose |
+| --- | --- |
+| `from mtlearn.layers import ConnectedFilterPreprocessingLayer` | Public layer import. |
+| `ConnectedFilterPreprocessingImplicitJacobianFunction` | Public differentiable reconstruction function. |
+| `build_dataloader_cached` | Build tree payload cache while estimating normalization statistics. |
+| `build_dataloader_cached_fixed_stats` | Build cache while keeping existing normalization statistics fixed. |
+| `inspect_training_sample` | Debug tree payloads, attributes, and scores for one sample. |
+| `cached_sample_count` | Inspect cache size without accessing cache internals. |
+| `get_config` and `from_config` | Round-trip layer architecture. |
+| `get_contracts` | Inspect parameter, inference, and training contracts together. |
+| `get_parameter_contract` | Inspect trainable CFP parameter names and shapes. |
+| `get_inference_contract` | Inspect forward-semantics settings. |
+| `get_training_contract` | Inspect training-only settings. |
+| `save_stats` and `load_stats` | Persist normalization statistics. |
+| `export_params` | Export learned parameter artifacts. |
+
+Default linear scorer parameter names are part of the current parameter
+contract: `_weights.<spec_name>` and `_biases.<spec_name>`.
 
 When moving behavior into helpers, keep the layer methods as the public surface
 when notebooks or downstream experiments already call them.
@@ -499,7 +354,7 @@ when notebooks or downstream experiments already call them.
 
 Use the smallest test that proves the contract:
 
-- import tests for old and new public paths;
+- import tests for public paths;
 - validation tests for bad config values and unknown kinds;
 - forward tests on small hand-computable images;
 - shape tests for `(B, C, H, W)` and cached dataloader input;

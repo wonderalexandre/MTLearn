@@ -36,9 +36,9 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         parent,
         node_of_pixel,
         attrs2d,
-        numRows: int,
-        numCols: int,
-        beta_f: float = 1.0,
+        num_rows: int,
+        num_cols: int,
+        score_sharpness: float = 1.0,
         clamp_min=None,
         clamp_max=None,
         order_forward=None,
@@ -46,7 +46,7 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
     ):
         """Apply the connected filter using implicit reconstruction metadata."""
         logits = attrs2d @ weight.view(-1) + bias
-        s = beta_f * logits
+        s = score_sharpness * logits
         if isinstance(clamp_min, bool) and clamp_max is None:
             clamp_min, clamp_max = (-12.0, 12.0) if clamp_min else (None, None)
         if (clamp_min is None) != (clamp_max is None):
@@ -69,10 +69,10 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
             parent,
             order_forward,
         )
-        y_2d = y.reshape(numRows, numCols)
+        y_2d = y.reshape(num_rows, num_cols)
 
         ctx.save_for_backward(attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, parent, node_of_pixel)
-        ctx.beta_f = beta_f
+        ctx.score_sharpness = score_sharpness
         ctx.order_backward = order_backward
         return y_2d
 
@@ -80,7 +80,7 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
     def backward(ctx, grad_output):
         """Compute gradients for the learnable criterion parameters."""
         attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, parent, node_of_pixel = ctx.saved_tensors
-        beta_f = ctx.beta_f
+        score_sharpness = ctx.score_sharpness
         order_backward = ctx.order_backward
         grad_output_flat = grad_output.flatten()
 
@@ -94,7 +94,7 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         )
 
         d_sigmoid = sigmoid * (1 - sigmoid)
-        grad_s = grad_nodes * residues * d_sigmoid * beta_f
+        grad_s = grad_nodes * residues * d_sigmoid * score_sharpness
         grad_s = torch.where(clamp_mask, grad_s, torch.zeros_like(grad_s))
 
         dW = attrs2d.T @ grad_s

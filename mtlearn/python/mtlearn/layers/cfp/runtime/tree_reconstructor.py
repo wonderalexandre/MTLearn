@@ -56,15 +56,15 @@ class TreeReconstructionFunction(torch.autograd.Function):
         tpost,
         parent,
         node_of_pixel,
-        numRows: int,
-        numCols: int,
+        num_rows: int,
+        num_cols: int,
         order_forward=None,
         order_backward=None,
     ):
         ctx.save_for_backward(tpre, tpost, parent, node_of_pixel)
         ctx.order_backward = order_backward
         y = reconstruct_from_info(node_signal, tpre, tpost, node_of_pixel, parent, order_forward)
-        return y.reshape(numRows, numCols)
+        return y.reshape(num_rows, num_cols)
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -104,7 +104,7 @@ class TreeReconstructor:
             tree_info["parent"],
             tree_info.get("order_forward"),
         )
-        return y.reshape(tree_info["numRows"], tree_info["numCols"])
+        return y.reshape(tree_info["num_rows"], tree_info["num_cols"])
 
     @staticmethod
     def apply(node_signal, tree_info):
@@ -115,8 +115,8 @@ class TreeReconstructor:
             tree_info["tpost"],
             tree_info["parent"],
             tree_info["node_of_pixel"],
-            tree_info["numRows"],
-            tree_info["numCols"],
+            tree_info["num_rows"],
+            tree_info["num_cols"],
             tree_info.get("order_forward"),
             tree_info.get("order_backward"),
         )

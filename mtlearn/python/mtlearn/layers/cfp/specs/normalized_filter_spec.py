@@ -19,8 +19,6 @@ class NormalizedFilterSpec:
     attributes: tuple[Any, ...]
     scoring_model: ScoringModel
     score_sharpness: float
-    preserve_root: bool
-    monotonicity_weight: float
     constraint_configs: tuple[dict[str, Any], ...]
     regularizer_configs: tuple[dict[str, Any], ...]
     tos_interpolation: Any

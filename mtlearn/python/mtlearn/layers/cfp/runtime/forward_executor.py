@@ -10,7 +10,10 @@ class ForwardExecutor:
 
     def forward(self, layer, x: torch.Tensor) -> torch.Tensor:
         """Apply all filter specs and return ``(B, C * specs, H, W)``."""
-        x, idx, use_cache = layer._batch_input(x)
+        batch = layer._batch_input(x)
+        x = batch.tensor
+        idx = batch.index
+        use_cache = batch.use_cache
         assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
         batch_size, channels, height, width = x.shape
         assert channels == layer.in_channels, f"in_channels={layer.in_channels}, input C={channels}"
@@ -56,7 +59,10 @@ class ForwardExecutor:
 
     def regularization_penalty(self, layer, x: torch.Tensor) -> torch.Tensor:
         """Return the per-spec training regularization penalty."""
-        x, idx, use_cache = layer._batch_input(x)
+        batch = layer._batch_input(x)
+        x = batch.tensor
+        idx = batch.index
+        use_cache = batch.use_cache
         assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
         batch_size, channels, _, _ = x.shape
         assert channels == layer.in_channels, f"in_channels={layer.in_channels}, input C={channels}"

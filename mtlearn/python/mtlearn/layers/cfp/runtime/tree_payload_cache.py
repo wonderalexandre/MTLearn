@@ -43,26 +43,13 @@ class TreePayloadCache:
         """Return cached sample keys."""
         return self._payloads.keys()
 
-    def _view(self, field: str) -> dict[str, dict[str, object]]:
-        return {
-            sample_key: {
-                tree_key: payload[field]
-                for tree_key, payload in per_sample.items()
-            }
-            for sample_key, per_sample in self._payloads.items()
-        }
+    def sample_count(self) -> int:
+        """Return the number of cached sample/channel keys."""
+        return len(self._payloads)
 
-    def tree_info(self) -> dict[str, dict[str, object]]:
-        """Return a compatibility view of cached tree metadata."""
-        return self._view("info")
-
-    def base_attrs(self) -> dict[str, dict[str, object]]:
-        """Return a compatibility view of cached raw attributes."""
-        return self._view("base_attrs")
-
-    def norm_attrs(self) -> dict[str, dict[str, object]]:
-        """Return a compatibility view of cached normalized attributes."""
-        return self._view("norm_attrs")
+    def payload_count(self) -> int:
+        """Return the number of cached sample/tree payloads."""
+        return sum(len(per_sample) for per_sample in self._payloads.values())
 
     def clear(self) -> None:
         """Drop all cached payloads."""
@@ -70,4 +57,4 @@ class TreePayloadCache:
         self.norm_epoch_by_key.clear()
 
     def __len__(self) -> int:
-        return sum(len(per_sample) for per_sample in self._payloads.values())
+        return self.payload_count()

@@ -21,7 +21,7 @@ class ScoringModel(torch.nn.Module):
         p0 = max(min(float(p0), 1.0 - 1e-6), 1e-6)
         return math.log(p0 / (1.0 - p0))
 
-    def init_identity(self, *, beta_f: float, p0: float = 0.995, **kwargs) -> None:
+    def init_identity(self, *, score_sharpness: float, p0: float = 0.995, **kwargs) -> None:
         """Initialize the scorer so node scores start close to ``p0``.
 
         Scorers that cannot define a meaningful identity initialization should
