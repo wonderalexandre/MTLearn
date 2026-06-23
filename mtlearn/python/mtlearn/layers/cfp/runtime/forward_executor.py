@@ -29,7 +29,7 @@ class ForwardExecutor:
                 base_key = f"{int(idx[batch_index])}_{channel_index}"
                 direct_payloads = {}
                 for spec in layer.filter_specs:
-                    info, norm_attrs = layer._get_tree_payload_for_sample(
+                    info, raw_attrs, norm_attrs = layer._get_tree_payload_for_sample(
                         base_key,
                         x[batch_index, channel_index],
                         spec,
@@ -37,19 +37,24 @@ class ForwardExecutor:
                         use_cache=use_cache,
                     )
 
+                    score_sharpness = layer._score_sharpness_for_spec(spec)
                     layer._active_context = layer._context_for(
                         base_key,
                         batch_index,
                         channel_index,
                         spec,
                         mode="forward",
+                        image_shape=(height, width),
+                        score_sharpness=score_sharpness,
+                        raw_attrs=raw_attrs,
+                        norm_attrs=norm_attrs,
                     )
                     try:
                         y_out = layer._apply_spec(
                             spec,
                             info,
                             norm_attrs,
-                            layer._score_sharpness_for_spec(spec),
+                            score_sharpness,
                         )
                     finally:
                         layer._active_context = None
@@ -64,7 +69,7 @@ class ForwardExecutor:
         idx = batch.index
         use_cache = batch.use_cache
         assert x.dim() == 4, f"expected (B, C, H, W), got {tuple(x.shape)}"
-        batch_size, channels, _, _ = x.shape
+        batch_size, channels, height, width = x.shape
         assert channels == layer.in_channels, f"in_channels={layer.in_channels}, input C={channels}"
 
         active_specs = [
@@ -81,19 +86,24 @@ class ForwardExecutor:
                 base_key = f"{int(idx[batch_index])}_{channel_index}"
                 direct_payloads = {}
                 for spec in active_specs:
-                    info, norm_attrs = layer._get_tree_payload_for_sample(
+                    info, raw_attrs, norm_attrs = layer._get_tree_payload_for_sample(
                         base_key,
                         x[batch_index, channel_index],
                         spec,
                         direct_payloads,
                         use_cache=use_cache,
                     )
+                    score_sharpness = layer._score_sharpness_for_spec(spec)
                     layer._active_context = layer._context_for(
                         base_key,
                         batch_index,
                         channel_index,
                         spec,
                         mode="regularization_penalty",
+                        image_shape=(height, width),
+                        score_sharpness=score_sharpness,
+                        raw_attrs=raw_attrs,
+                        norm_attrs=norm_attrs,
                     )
                     try:
                         penalty = penalty + layer._regularization_penalty_for_spec(

@@ -89,8 +89,7 @@ At the filter-spec and scorer level, the sigmoid gain is named
 
 The scorer receives normalized attributes only. It does not receive raw pixels,
 targets, or reconstructed images directly. Tree metadata is available through
-`tree_info` for future tree-aware scorers, and execution metadata is available
-through `CFPContext`.
+`tree_info`, and execution metadata is available through `CFPContext`.
 
 ## Scoring Families
 
@@ -435,7 +434,3 @@ differentiable, and cache-friendly, but it limits expressiveness:
 - no direct access to pixels or images inside the scorer;
 - no built-in feature-selection mechanism driven by `required_features()`;
 - no tree-aware scorer is registered yet.
-
-Future scorer families can relax these constraints, but they should make the
-additional dependency explicit in the scorer contract, config, tests, and
-architecture guide.

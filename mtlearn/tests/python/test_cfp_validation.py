@@ -604,8 +604,19 @@ def test_custom_scoring_model_receives_cfp_context():
     assert context.sample_key == "0_0"
     assert context.batch_index == 0
     assert context.channel_index == 0
+    assert context.mode == "forward"
     assert context.spec_name == "context_area"
-    assert context.extras["mode"] == "forward"
+    assert context.spec_index == 0
+    assert context.tree_type == morphology.TreeType.MAX_TREE
+    assert context.tree_key == layer.filter_specs[0].tree_key
+    assert context.attribute_types == (morphology.AttributeType.AREA,)
+    assert context.attribute_names == ("AREA",)
+    assert context.image_shape == (2, 2)
+    assert context.normalization_mode == "none"
+    assert context.score_sharpness == pytest.approx(layer.filter_specs[0].score_sharpness)
+    assert context.is_training is True
+    assert morphology.AttributeType.AREA in context.raw_attributes
+    assert morphology.AttributeType.AREA in context.normalized_attributes
 
 
 def test_filter_spec_rejects_unknown_scoring_config():
@@ -667,6 +678,62 @@ def test_filter_spec_accepts_declarative_constraints_and_regularizers():
     ]
     assert "regularizers" not in layer.get_inference_contract()["filter_specs"][0]
     assert restored.get_config() == layer.get_config()
+
+
+def test_custom_regularizer_receives_rich_cfp_context():
+    class RecordingRegularizer(cfp.Regularizer):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def forward(self, scores, tree_info, features=None, context=None):
+            self.calls.append((scores, tree_info, features, context))
+            return scores.sum() * 0.0
+
+    regularizer = RecordingRegularizer()
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "context_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    layer._regularizers["context_area"] = torch.nn.ModuleList([regularizer])
+    image = torch.tensor(
+        [[[[0.0, 0.2], [0.8, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.regularization_penalty(image)
+
+    assert penalty.item() == pytest.approx(0.0)
+    assert len(regularizer.calls) == 1
+    scores, tree_info, features, context = regularizer.calls[0]
+    assert scores.dim() == 1
+    assert features.dim() == 2
+    assert isinstance(context, CFPContext)
+    assert context.sample_key == "0_0"
+    assert context.batch_index == 0
+    assert context.channel_index == 0
+    assert context.mode == "regularization_penalty"
+    assert context.spec_name == "context_area"
+    assert context.spec_index == 0
+    assert context.tree_type == morphology.TreeType.MAX_TREE
+    assert context.tree_key == layer.filter_specs[0].tree_key
+    assert context.attribute_types == (morphology.AttributeType.AREA,)
+    assert context.attribute_names == ("AREA",)
+    assert context.image_shape == (2, 2)
+    assert context.normalization_mode == "none"
+    assert context.score_sharpness == pytest.approx(layer.filter_specs[0].score_sharpness)
+    assert context.is_training is True
+    assert morphology.AttributeType.AREA in context.raw_attributes
+    assert morphology.AttributeType.AREA in context.normalized_attributes
+    assert tree_info["tree_type"] == context.tree_type
 
 
 def test_filter_spec_accepts_attribute_order_and_ancestor_regularizers():
@@ -1083,6 +1150,7 @@ def test_forward_orders_outputs_by_input_channel_then_filter_spec(monkeypatch):
     def fake_compute_payload(img_np, tree_key, *, update_stats):
         return {
             "info": {"channel_marker": int(img_np[0, 0])},
+            "base_attrs": {},
             "norm_attrs": {},
         }
 

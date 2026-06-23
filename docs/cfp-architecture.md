@@ -55,7 +55,7 @@ to be extended or imported by downstream code.
 | Score constraints | Deterministic post-processing applied to scores before reconstruction. |
 | Altitude residues | Fixed backend-provided per-node increments reconstructed by CFP after multiplication by scores. |
 | Regularizers | Training-only penalties computed from scores, tree tensors, and optionally normalized features. |
-| `CFPContext` | Metadata passed to components during normal layer execution. It identifies sample, channel, spec, and execution mode. |
+| `CFPContext` | Metadata passed to components during normal layer execution. It identifies sample, channel, spec, tree, attributes, image shape, normalization, and execution mode. |
 | Inference contract | The part of the layer configuration that changes forward semantics. |
 | Training contract | Training-only settings, primarily regularization configuration. |
 
@@ -100,7 +100,7 @@ The `info` mapping currently contains:
 - `residues`: altitude residues from the backend;
 - `tpre` and `tpost`: tree traversal entry and exit times;
 - `parent`: dense parent ids;
-- `node_of_pixel`: node id associated with each pixel;
+- `node_of_pixel`: proper-part owner node id for each flattened pixel;
 - `num_rows` and `num_cols`: image shape;
 - `tree_type`: normalized tree type string;
 - `order_forward` and `order_backward`: traversal orders for reconstruction.
@@ -186,15 +186,26 @@ parameters participate:
 
 Scoring models, score constraints, and regularizers receive a `CFPContext`
 when the layer is running through its normal execution path. The context carries
-metadata only; it should not own tensors required for gradients.
+runtime metadata; it should not be used as hidden mutable state.
 
 The context identifies:
 
 - `sample_key`;
 - `batch_index`;
 - `channel_index`;
+- `mode`;
 - `spec_name`;
-- `extras`, including the current execution mode.
+- `spec_index`;
+- `tree_type` and `tree_key`;
+- `attribute_types` and `attribute_names`;
+- `image_shape`;
+- `normalization_mode`;
+- `score_sharpness`;
+- `is_training`.
+
+It also exposes `raw_attributes` and `normalized_attributes` mappings when the
+current tree payload has already computed those tensors. Custom components may
+read these mappings, but they should not mutate them.
 
 Current modes are `"forward"` and `"regularization_penalty"`.
 
@@ -295,9 +306,9 @@ dL/dscore(node) = residue(node) * dL/dfiltered_increment(node)
 ```
 
 Alternative output projections, top-hat outputs, or attribute reconstructions
-are not current CFP extension points in Python. A future method that changes
-the reconstructed morphology signal should define its own forward and backward
-contract instead of hiding that behavior inside a filter spec.
+are not current CFP extension points in Python. Changing the reconstructed
+morphology signal requires a separate forward and backward contract; it should
+not be hidden inside a filter spec.
 
 ## Configs, Contracts, and State
 

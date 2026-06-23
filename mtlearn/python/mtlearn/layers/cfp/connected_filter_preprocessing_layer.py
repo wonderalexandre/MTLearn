@@ -377,13 +377,36 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             return parameter.dtype
         return self._module_dtype()
 
-    def _context_for(self, base_key: str, batch_index: int, channel_index: int, spec: _NormalizedFilterSpec, *, mode: str) -> CFPContext:
+    def _context_for(
+        self,
+        base_key: str,
+        batch_index: int,
+        channel_index: int,
+        spec: _NormalizedFilterSpec,
+        *,
+        mode: str,
+        image_shape: tuple[int, int],
+        score_sharpness: float,
+        raw_attrs=None,
+        norm_attrs=None,
+    ) -> CFPContext:
         return CFPContext(
             sample_key=base_key,
             batch_index=batch_index,
             channel_index=channel_index,
+            mode=mode,
             spec_name=spec.key,
-            extras={"mode": mode},
+            spec_index=spec.index,
+            tree_type=spec.tree_type,
+            tree_key=spec.tree_key,
+            attribute_types=spec.attributes,
+            attribute_names=tuple(_enum_name(attr_type) for attr_type in spec.attributes),
+            image_shape=image_shape,
+            normalization_mode=self.scale_mode,
+            score_sharpness=score_sharpness,
+            is_training=self.training,
+            raw_attributes=dict(raw_attrs or {}),
+            normalized_attributes=dict(norm_attrs or {}),
         )
 
     def _score_sharpness_for_spec(self, spec: _NormalizedFilterSpec) -> float:
@@ -443,12 +466,20 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             return parameter.sum() * 0.0
         return torch.zeros((), dtype=torch.float32, device=self.device)
 
-    def _get_tree_payload_for_sample(self, base_key: str, img_ch: torch.Tensor, spec: _NormalizedFilterSpec, direct_payloads, *, use_cache: bool):
+    def _get_tree_payload_for_sample(
+        self,
+        base_key: str,
+        img_ch: torch.Tensor,
+        spec: _NormalizedFilterSpec,
+        direct_payloads,
+        *,
+        use_cache: bool,
+    ):
         if use_cache:
             self._ensure_tree_payload_cached(base_key, img_ch, spec.tree_key)
             self._maybe_refresh_norm_for_key(base_key)
             payload = self._tree_payload_cache.get(base_key, spec.tree_key)
-            return payload["info"], payload["norm_attrs"]
+            return payload["info"], payload["base_attrs"], payload["norm_attrs"]
 
         if spec.tree_key not in direct_payloads:
             img_np = to_numpy_u8(img_ch.detach())
@@ -458,7 +489,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 update_stats=False,
             )
         payload = direct_payloads[spec.tree_key]
-        return payload["info"], payload["norm_attrs"]
+        return payload["info"], payload["base_attrs"], payload["norm_attrs"]
 
     def _apply_spec(self, spec: _NormalizedFilterSpec, info, norm_attrs, score_sharpness):
         dtype = self._score_dtype(spec)

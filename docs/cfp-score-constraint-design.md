@@ -198,9 +198,7 @@ This is different from regularizers, which are training-only settings.
 Current boundary: custom constraints should not introduce trainable parameters.
 They are `torch.nn.Module` subclasses and would technically be visited by
 `layer.parameters()`, but the current parameter contract and `export_params()`
-payload do not describe constraint-owned parameters. If a future constraint
-needs learned parameters, extend the parameter contract, serialization, tests,
-and docs before relying on it.
+payload do not describe constraint-owned parameters.
 
 ## Design Guidelines
 

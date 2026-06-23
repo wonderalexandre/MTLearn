@@ -80,6 +80,27 @@ The `scores` passed to a regularizer are already post-constraint scores. For
 example, if `preserve_root` is active, the root score seen by the regularizer is
 already fixed to `1`.
 
+`context` is a `CFPContext` when the layer calls the regularizer through
+`regularization_penalty(...)`. It carries stable metadata for custom
+regularizers:
+
+| Field | Meaning |
+| --- | --- |
+| `sample_key`, `batch_index`, `channel_index` | Location of the channel image inside the current batch or cached loader. |
+| `mode` | Current execution mode. For regularizers this is `"regularization_penalty"`. |
+| `spec_name`, `spec_index` | Normalized filter-spec identity. |
+| `tree_type`, `tree_key` | Tree construction identity used for the payload cache. |
+| `attribute_types`, `attribute_names` | Attributes requested by the filter spec, in feature-column order. |
+| `image_shape` | Spatial shape `(H, W)` of the channel image. |
+| `normalization_mode` | Layer attribute-normalization mode. |
+| `score_sharpness` | Effective score sharpness for the current spec. |
+| `is_training` | Whether the layer module is in training mode. |
+| `raw_attributes`, `normalized_attributes` | Per-attribute node tensors available in the current tree payload. |
+
+Use `features` when a regularizer only needs the normalized feature matrix.
+Use `context.raw_attributes` or `context.normalized_attributes` when the
+regularizer needs to associate a tensor with a specific attribute type.
+
 The layer averages the accumulated regularization penalty over
 `batch_size * channels` and sums the active spec terms. Specs with no effective
 regularizers are skipped. If no specs are active, the method returns a zero
@@ -417,11 +438,9 @@ them cheap and differentiable, but it limits expressiveness:
 - no regularizer receives target images;
 - no regularizer receives reconstructed output pixels;
 - no regularizer receives altitude increments directly;
+- regularizers receive tree/spec metadata through `CFPContext`, but should not
+  mutate context tensors or use it as hidden global state;
 - direct regularizer module objects are not accepted in filter specs;
 - trainable regularizer parameters are not represented in the current parameter
   contract;
 - the public regularization method is `regularization_penalty(...)`.
-
-Future regularizer families can relax these boundaries, but they should update
-the regularizer contract, serialization rules, tests, and architecture guide at
-the same time.
