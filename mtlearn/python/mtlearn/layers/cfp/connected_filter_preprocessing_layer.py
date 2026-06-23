@@ -516,6 +516,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             info["num_cols"],
             info["order_forward"],
             info["order_backward"],
+            info["num_times"],
         )
 
         return y_ch

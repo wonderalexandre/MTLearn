@@ -48,6 +48,7 @@ class TreePayloadProvider:
         residues, tpre, tpost, parent, node_of_pixel = (
             mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
         )
+        num_times = int(tpost.max().item()) + 1
         return {
             "residues": residues.to(self.device),
             "tpre": tpre.to(self.device),
@@ -56,6 +57,7 @@ class TreePayloadProvider:
             "node_of_pixel": node_of_pixel.to(self.device),
             "num_rows": tree.numRows,
             "num_cols": tree.numCols,
+            "num_times": num_times,
             "tree_type": spec.tree_type,
             "order_forward": torch.argsort(tpre, descending=False).to(self.device),
             "order_backward": torch.argsort(tpre).to(self.device),

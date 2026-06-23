@@ -108,6 +108,7 @@ def test_tree_reconstruction_function_gradcheck():
     node_signal = residues.to(dtype=torch.float64).detach().requires_grad_(True)
     order_forward = torch.argsort(tpre, descending=False)
     order_backward = torch.argsort(tpre)
+    num_times = int(tpost.max().item()) + 1
 
     def reconstructed_mean(signal):
         return TreeReconstructionFunction.apply(
@@ -120,6 +121,7 @@ def test_tree_reconstruction_function_gradcheck():
             tree.numCols,
             order_forward,
             order_backward,
+            num_times,
         ).mean()
 
     assert gradcheck(reconstructed_mean, (node_signal,), eps=1e-6, atol=1e-4)
