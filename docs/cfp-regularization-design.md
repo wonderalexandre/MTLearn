@@ -5,7 +5,9 @@ and extended in `mtlearn.layers.cfp`. It focuses on regularization as a
 training-only mechanism. For scoring-specific details, see
 [CFP Scoring Design](cfp-scoring-design.md). For score post-processing details,
 see [CFP Score Constraint Design](cfp-score-constraint-design.md). For the
-broader package layout, see [CFP Architecture](cfp-architecture.md).
+broader package layout, see [CFP Architecture](cfp-architecture.md). For the
+training objective around task, auxiliary, and regularization terms, see
+[CFP Loss Design](cfp-loss-design.md).
 
 ## What Regularization Does
 

@@ -4,7 +4,9 @@ This guide describes how CFP scoring models are designed, configured, trained,
 and extended in `mtlearn.layers.cfp`. It focuses on the scoring contract
 itself. For the broader package layout, see
 [CFP Architecture](cfp-architecture.md). For score post-processing details, see
-[CFP Score Constraint Design](cfp-score-constraint-design.md).
+[CFP Score Constraint Design](cfp-score-constraint-design.md). For how losses
+supervise scores indirectly through downstream tasks, see
+[CFP Loss Design](cfp-loss-design.md).
 
 ## What Scoring Does
 

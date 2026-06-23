@@ -9,6 +9,7 @@ Component-specific implementation details live in separate guides:
 - [CFP Scoring Design](cfp-scoring-design.md)
 - [CFP Score Constraint Design](cfp-score-constraint-design.md)
 - [CFP Regularization Design](cfp-regularization-design.md)
+- [CFP Loss Design](cfp-loss-design.md)
 
 The public user import remains:
 
@@ -55,6 +56,7 @@ to be extended or imported by downstream code.
 | Score constraints | Deterministic post-processing applied to scores before reconstruction. |
 | Altitude residues | Fixed backend-provided per-node increments reconstructed by CFP after multiplication by scores. |
 | Regularizers | Training-only penalties computed from scores, tree tensors, and optionally normalized features. |
+| Loss design | Training-loop objective design that decides how task, auxiliary, and regularization terms supervise CFP. |
 | `CFPContext` | Metadata passed to components during normal layer execution. It identifies sample, channel, spec, tree, attributes, image shape, normalization, and execution mode. |
 | Inference contract | The part of the layer configuration that changes forward semantics. |
 | Training contract | Training-only settings, primarily regularization configuration. |
@@ -275,6 +277,11 @@ inference semantics and therefore belong in the inference contract.
 Regularizers compute training penalties. They do not change the forward output
 unless the training loop explicitly adds `layer.regularization_penalty(x)` to
 the task loss.
+
+Loss design belongs to the training loop. Target-dependent terms should remain
+explicit in experiment code or dedicated training utilities rather than being
+hidden inside scoring, constraints, or current regularizers. See
+[CFP Loss Design](cfp-loss-design.md).
 
 Normalization converts raw node attributes into stable feature tensors. It is
 shared infrastructure used before scoring and regularization. Statistical
