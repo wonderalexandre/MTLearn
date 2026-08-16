@@ -7,7 +7,7 @@ on:
       - ".github/workflows/notebooks.yml"
       - "CMakeLists.txt"
       - "cmake/**"
-      - "external/MorphologicalAttributeFilters"
+      - "external/mmcfilters"
       - "mtlearn/**"
       - "notebooks/**"
       - "pyproject.toml"

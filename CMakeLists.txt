@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.20)
 # Main mtlearn project
 # ---------------------------------------------------------------------------
 # This file configures the CMake build for the C++ library, Python bindings,
-# and test executables. It assumes MorphologicalAttributeFilters is available
-# as a submodule at external/MorphologicalAttributeFilters.
+# and test executables. It assumes mmcfilters is available as a submodule at
+# external/mmcfilters.
 
 project(mtlearn LANGUAGES CXX)
 
@@ -54,7 +54,7 @@ if(DEFINED Python3_EXECUTABLE AND NOT DEFINED Python3_ROOT_DIR)
     set(Python3_ROOT_DIR "${_mtlearn_py_root}" CACHE PATH "Python root" FORCE)
 endif()
 
-set(MTLEARN_MMCFILTERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/MorphologicalAttributeFilters")
+set(MTLEARN_MMCFILTERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/mmcfilters")
 # Ensure the required mmcfilters submodule is available.
 if(NOT EXISTS "${MTLEARN_MMCFILTERS_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "mmcfilters dependency not found at ${MTLEARN_MMCFILTERS_DIR}. Initialize the submodule or adjust the path.")
