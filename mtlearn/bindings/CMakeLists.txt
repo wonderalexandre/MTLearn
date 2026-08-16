@@ -43,7 +43,7 @@ if(MTLEARN_WITH_TORCH)
     target_include_directories(_mtlearn PRIVATE
         ${PROJECT_SOURCE_DIR}/mtlearn/include
         ${PROJECT_SOURCE_DIR}/mtlearn/src
-        ${CMAKE_SOURCE_DIR}/external/MorphologicalAttributeFilters
+        ${CMAKE_SOURCE_DIR}/external/mmcfilters
         ${TORCH_INCLUDE_DIRS})
     target_compile_definitions(_mtlearn PRIVATE MTLEARN_WITH_TORCH=1)
 endif()
