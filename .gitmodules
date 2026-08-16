@@ -1,3 +1,3 @@
-[submodule "external/MorphologicalAttributeFilters"]
-	path = external/MorphologicalAttributeFilters
-	url = https://github.com/wonderalexandre/MorphologicalAttributeFilters
+[submodule "external/mmcfilters"]
+	path = external/mmcfilters
+	url = https://github.com/wonderalexandre/mmcfilters

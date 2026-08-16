@@ -118,11 +118,11 @@ def _synthetic_attribute_images():
 
 
 def _real_attribute_images():
-    data_dir = _repo_root() / "external" / "MorphologicalAttributeFilters" / "dat"
+    data_dir = _repo_root() / "external" / "mmcfilters" / "dat"
     paths = [data_dir / name for name in ("lena.pgm", "brain2.pgm", "wrist.pgm")]
     missing = [str(path) for path in paths if not path.is_file()]
     if missing:
-        pytest.skip("real attribute fixtures unavailable; initialize the MorphologicalAttributeFilters submodule")
+        pytest.skip("real attribute fixtures unavailable; initialize the mmcfilters submodule")
     return [(path.stem, _sampled(_read_pgm(path))) for path in paths]
 
 

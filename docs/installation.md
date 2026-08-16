@@ -106,7 +106,7 @@ git submodule update --init --recursive
 The current backend source is expected at:
 
 ```text
-external/MorphologicalAttributeFilters
+external/mmcfilters
 ```
 
 ## Editable Install
