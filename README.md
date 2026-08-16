@@ -86,7 +86,7 @@ For ICPR 2026 Reproducible Research in Pattern Recognition (RRPR) review, use [R
 
 **MTLearn** is a research-oriented library. CFP is the current validated trainable connected-operator layer, with support for max-tree, min-tree, and tree-of-shapes workflows; mixed tree specs; multi-attribute dataset-level normalization; cached preprocessing; and PyTorch forward/backward for CFP parameters on CPU or CUDA tensors.
 
-User code should interact with morphology through the public Python facade `mtlearn.morphology` and the primary CFP layer in `mtlearn.layers`, rather than depending on backend-specific APIs. The backend is [`MorphologicalAttributeFilters`](https://github.com/wonderalexandre/MorphologicalAttributeFilters) / `mmcfilters`, but the top-level Python package `mmcfilters` is not required as a runtime dependency of `mtlearn`.
+User code should interact with morphology through the public Python facade `mtlearn.morphology` and the primary CFP layer in `mtlearn.layers`, rather than depending on backend-specific APIs. The backend is [`mmcfilters`](https://github.com/wonderalexandre/mmcfilters), but the top-level Python package `mmcfilters` is not required as a runtime dependency of `mtlearn`.
 
 ## Citation
 
