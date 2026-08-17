@@ -89,13 +89,13 @@ public:
             mmcfilters::NodePreservationMask(std::move(criterion))));
     }
 
-    // The hard subtractive rule can produce residues outside the source range,
+    // The subtractive rule can produce residues outside the source range,
     // so the backend publishes them in the wider signed altitude-difference type
     // and mtlearn exposes that type unchanged rather than saturating it.
     py::array_t<std::int64_t> filteringSubtractiveRule(std::vector<bool> criterion)
     {
         requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(mmcfilters::applyHardSubtractiveAttributeFilter(
+        return imageToNumpy(mmcfilters::applySubtractiveAttributeFilter(
             morphology::detail::backend(*tree_),
             mmcfilters::NodePreservationMask(std::move(criterion))));
     }
