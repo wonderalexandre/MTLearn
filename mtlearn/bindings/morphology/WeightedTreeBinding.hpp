@@ -338,7 +338,9 @@ inline void bindWeightedTree(py::module& m)
 {
     auto weightedTree = py::class_<morphology::WeightedTree, morphology::WeightedTreePtr>(
         m,
-        "ValuedMorphologicalTree",
+        // Python-facing name: this is mtlearn's own API surface and stays put
+        // even though the backend type it wraps was renamed.
+        "WeightedMorphologicalTree",
         py::module_local(),
         R"pbdoc(Native weighted morphology-tree handle returned by ``mtlearn.morphology``.
 
