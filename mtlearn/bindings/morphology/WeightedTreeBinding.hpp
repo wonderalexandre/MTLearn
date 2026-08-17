@@ -18,6 +18,29 @@
 namespace mtlearn {
 namespace morphology_pybind {
 
+// The tree kind used to be published as the backend enum's raw integer, which
+// silently changed meaning when the backend renumbered it. Publishing the name
+// instead keeps mtlearn's own TreeType vocabulary and fails loudly rather than
+// quietly if the backend set ever changes again.
+inline const char* treeKindName(mmcfilters::MorphologicalTreeKind kind)
+{
+    switch (kind) {
+    case mmcfilters::MorphologicalTreeKind::MaxTree:
+        return "max-tree";
+    case mmcfilters::MorphologicalTreeKind::MinTree:
+        return "min-tree";
+    case mmcfilters::MorphologicalTreeKind::TreeOfShapes:
+        return "tree-of-shapes";
+    case mmcfilters::MorphologicalTreeKind::UnrestrictedResidualTree:
+        return "unrestricted-residual-tree";
+    case mmcfilters::MorphologicalTreeKind::SaturatedResidualTree:
+        return "saturated-residual-tree";
+    case mmcfilters::MorphologicalTreeKind::Generic:
+        return "generic";
+    }
+    throw std::invalid_argument("unknown morphological tree kind");
+}
+
 // The tree-of-shapes adjacency radii used to be plain accessors on the tree.
 // They now live inside the retained topographic convention, which keeps the
 // resolved complementary adjacencies whenever the immersion is a complementary
@@ -282,8 +305,8 @@ void bindWeightedTreeQueries(PyClass& cls)
         // These accessors keep the previous Python shape by reading the new
         // models here.
         .def_property_readonly("treeType", [](morphology::WeightedTree& self) {
-            return static_cast<int>(morphology::detail::topology(self).semantics().kind);
-        })
+            return treeKindName(morphology::detail::topology(self).semantics().kind);
+        }, "Declared tree kind, using the same vocabulary as morphology.TreeType.")
         .def_property_readonly("hasAdjacencyRelation", [](morphology::WeightedTree& self) {
             return morphology::detail::topology(self).sharedAdjacencyContext() != nullptr;
         })

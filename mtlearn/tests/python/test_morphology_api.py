@@ -193,7 +193,7 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         infinity_seed_col=0,
     )
 
-    assert tree.treeType == 3
+    assert tree.treeType == "tree-of-shapes"
     assert tree.hasTreeOfShapesAdjacencyPolicy is True
     assert tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.0
     assert tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.5
@@ -204,7 +204,7 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
     )
 
-    assert enum_tree.treeType == 3
+    assert enum_tree.treeType == "tree-of-shapes"
     assert enum_tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.5
     assert enum_tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.0
 
@@ -462,3 +462,40 @@ def test_removed_backend_symbols_are_not_reexported():
     for name in removed_symbols:
         assert not hasattr(mtlearn, name)
         assert not hasattr(mtlearn._bindings, name)
+
+
+def test_backend_vocabulary_aliases_keep_the_canonical_names():
+    """The new backend spellings are accepted, but never become the canonical name.
+
+    CFP normalization statistics are keyed by the enum name (see
+    ``ConnectedFilterPreprocessingLayer._stat_key``) and those keys are written
+    into checkpoints. If an alias ever displaced the canonical name, saved
+    statistics would stop matching and be silently recomputed.
+    """
+    aliases = {
+        "BITQUADS_AREA": "BITQUAD_AREA",
+        "BITQUADS_CIRCULARITY": "BITQUAD_CIRCULARITY",
+        "BITQUADS_LENGTH_AVERAGE": "BITQUAD_LENGTH_AVERAGE",
+        "BITQUADS_NUMBER_EULER": "BITQUAD_NUMBER_EULER",
+        "BITQUADS_NUMBER_HOLES": "BITQUAD_NUMBER_HOLES",
+        "BITQUADS_PERIMETER": "BITQUAD_PERIMETER",
+        "BITQUADS_PERIMETER_AVERAGE": "BITQUAD_PERIMETER_AVERAGE",
+        "BITQUADS_PERIMETER_CONTINUOUS": "BITQUAD_PERIMETER_CONTINUOUS",
+        "BITQUADS_WIDTH_AVERAGE": "BITQUAD_WIDTH_AVERAGE",
+        "BOX_COL_MAX": "BOX_COLUMN_MAX",
+        "BOX_COL_MIN": "BOX_COLUMN_MIN",
+        "BOX_HEIGHT": "BOUNDING_BOX_HEIGHT",
+        "GRAY_HEIGHT": "GRAY_LEVEL_HEIGHT",
+        "HEIGHT_NODE": "SUBTREE_HEIGHT",
+        "MEAN_LEVEL": "MEAN_GRAY_LEVEL",
+        "VARIANCE_LEVEL": "GRAY_LEVEL_VARIANCE",
+    }
+
+    for canonical, alias in aliases.items():
+        canonical_value = getattr(morphology.AttributeType, canonical)
+        alias_value = getattr(morphology.AttributeType, alias)
+        assert alias_value == canonical_value, f"{alias} must alias {canonical}"
+        assert canonical_value.name == canonical, (
+            f"{canonical} lost its canonical name to {canonical_value.name}; "
+            "this would change persisted CFP statistic keys"
+        )
