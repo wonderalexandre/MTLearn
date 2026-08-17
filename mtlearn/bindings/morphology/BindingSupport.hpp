@@ -231,9 +231,9 @@ inline mmcfilters::NodeIdSpace toBackend(morphology::NodeIdSpace outputSpace)
 {
     switch (outputSpace) {
     case morphology::NodeIdSpace::MORPHOLOGICAL_TREE:
-        return mmcfilters::NodeIdSpace::MORPHOLOGICAL_TREE;
+        return mmcfilters::NodeIdSpace::MorphologicalTree;
     case morphology::NodeIdSpace::HIGRA:
-        return mmcfilters::NodeIdSpace::HIGRA;
+        return mmcfilters::NodeIdSpace::Higra;
     }
     throw std::invalid_argument("unknown NodeIdSpace");
 }
@@ -242,17 +242,17 @@ inline mmcfilters::AttributeGroup toBackend(morphology::AttributeGroup group)
 {
     switch (group) {
     case morphology::AttributeGroup::ALL:
-        return mmcfilters::AttributeGroup::ALL;
+        return mmcfilters::AttributeGroup::All;
     case morphology::AttributeGroup::GRAY_LEVEL:
-        return mmcfilters::AttributeGroup::GRAY_LEVEL;
+        return mmcfilters::AttributeGroup::GrayLevel;
     case morphology::AttributeGroup::SHAPE:
-        return mmcfilters::AttributeGroup::SHAPE;
+        return mmcfilters::AttributeGroup::Shape;
     case morphology::AttributeGroup::MOMENTS:
-        return mmcfilters::AttributeGroup::MOMENTS;
+        return mmcfilters::AttributeGroup::Moments;
     case morphology::AttributeGroup::BOUNDARY:
-        return mmcfilters::AttributeGroup::BOUNDARY;
+        return mmcfilters::AttributeGroup::Boundary;
     case morphology::AttributeGroup::TREE_TOPOLOGY:
-        return mmcfilters::AttributeGroup::TREE_TOPOLOGY;
+        return mmcfilters::AttributeGroup::TreeTopology;
     }
     throw std::invalid_argument("unknown AttributeGroup");
 }
@@ -261,133 +261,133 @@ inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
 {
     switch (attribute) {
     case morphology::Attribute::AREA:
-        return mmcfilters::Attribute::AREA;
+        return mmcfilters::Attribute::Area;
     case morphology::Attribute::VOLUME:
-        return mmcfilters::Attribute::VOLUME;
+        return mmcfilters::Attribute::Volume;
     case morphology::Attribute::RELATIVE_VOLUME:
-        return mmcfilters::Attribute::RELATIVE_VOLUME;
+        return mmcfilters::Attribute::RelativeVolume;
     case morphology::Attribute::LEVEL:
         return mmcfilters::Attribute::LEVEL;
     case morphology::Attribute::GRAY_HEIGHT:
-        return mmcfilters::Attribute::GRAY_HEIGHT;
+        return mmcfilters::Attribute::GrayLevelHeight;
     case morphology::Attribute::MEAN_LEVEL:
-        return mmcfilters::Attribute::MEAN_LEVEL;
+        return mmcfilters::Attribute::MeanGrayLevel;
     case morphology::Attribute::VARIANCE_LEVEL:
-        return mmcfilters::Attribute::VARIANCE_LEVEL;
+        return mmcfilters::Attribute::GrayLevelVariance;
     case morphology::Attribute::BOX_WIDTH:
-        return mmcfilters::Attribute::BOX_WIDTH;
+        return mmcfilters::Attribute::BoxWidth;
     case morphology::Attribute::BOX_HEIGHT:
-        return mmcfilters::Attribute::BOX_HEIGHT;
+        return mmcfilters::Attribute::BoundingBoxHeight;
     case morphology::Attribute::DIAGONAL_LENGTH:
-        return mmcfilters::Attribute::DIAGONAL_LENGTH;
+        return mmcfilters::Attribute::DiagonalLength;
     case morphology::Attribute::RECTANGULARITY:
-        return mmcfilters::Attribute::RECTANGULARITY;
+        return mmcfilters::Attribute::Rectangularity;
     case morphology::Attribute::RATIO_WH:
-        return mmcfilters::Attribute::RATIO_WH;
+        return mmcfilters::Attribute::RatioWh;
     case morphology::Attribute::BOX_COL_MIN:
-        return mmcfilters::Attribute::BOX_COL_MIN;
+        return mmcfilters::Attribute::BoxColumnMin;
     case morphology::Attribute::BOX_COL_MAX:
-        return mmcfilters::Attribute::BOX_COL_MAX;
+        return mmcfilters::Attribute::BoxColumnMax;
     case morphology::Attribute::BOX_ROW_MIN:
-        return mmcfilters::Attribute::BOX_ROW_MIN;
+        return mmcfilters::Attribute::BoxRowMin;
     case morphology::Attribute::BOX_ROW_MAX:
-        return mmcfilters::Attribute::BOX_ROW_MAX;
+        return mmcfilters::Attribute::BoxRowMax;
     case morphology::Attribute::CENTRAL_MOMENT_20:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_20;
+        return mmcfilters::Attribute::CentralMoment20;
     case morphology::Attribute::CENTRAL_MOMENT_02:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_02;
+        return mmcfilters::Attribute::CentralMoment02;
     case morphology::Attribute::CENTRAL_MOMENT_11:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_11;
+        return mmcfilters::Attribute::CentralMoment11;
     case morphology::Attribute::CENTRAL_MOMENT_30:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_30;
+        return mmcfilters::Attribute::CentralMoment30;
     case morphology::Attribute::CENTRAL_MOMENT_03:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_03;
+        return mmcfilters::Attribute::CentralMoment03;
     case morphology::Attribute::CENTRAL_MOMENT_21:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_21;
+        return mmcfilters::Attribute::CentralMoment21;
     case morphology::Attribute::CENTRAL_MOMENT_12:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_12;
+        return mmcfilters::Attribute::CentralMoment12;
     case morphology::Attribute::HU_MOMENT_1:
-        return mmcfilters::Attribute::HU_MOMENT_1;
+        return mmcfilters::Attribute::HuMoment1;
     case morphology::Attribute::HU_MOMENT_2:
-        return mmcfilters::Attribute::HU_MOMENT_2;
+        return mmcfilters::Attribute::HuMoment2;
     case morphology::Attribute::HU_MOMENT_3:
-        return mmcfilters::Attribute::HU_MOMENT_3;
+        return mmcfilters::Attribute::HuMoment3;
     case morphology::Attribute::HU_MOMENT_4:
-        return mmcfilters::Attribute::HU_MOMENT_4;
+        return mmcfilters::Attribute::HuMoment4;
     case morphology::Attribute::HU_MOMENT_5:
-        return mmcfilters::Attribute::HU_MOMENT_5;
+        return mmcfilters::Attribute::HuMoment5;
     case morphology::Attribute::HU_MOMENT_6:
-        return mmcfilters::Attribute::HU_MOMENT_6;
+        return mmcfilters::Attribute::HuMoment6;
     case morphology::Attribute::HU_MOMENT_7:
-        return mmcfilters::Attribute::HU_MOMENT_7;
+        return mmcfilters::Attribute::HuMoment7;
     case morphology::Attribute::INERTIA:
-        return mmcfilters::Attribute::INERTIA;
+        return mmcfilters::Attribute::Inertia;
     case morphology::Attribute::COMPACTNESS:
-        return mmcfilters::Attribute::COMPACTNESS;
+        return mmcfilters::Attribute::Compactness;
     case morphology::Attribute::ECCENTRICITY:
-        return mmcfilters::Attribute::ECCENTRICITY;
+        return mmcfilters::Attribute::Eccentricity;
     case morphology::Attribute::LENGTH_MAJOR_AXIS:
-        return mmcfilters::Attribute::LENGTH_MAJOR_AXIS;
+        return mmcfilters::Attribute::LengthMajorAxis;
     case morphology::Attribute::LENGTH_MINOR_AXIS:
-        return mmcfilters::Attribute::LENGTH_MINOR_AXIS;
+        return mmcfilters::Attribute::LengthMinorAxis;
     case morphology::Attribute::AXIS_ORIENTATION:
-        return mmcfilters::Attribute::AXIS_ORIENTATION;
+        return mmcfilters::Attribute::AxisOrientation;
     case morphology::Attribute::CIRCULARITY:
-        return mmcfilters::Attribute::CIRCULARITY;
+        return mmcfilters::Attribute::Circularity;
     case morphology::Attribute::BITQUADS_AREA:
-        return mmcfilters::Attribute::BITQUADS_AREA;
+        return mmcfilters::Attribute::BitquadArea;
     case morphology::Attribute::BITQUADS_NUMBER_EULER:
-        return mmcfilters::Attribute::BITQUADS_NUMBER_EULER;
+        return mmcfilters::Attribute::BitquadNumberEuler;
     case morphology::Attribute::BITQUADS_NUMBER_HOLES:
-        return mmcfilters::Attribute::BITQUADS_NUMBER_HOLES;
+        return mmcfilters::Attribute::BitquadNumberHoles;
     case morphology::Attribute::BITQUADS_PERIMETER:
-        return mmcfilters::Attribute::BITQUADS_PERIMETER;
+        return mmcfilters::Attribute::BitquadPerimeter;
     case morphology::Attribute::BITQUADS_PERIMETER_CONTINUOUS:
-        return mmcfilters::Attribute::BITQUADS_PERIMETER_CONTINUOUS;
+        return mmcfilters::Attribute::BitquadPerimeterContinuous;
     case morphology::Attribute::BITQUADS_CIRCULARITY:
-        return mmcfilters::Attribute::BITQUADS_CIRCULARITY;
+        return mmcfilters::Attribute::BitquadCircularity;
     case morphology::Attribute::BITQUADS_PERIMETER_AVERAGE:
-        return mmcfilters::Attribute::BITQUADS_PERIMETER_AVERAGE;
+        return mmcfilters::Attribute::BitquadPerimeterAverage;
     case morphology::Attribute::BITQUADS_LENGTH_AVERAGE:
-        return mmcfilters::Attribute::BITQUADS_LENGTH_AVERAGE;
+        return mmcfilters::Attribute::BitquadLengthAverage;
     case morphology::Attribute::BITQUADS_WIDTH_AVERAGE:
-        return mmcfilters::Attribute::BITQUADS_WIDTH_AVERAGE;
+        return mmcfilters::Attribute::BitquadWidthAverage;
     case morphology::Attribute::HEIGHT_NODE:
-        return mmcfilters::Attribute::HEIGHT_NODE;
+        return mmcfilters::Attribute::SubtreeHeight;
     case morphology::Attribute::DEPTH_NODE:
-        return mmcfilters::Attribute::DEPTH_NODE;
+        return mmcfilters::Attribute::DepthNode;
     case morphology::Attribute::IS_LEAF_NODE:
-        return mmcfilters::Attribute::IS_LEAF_NODE;
+        return mmcfilters::Attribute::IsLeafNode;
     case morphology::Attribute::IS_ROOT_NODE:
-        return mmcfilters::Attribute::IS_ROOT_NODE;
+        return mmcfilters::Attribute::IsRootNode;
     case morphology::Attribute::NUM_CHILDREN_NODE:
-        return mmcfilters::Attribute::NUM_CHILDREN_NODE;
+        return mmcfilters::Attribute::NumChildrenNode;
     case morphology::Attribute::NUM_SIBLINGS_NODE:
-        return mmcfilters::Attribute::NUM_SIBLINGS_NODE;
+        return mmcfilters::Attribute::NumSiblingsNode;
     case morphology::Attribute::NUM_DESCENDANTS_NODE:
-        return mmcfilters::Attribute::NUM_DESCENDANTS_NODE;
+        return mmcfilters::Attribute::NumDescendantsNode;
     case morphology::Attribute::NUM_LEAF_DESCENDANTS_NODE:
-        return mmcfilters::Attribute::NUM_LEAF_DESCENDANTS_NODE;
+        return mmcfilters::Attribute::NumLeafDescendantsNode;
     case morphology::Attribute::LEAF_RATIO_NODE:
-        return mmcfilters::Attribute::LEAF_RATIO_NODE;
+        return mmcfilters::Attribute::LeafRatioNode;
     case morphology::Attribute::BALANCE_NODE:
-        return mmcfilters::Attribute::BALANCE_NODE;
+        return mmcfilters::Attribute::BalanceNode;
     case morphology::Attribute::MAX_DIST:
-        return mmcfilters::Attribute::MAX_DIST;
+        return mmcfilters::Attribute::MaxDist;
     case morphology::Attribute::AVG_CHILD_HEIGHT_NODE:
-        return mmcfilters::Attribute::AVG_CHILD_HEIGHT_NODE;
+        return mmcfilters::Attribute::AvgChildHeightNode;
     case morphology::Attribute::CONTOUR_PIXELS:
-        return mmcfilters::Attribute::CONTOUR_PIXELS;
+        return mmcfilters::Attribute::ContourPixels;
     case morphology::Attribute::CONTOUR_PERIMETER:
-        return mmcfilters::Attribute::CONTOUR_PERIMETER;
+        return mmcfilters::Attribute::ContourPerimeter;
     case morphology::Attribute::CONTOUR_SIDE_NORTH:
-        return mmcfilters::Attribute::CONTOUR_SIDE_NORTH;
+        return mmcfilters::Attribute::ContourSideNorth;
     case morphology::Attribute::CONTOUR_SIDE_WEST:
-        return mmcfilters::Attribute::CONTOUR_SIDE_WEST;
+        return mmcfilters::Attribute::ContourSideWest;
     case morphology::Attribute::CONTOUR_SIDE_EAST:
-        return mmcfilters::Attribute::CONTOUR_SIDE_EAST;
+        return mmcfilters::Attribute::ContourSideEast;
     case morphology::Attribute::CONTOUR_SIDE_SOUTH:
-        return mmcfilters::Attribute::CONTOUR_SIDE_SOUTH;
+        return mmcfilters::Attribute::ContourSideSouth;
     }
     throw std::invalid_argument("unknown Attribute");
 }

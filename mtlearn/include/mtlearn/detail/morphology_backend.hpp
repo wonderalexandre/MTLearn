@@ -12,7 +12,7 @@
 
 #include <mmcfilters/trees/MorphologicalTree.hpp>
 #include <mmcfilters/trees/detail/TreeTraversalDetail.hpp>
-#include <mmcfilters/trees/WeightedMorphologicalTree.hpp>
+#include <mmcfilters/trees/ValuedMorphologicalTree.hpp>
 #include <mmcfilters/utils/Common.hpp>
 
 #include <cstdint>
@@ -21,7 +21,7 @@
 namespace mtlearn::morphology::detail {
 
 using TreeTopology = mmcfilters::MorphologicalTree;
-using BackendWeightedTree = mmcfilters::WeightedMorphologicalTree<std::uint8_t>;
+using BackendWeightedTree = mmcfilters::ValuedMorphologicalTree<std::uint8_t>;
 
 // Friend-access gateway implemented in morphology.cpp. Public code should not
 // include this detail header; internal code uses it to unwrap WeightedTree only

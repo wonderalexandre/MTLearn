@@ -36,20 +36,61 @@ mmcfilters::ImageUInt8Ptr backendImageFromView(ImageViewUInt8 image)
         image.cols);
 }
 
-// Translate the facade interpolation enum into the backend enum. Keeping this
-// conversion local avoids exposing mmcfilters enum values in the public header.
-mmcfilters::ToSInterpolation toBackendInterpolation(TreeOfShapesInterpolation interpolation)
+// Translate the public infinity seed into the backend's infinity pixel.
+//
+// The facade parameter is a pixel of the source image domain. The backend
+// expects a row-major index into the interpolated domain, which without an
+// exterior ring spans 2n-1 entries on each axis and places source pixel
+// (row, col) at (2*row, 2*col).
+int interpolatedInfinityPixel(int numRows, int numCols, int infinitySeedRow, int infinitySeedCol)
 {
-    switch (interpolation) {
-    case TreeOfShapesInterpolation::SelfDual:
-        return mmcfilters::ToSInterpolation::SelfDual;
-    case TreeOfShapesInterpolation::Min4cMax8c:
-        return mmcfilters::ToSInterpolation::Min4cMax8c;
-    case TreeOfShapesInterpolation::Min8cMax4c:
-        return mmcfilters::ToSInterpolation::Min8cMax4c;
+    if (infinitySeedRow < 0 || infinitySeedRow >= numRows || infinitySeedCol < 0 || infinitySeedCol >= numCols) {
+        throw std::invalid_argument("tree-of-shapes infinity seed must be inside the image domain");
     }
 
-    throw std::invalid_argument("unknown tree-of-shapes interpolation");
+    const int interpolatedCols = 2 * numCols - 1;
+    return (2 * infinitySeedRow) * interpolatedCols + (2 * infinitySeedCol);
+}
+
+// Translate the facade interpolation enum into a complete backend topographic
+// convention. Keeping this conversion local avoids exposing mmcfilters types in
+// the public header.
+//
+// mtlearn always builds the tree of shapes without the exterior ring, and that
+// is what keeps the published altitudes on the source 8-bit lattice: the
+// boundary reference level is the only construction level that can fall between
+// two source levels, and without the ring it is cropped away before any
+// interior cell reads it. The 8-bit encoding is therefore exact here, not a
+// quantization.
+mmcfilters::TopographicConvention toBackendConvention(
+    TreeOfShapesInterpolation interpolation,
+    int numRows,
+    int numCols,
+    int infinitySeedRow,
+    int infinitySeedCol)
+{
+    mmcfilters::TopographicConvention convention;
+    convention.domainExtension = mmcfilters::TopographicDomainExtension::None;
+    convention.altitudeEncoding = mmcfilters::TopographicAltitudeEncoding::UInt8;
+
+    switch (interpolation) {
+    case TreeOfShapesInterpolation::SelfDual:
+        convention.immersion = mmcfilters::SelfDualSpanImmersion{};
+        break;
+    case TreeOfShapesInterpolation::Min4cMax8c:
+        convention.immersion =
+            mmcfilters::CanonicalComplementaryGridImmersion{mmcfilters::ComplementaryPairing::Min4Max8};
+        break;
+    case TreeOfShapesInterpolation::Min8cMax4c:
+        convention.immersion =
+            mmcfilters::CanonicalComplementaryGridImmersion{mmcfilters::ComplementaryPairing::Min8Max4};
+        break;
+    default:
+        throw std::invalid_argument("unknown tree-of-shapes interpolation");
+    }
+
+    convention.infinityPixel = interpolatedInfinityPixel(numRows, numCols, infinitySeedRow, infinitySeedCol);
+    return convention;
 }
 
 } // namespace
@@ -90,31 +131,29 @@ WeightedTree WeightedTree::createTreeOfShapes(
     int infinitySeedCol)
 {
     return WeightedTree(std::make_shared<Impl>(
-        mmcfilters::MorphologicalTreeFactory::createTreeOfShapes(
+        mmcfilters::MorphologicalTreeFactory::createTreeOfShapes<std::uint8_t>(
             backendImageFromView(image),
-            toBackendInterpolation(interpolation),
-            infinitySeedRow,
-            infinitySeedCol)));
+            toBackendConvention(interpolation, image.rows, image.cols, infinitySeedRow, infinitySeedCol))));
 }
 
 int WeightedTree::numRows() const
 {
-    return impl_->backend.topology().getNumRowsOfImage();
+    return impl_->backend.topology().numRows();
 }
 
 int WeightedTree::numCols() const
 {
-    return impl_->backend.topology().getNumColsOfImage();
+    return impl_->backend.topology().numColumns();
 }
 
 int WeightedTree::numNodes() const
 {
-    return impl_->backend.topology().getNumNodes();
+    return impl_->backend.topology().numNodes();
 }
 
 int WeightedTree::numInternalNodeSlots() const
 {
-    return impl_->backend.topology().getNumInternalNodeSlots();
+    return impl_->backend.topology().numInternalNodeSlots();
 }
 
 // The following accessors intentionally forward directly to the backend. They
@@ -122,12 +161,12 @@ int WeightedTree::numInternalNodeSlots() const
 // expected by the Python notebooks and CFP preprocessing code.
 float WeightedTree::getAltitude(NodeId nodeId) const
 {
-    return static_cast<float>(impl_->backend.getAltitude(nodeId));
+    return static_cast<float>(impl_->backend.nodeAltitude(nodeId));
 }
 
 float WeightedTree::getNodeResidue(NodeId nodeId) const
 {
-    return static_cast<float>(impl_->backend.getNodeResidue(nodeId));
+    return static_cast<float>(impl_->backend.nodeResidue(nodeId));
 }
 
 void WeightedTree::pruneNode(NodeId nodeId)
@@ -142,10 +181,10 @@ void WeightedTree::mergeNodeIntoParent(NodeId nodeId)
 
 UInt8Image WeightedTree::reconstructionImage() const
 {
-    auto backendImage = impl_->backend.reconstructionImage();
+    auto backendImage = impl_->backend.reconstructFromNodeAltitudes();
     UInt8Image image;
     image.rows = backendImage->getNumRows();
-    image.cols = backendImage->getNumCols();
+    image.cols = backendImage->getNumColumns();
 
     const auto buffer = backendImage->rawDataPtr();
     const auto size = static_cast<std::size_t>(image.rows) * static_cast<std::size_t>(image.cols);

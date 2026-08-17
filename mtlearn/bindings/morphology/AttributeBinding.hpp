@@ -181,7 +181,7 @@ std::pair<py::dict, py::array> computeAttributesTyped(
     morphology::NodeIdSpace outputSpace)
 {
     if (!tree) {
-        throw py::value_error("invalid WeightedMorphologicalTree");
+        throw py::value_error("invalid ValuedMorphologicalTree");
     }
 
     const auto backendAttributes = toBackend(attributes);
@@ -218,7 +218,7 @@ py::array computeSingleAttributeTyped(
     morphology::NodeIdSpace outputSpace)
 {
     if (!tree) {
-        throw py::value_error("invalid WeightedMorphologicalTree");
+        throw py::value_error("invalid ValuedMorphologicalTree");
     }
 
     auto [attributeNames, buffer] =

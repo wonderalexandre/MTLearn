@@ -134,7 +134,7 @@ private:
     static morphology::WeightedTreePtr requireTree(morphology::WeightedTreePtr tree)
     {
         if (!tree) {
-            throw py::value_error("invalid WeightedMorphologicalTree");
+            throw py::value_error("invalid ValuedMorphologicalTree");
         }
         return tree;
     }
@@ -153,7 +153,7 @@ private:
     {
         return require1DFloatingArray<Real>(
             std::move(attribute),
-            topology().getNumInternalNodeSlots(),
+            topology().numInternalNodeSlots(),
             argumentName);
     }
 
@@ -266,12 +266,12 @@ private:
 
     void requireNodeCriterion(const std::vector<bool>& criterion, std::string_view argumentName) const
     {
-        requireVectorSize(criterion, static_cast<std::size_t>(topology().getNumInternalNodeSlots()), argumentName);
+        requireVectorSize(criterion, static_cast<std::size_t>(topology().numInternalNodeSlots()), argumentName);
     }
 
     void requireNodeScores(const std::vector<float>& scores, std::string_view argumentName) const
     {
-        requireVectorSize(scores, static_cast<std::size_t>(topology().getNumInternalNodeSlots()), argumentName);
+        requireVectorSize(scores, static_cast<std::size_t>(topology().numInternalNodeSlots()), argumentName);
     }
 
     morphology::WeightedTreePtr tree_;

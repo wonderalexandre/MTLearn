@@ -27,7 +27,7 @@ inline void init_ConnectedFilterPreprocessingTreeTensors(py::module& m)
         R"pbdoc(Stateless tensor extractors used by CFP layer implementations.
 
 These helpers expose residues, sparse Jacobians, and traversal metadata for a
-``WeightedMorphologicalTree``. They are primarily implementation support for
+``ValuedMorphologicalTree``. They are primarily implementation support for
 ``mtlearn.layers``.
 )pbdoc")
         .def_static(

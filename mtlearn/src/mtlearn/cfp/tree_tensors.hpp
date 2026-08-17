@@ -31,17 +31,17 @@ public:
     static torch::Tensor getResidues(morphology::WeightedTreePtr weightedTree)
     {
         if (!weightedTree) {
-            throw std::invalid_argument("Invalid WeightedMorphologicalTree");
+            throw std::invalid_argument("Invalid ValuedMorphologicalTree");
         }
 
         const auto& tree = morphology::detail::topology(*weightedTree);
-        const int numNodes = tree.getNumInternalNodeSlots();
+        const int numNodes = tree.numInternalNodeSlots();
         float* residues = new float[numNodes];
 
         // Only live nodes have meaningful residues. The array keeps backend
         // node ids as direct tensor indices so Python code can index without a
         // remapping table.
-        for (morphology::NodeId nodeId : tree.getAliveNodeIds()) {
+        for (morphology::NodeId nodeId : tree.aliveNodeIds()) {
             residues[nodeId] = morphology::residue(*weightedTree, nodeId);
         }
 
@@ -54,20 +54,20 @@ public:
     static torch::Tensor getJacobian(morphology::WeightedTreePtr weightedTree)
     {
         if (!weightedTree) {
-            throw std::invalid_argument("Invalid WeightedMorphologicalTree");
+            throw std::invalid_argument("Invalid ValuedMorphologicalTree");
         }
 
         const auto& tree = morphology::detail::topology(*weightedTree);
         std::vector<int64_t> rowIndices;
         std::vector<int64_t> colIndices;
-        const auto imageSize = tree.getNumRowsOfImage() * tree.getNumColsOfImage();
+        const auto imageSize = tree.numRows() * tree.numColumns();
 
         // A node contributes to every pixel covered by its complete subtree.
         // The explicit-Jacobian implementation uses this matrix to reconstruct
         // pixels from filtered node residues.
-        for (morphology::NodeId nodeId : tree.getAliveNodeIds()) {
-            for (morphology::NodeId subtreeNodeId : tree.getNodeSubtree(nodeId)) {
-                for (int pixel : tree.getProperParts(subtreeNodeId)) {
+        for (morphology::NodeId nodeId : tree.aliveNodeIds()) {
+            for (morphology::NodeId subtreeNodeId : tree.subtreeNodes(nodeId)) {
+                for (int pixel : tree.properPart(subtreeNodeId)) {
                     rowIndices.push_back(nodeId);
                     colIndices.push_back(pixel);
                 }
@@ -77,7 +77,7 @@ public:
         return toSparseCooTensor(
             rowIndices,
             colIndices,
-            tree.getNumInternalNodeSlots(),
+            tree.numInternalNodeSlots(),
             imageSize
         );
     }
@@ -89,15 +89,15 @@ public:
     static std::list<torch::Tensor> getInfoForJacobian(morphology::WeightedTreePtr weightedTree)
     {
         if (!weightedTree) {
-            throw std::invalid_argument("Invalid WeightedMorphologicalTree");
+            throw std::invalid_argument("Invalid ValuedMorphologicalTree");
         }
         const auto& tree = morphology::detail::topology(*weightedTree);
-        if (tree.getNumNodes() == 0) {
-            throw std::runtime_error("WeightedMorphologicalTree is empty.");
+        if (tree.numNodes() == 0) {
+            throw std::runtime_error("ValuedMorphologicalTree is empty.");
         }
 
-        const int numNodes = tree.getNumInternalNodeSlots();
-        const int numPixels = tree.getNumRowsOfImage() * tree.getNumColsOfImage();
+        const int numNodes = tree.numInternalNodeSlots();
+        const int numPixels = tree.numRows() * tree.numColumns();
 
         auto opts_i64 = torch::TensorOptions().dtype(torch::kInt64).requires_grad(false);
         auto opts_f32 = torch::TensorOptions().dtype(torch::kFloat32).requires_grad(false);
@@ -121,16 +121,16 @@ public:
         for (morphology::NodeId nodeId = 0; nodeId < numNodes; ++nodeId) {
             if (tree.isAlive(nodeId)) {
                 residuesPtr[nodeId] = morphology::residue(*weightedTree, nodeId);
-                preOrderPtr[nodeId] = static_cast<int64_t>(tree.getNodeTimePreOrder(nodeId));
-                postOrderPtr[nodeId] = static_cast<int64_t>(tree.getNodeTimePostOrder(nodeId));
-                parentPtr[nodeId] = static_cast<int64_t>(tree.getNodeParent(nodeId));
+                preOrderPtr[nodeId] = static_cast<int64_t>(tree.dfsEntryIndex(nodeId));
+                postOrderPtr[nodeId] = static_cast<int64_t>(tree.dfsExitIndex(nodeId));
+                parentPtr[nodeId] = static_cast<int64_t>(tree.parent(nodeId));
             }
         }
 
         // nodeOfPixel is the final gather map used to reconstruct image pixels
         // from node-level filtered residues.
         for (int pixel = 0; pixel < numPixels; ++pixel) {
-            nodeOfPixelPtr[pixel] = static_cast<int64_t>(tree.getProperPartOwner(pixel));
+            nodeOfPixelPtr[pixel] = static_cast<int64_t>(tree.smallestNode(pixel));
         }
 
         std::list<torch::Tensor> result;

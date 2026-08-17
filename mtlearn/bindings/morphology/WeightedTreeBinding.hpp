@@ -37,8 +37,8 @@ inline std::vector<int> collectPixelsOfConnectedComponent(
     morphology::NodeId nodeId)
 {
     std::vector<int> pixels;
-    for (morphology::NodeId subtreeNodeId : tree.getNodeSubtree(nodeId)) {
-        for (int properPart : tree.getProperParts(subtreeNodeId)) {
+    for (morphology::NodeId subtreeNodeId : tree.subtreeNodes(nodeId)) {
+        for (int properPart : tree.properPart(subtreeNodeId)) {
             pixels.push_back(properPart);
         }
     }
@@ -54,7 +54,7 @@ inline py::array_t<uint8_t> reconstructNode(const morphology::detail::TreeTopolo
         throw std::invalid_argument("invalid NodeId for reconstruction");
     }
 
-    auto image = mmcfilters::ImageUInt8::create(tree.getNumRowsOfImage(), tree.getNumColsOfImage());
+    auto image = mmcfilters::ImageUInt8::create(tree.numRows(), tree.numColumns());
     image->fill(0);
     for (int pixel : collectPixelsOfConnectedComponent(tree, nodeId)) {
         (*image)[pixel] = 255;
@@ -87,143 +87,143 @@ inline void bindCoreMorphologyEnums(py::module& m)
 }
 
 // Attach topology, traversal, and mutation methods to the Python
-// WeightedMorphologicalTree class. Multiple naming styles are intentionally
+// ValuedMorphologicalTree class. Multiple naming styles are intentionally
 // preserved because notebooks historically used camelCase and snake_case.
 template <class PyClass>
 void bindWeightedTreeQueries(PyClass& cls)
 {
     cls.def_property_readonly("numInternalNodeSlots", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getNumInternalNodeSlots();
+            return morphology::detail::topology(self).numInternalNodeSlots();
         }, "Number of backend node slots used by node-indexed arrays.")
         .def_property_readonly("numTotalProperParts", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getNumTotalProperParts();
+            return morphology::detail::topology(self).numPixels();
         }, "Number of proper parts, normally matching the number of image pixels.")
         .def_property_readonly("numHigraNodes", [](morphology::WeightedTree& self) {
             return morphology::detail::topology(self).getNumHigraNodes();
         }, "Number of nodes in the exported Higra-compatible hierarchy.")
         .def("getRoot", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getRoot();
+            return morphology::detail::topology(self).root();
         }, "Return the root node id.")
         .def_property_readonly("root", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getRoot();
+            return morphology::detail::topology(self).root();
         }, "Root node id.")
         .def_property_readonly("numFreeNodeSlots", [](morphology::WeightedTree& self) {
             return morphology::detail::topology(self).getNumFreeNodeSlots();
         }, "Number of inactive node slots currently held by the backend.")
         .def_property_readonly("numLeafNodes", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getNumLeafNodes();
+            return morphology::detail::topology(self).numLeafNodes();
         }, "Number of live leaf nodes.")
         .def("getAliveNodeIds", [](morphology::WeightedTree& self) {
-            return collectNodeIds(morphology::detail::topology(self).getAliveNodeIds());
+            return collectNodeIds(morphology::detail::topology(self).aliveNodeIds());
         }, "Return live node ids in the morphology-tree node-id space.")
         .def_property_readonly("aliveNodeIds", [](morphology::WeightedTree& self) {
-            return collectNodeIds(morphology::detail::topology(self).getAliveNodeIds());
+            return collectNodeIds(morphology::detail::topology(self).aliveNodeIds());
         }, "Live node ids in the morphology-tree node-id space.")
         .def_property_readonly("alive_node_ids", [](morphology::WeightedTree& self) {
-            return collectNodeIds(morphology::detail::topology(self).getAliveNodeIds());
+            return collectNodeIds(morphology::detail::topology(self).aliveNodeIds());
         }, "Live node ids in the morphology-tree node-id space.")
         .def("getLeafNodeIds", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getLeaves();
+            return morphology::detail::topology(self).leaves();
         }, "Return live leaf-node ids.")
         .def_property_readonly("leafNodeIds", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getLeaves();
+            return morphology::detail::topology(self).leaves();
         }, "Live leaf-node ids.")
         .def_property_readonly("leaf_node_ids", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getLeaves();
+            return morphology::detail::topology(self).leaves();
         }, "Live leaf-node ids.")
         .def("getChildren", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getChildren(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).children(nodeId));
         }, "nodeId"_a, "Return direct children of ``nodeId``.")
         .def("childrenOf", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getChildren(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).children(nodeId));
         }, "nodeId"_a, "Alias for ``getChildren``.")
         .def("children_of", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getChildren(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).children(nodeId));
         }, "nodeId"_a, "Alias for ``getChildren``.")
         .def("getNodeNumDescendants", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeNumDescendants(nodeId);
+            return morphology::detail::topology(self).numDescendants(nodeId);
         }, "nodeId"_a)
         .def("getNodeNumSiblings", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeNumSiblings(nodeId);
+            return morphology::detail::topology(self).numSiblings(nodeId);
         }, "nodeId"_a)
         .def("getNumProperParts", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNumProperParts(nodeId);
+            return morphology::detail::topology(self).properPartCardinality(nodeId);
         }, "nodeId"_a)
         .def("getNodeTimePreOrder", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeTimePreOrder(nodeId);
+            return morphology::detail::topology(self).dfsEntryIndex(nodeId);
         }, "nodeId"_a)
         .def("getNodeTimePostOrder", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeTimePostOrder(nodeId);
+            return morphology::detail::topology(self).dfsExitIndex(nodeId);
         }, "nodeId"_a)
         .def("getProperParts", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getProperParts(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).properPart(nodeId));
         }, "nodeId"_a, "Return proper parts owned directly by ``nodeId``.")
         .def("properPartsOf", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getProperParts(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).properPart(nodeId));
         }, "nodeId"_a, "Alias for ``getProperParts``.")
         .def("proper_parts_of", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getProperParts(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).properPart(nodeId));
         }, "nodeId"_a, "Alias for ``getProperParts``.")
         .def("reconstructNode", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
             return reconstructNode(morphology::detail::topology(self), nodeId);
         }, "nodeId"_a, "Return a uint8 mask for the connected component represented by ``nodeId``.")
         .def("getPostOrderNodes", [](morphology::WeightedTree& self, std::optional<morphology::NodeId> rootNodeId) {
             return rootNodeId.has_value()
-                ? collectNodeIds(morphology::detail::topology(self).getPostOrderNodes(*rootNodeId))
-                : collectNodeIds(morphology::detail::topology(self).getPostOrderNodes());
+                ? collectNodeIds(morphology::detail::topology(self).postOrder(*rootNodeId))
+                : collectNodeIds(morphology::detail::topology(self).postOrder());
         }, "rootNodeId"_a = std::nullopt)
         .def("getIteratorBreadthFirstTraversal", [](morphology::WeightedTree& self, std::optional<morphology::NodeId> rootNodeId) {
             return rootNodeId.has_value()
-                ? collectNodeIds(morphology::detail::topology(self).getIteratorBreadthFirstTraversal(*rootNodeId))
-                : collectNodeIds(morphology::detail::topology(self).getIteratorBreadthFirstTraversal());
+                ? collectNodeIds(morphology::detail::topology(self).breadthFirstTraversal(*rootNodeId))
+                : collectNodeIds(morphology::detail::topology(self).breadthFirstTraversal());
         }, "rootNodeId"_a = std::nullopt)
         .def("getPathToRootNodes", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getPathToRootNodes(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).ancestors(nodeId));
         }, "nodeId"_a, "Return the path from ``nodeId`` to the root.")
         .def("getPathBetweenNodes", [](morphology::WeightedTree& self, morphology::NodeId sourceNodeId, morphology::NodeId targetNodeId) {
             return collectNodeIds(morphology::detail::topology(self).getPathBetweenNodes(sourceNodeId, targetNodeId));
         }, "sourceNodeId"_a, "targetNodeId"_a, "Return the tree path between two nodes.")
         .def("getNodeSubtree", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getNodeSubtree(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).subtreeNodes(nodeId));
         }, "nodeId"_a, "Return nodes in the subtree rooted at ``nodeId``.")
         .def("nodeSubtreeOf", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getNodeSubtree(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).subtreeNodes(nodeId));
         }, "nodeId"_a, "Alias for ``getNodeSubtree``.")
         .def("node_subtree_of", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getNodeSubtree(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).subtreeNodes(nodeId));
         }, "nodeId"_a, "Alias for ``getNodeSubtree``.")
         .def("getDescendants", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getDescendants(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).descendants(nodeId));
         }, "nodeId"_a, "Return descendants of ``nodeId``.")
         .def("descendantsOf", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getDescendants(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).descendants(nodeId));
         }, "nodeId"_a, "Alias for ``getDescendants``.")
         .def("descendants_of", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return collectNodeIds(morphology::detail::topology(self).getDescendants(nodeId));
+            return collectNodeIds(morphology::detail::topology(self).descendants(nodeId));
         }, "nodeId"_a, "Alias for ``getDescendants``.")
         .def("getNodeParent", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeParent(nodeId);
+            return morphology::detail::topology(self).parent(nodeId);
         }, "nodeId"_a, "Return the parent node id for ``nodeId``.")
         .def("parentOf", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeParent(nodeId);
+            return morphology::detail::topology(self).parent(nodeId);
         }, "nodeId"_a, "Alias for ``getNodeParent``.")
         .def("parent_of", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNodeParent(nodeId);
+            return morphology::detail::topology(self).parent(nodeId);
         }, "nodeId"_a, "Alias for ``getNodeParent``.")
         .def("getProperPartOwner", [](morphology::WeightedTree& self, int pixelId) {
-            return morphology::detail::topology(self).getProperPartOwner(pixelId);
+            return morphology::detail::topology(self).smallestNode(pixelId);
         }, "pixelId"_a, "Return the node that owns a flattened image pixel/proper part.")
         .def("properPartOwnerOf", [](morphology::WeightedTree& self, int pixelId) {
-            return morphology::detail::topology(self).getProperPartOwner(pixelId);
+            return morphology::detail::topology(self).smallestNode(pixelId);
         }, "pixelId"_a, "Alias for ``getProperPartOwner``.")
         .def("proper_part_owner_of", [](morphology::WeightedTree& self, int pixelId) {
-            return morphology::detail::topology(self).getProperPartOwner(pixelId);
+            return morphology::detail::topology(self).smallestNode(pixelId);
         }, "pixelId"_a, "Alias for ``getProperPartOwner``.")
         .def("getHigraNodeId", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
             return morphology::detail::topology(self).getHigraNodeId(nodeId);
         }, "nodeId"_a)
         .def("getNumChildren", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).getNumChildren(nodeId);
+            return morphology::detail::topology(self).numChildren(nodeId);
         }, "nodeId"_a)
         .def("getFirstChild", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
             return morphology::detail::topology(self).getFirstChild(nodeId);
@@ -271,13 +271,13 @@ void bindWeightedTreeQueries(PyClass& cls)
             return morphology::detail::topology(self).getTreeOfShapesMaxTreeAdjacencyRadius();
         })
         .def_property_readonly("numRows", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getNumRowsOfImage();
+            return morphology::detail::topology(self).numRows();
         }, "Number of rows in the source image.")
         .def_property_readonly("numCols", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getNumColsOfImage();
+            return morphology::detail::topology(self).numColumns();
         }, "Number of columns in the source image.")
         .def_property_readonly("numNodes", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getNumNodes();
+            return morphology::detail::topology(self).numNodes();
         }, "Number of live morphology-tree nodes.")
         .def("getAltitude", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
             return self.getAltitude(nodeId);
@@ -312,7 +312,7 @@ inline void bindWeightedTree(py::module& m)
 {
     auto weightedTree = py::class_<morphology::WeightedTree, morphology::WeightedTreePtr>(
         m,
-        "WeightedMorphologicalTree",
+        "ValuedMorphologicalTree",
         py::module_local(),
         R"pbdoc(Native weighted morphology-tree handle returned by ``mtlearn.morphology``.
 
