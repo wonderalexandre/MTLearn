@@ -35,7 +35,6 @@ inline const std::vector<morphology::Attribute>& allAttributes()
         morphology::Attribute::AREA,
         morphology::Attribute::VOLUME,
         morphology::Attribute::RELATIVE_VOLUME,
-        morphology::Attribute::LEVEL,
         morphology::Attribute::GRAY_HEIGHT,
         morphology::Attribute::MEAN_LEVEL,
         morphology::Attribute::VARIANCE_LEVEL,
@@ -318,8 +317,6 @@ Returns:
         .value("AREA", morphology::Attribute::AREA)
         .value("VOLUME", morphology::Attribute::VOLUME)
         .value("RELATIVE_VOLUME", morphology::Attribute::RELATIVE_VOLUME)
-        .value("LEVEL", morphology::Attribute::LEVEL)
-        .value("ALTITUDE", morphology::Attribute::LEVEL)
         .value("GRAY_HEIGHT", morphology::Attribute::GRAY_HEIGHT)
         .value("MEAN_LEVEL", morphology::Attribute::MEAN_LEVEL)
         .value("VARIANCE_LEVEL", morphology::Attribute::VARIANCE_LEVEL)

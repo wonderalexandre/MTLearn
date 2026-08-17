@@ -266,7 +266,8 @@ inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
         return mmcfilters::Attribute::Volume;
     case morphology::Attribute::RELATIVE_VOLUME:
         return mmcfilters::Attribute::RelativeVolume;
-    // PENDING(decisao): Attribute::LEVEL nao tem correspondente no enum novo.
+    // The backend dropped the plain node-altitude attribute, so the facade no
+    // longer publishes LEVEL/ALTITUDE either.
     case morphology::Attribute::GRAY_HEIGHT:
         return mmcfilters::Attribute::GrayLevelHeight;
     case morphology::Attribute::MEAN_LEVEL:
@@ -403,7 +404,6 @@ inline morphology::Attribute fromBackend(mmcfilters::Attribute attribute)
     MTLEARN_FROM_BACKEND_ATTRIBUTE(Area, AREA);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(Volume, VOLUME);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(RelativeVolume, RELATIVE_VOLUME);
-    // PENDING(decisao): Attribute::LEVEL nao tem correspondente no enum novo.
     MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelHeight, GRAY_HEIGHT);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(MeanGrayLevel, MEAN_LEVEL);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelVariance, VARIANCE_LEVEL);

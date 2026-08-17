@@ -158,7 +158,7 @@ def _assert_all_attributes_finite(image: np.ndarray, label: str):
             assert values.dtype == np.dtype(dtype), f"{label}: {tree_name}: expected {dtype}"
             assert values.shape == (tree.numInternalNodeSlots, len(layout))
             assert "ECCENTRICITY" in layout
-            assert "BITQUADS_CIRCULARITY" in layout
+            assert "BITQUAD_CIRCULARITY" in layout
             assert "MAX_DIST" in layout
 
             examples = _non_finite_examples(values, layout)
@@ -193,7 +193,7 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         infinity_seed_col=0,
     )
 
-    assert tree.treeType == 2
+    assert tree.treeType == 3
     assert tree.hasTreeOfShapesAdjacencyPolicy is True
     assert tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.0
     assert tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.5
@@ -204,7 +204,7 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
     )
 
-    assert enum_tree.treeType == 2
+    assert enum_tree.treeType == 3
     assert enum_tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.5
     assert enum_tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.0
 
@@ -364,10 +364,10 @@ def test_attribute_filter_accepts_float64_attributes():
 def test_attribute_filter_extinction_methods():
     image = _small_image()
     tree = morphology.create_max_tree(image)
-    level = morphology.compute_single_attribute(tree, morphology.AttributeType.LEVEL)
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_LEVEL)
     level64 = morphology.compute_single_attribute(
         tree,
-        morphology.AttributeType.LEVEL,
+        morphology.AttributeType.MEAN_LEVEL,
         dtype=np.float64,
     )
     attribute_filter = morphology.create_attribute_filter(tree)
@@ -400,7 +400,7 @@ def test_attribute_filter_extinction_methods():
 
 def test_attribute_filter_extinction_validates_inputs():
     tree = morphology.create_max_tree(_small_image())
-    level = morphology.compute_single_attribute(tree, morphology.AttributeType.LEVEL)
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_LEVEL)
     attribute_filter = morphology.create_attribute_filter(tree)
 
     with pytest.raises(ValueError, match="attr must have length"):
@@ -434,7 +434,7 @@ def test_attribute_filter_extinction_validates_inputs():
     tos_attribute_filter = morphology.create_attribute_filter(tos)
     tos_attr = np.ones(tos.numInternalNodeSlots, dtype=np.float32)
 
-    with pytest.raises(ValueError, match="defined only for MAX_TREE and MIN_TREE"):
+    with pytest.raises(ValueError, match="requires a globally monotone altitude order"):
         tos_attribute_filter.filteringByExtinctionValue(tos_attr, extrema_to_keep=1)
 
 

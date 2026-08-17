@@ -70,7 +70,6 @@ enum class Attribute {
     AREA,                         ///< Component area.
     VOLUME,                       ///< Component volume.
     RELATIVE_VOLUME,              ///< Volume relative to its parent context.
-    LEVEL,                        ///< Node gray-level altitude.
     GRAY_HEIGHT,                  ///< Gray-level height.
     MEAN_LEVEL,                   ///< Mean gray-level value.
     VARIANCE_LEVEL,               ///< Gray-level variance.

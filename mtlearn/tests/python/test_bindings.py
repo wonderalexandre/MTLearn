@@ -268,7 +268,6 @@ def test_morphology_facade_computes_attributes_and_filters():
     assert not hasattr(morphology.AttributeGroup, "GEOMETRIC")
     assert morphology.TreeType.MAX_TREE.value == "max-tree"
     assert morphology.normalize_tree_type(morphology.TreeType.TREE_OF_SHAPES) == "tree-of-shapes"
-    assert morphology.AttributeType.ALTITUDE == morphology.AttributeType.LEVEL
     assert hasattr(morphology.AttributeType, "CONTOUR_PERIMETER")
     boundary_attributes = morphology.expand_attribute_group(morphology.AttributeGroup.BOUNDARY)
     assert morphology.AttributeType.BITQUADS_AREA in boundary_attributes
