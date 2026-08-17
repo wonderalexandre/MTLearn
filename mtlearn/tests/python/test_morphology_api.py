@@ -392,24 +392,10 @@ def test_attribute_filter_extinction_methods():
         level,
         min_extinction=float(np.finfo(level.dtype).max),
     )
-    saliency = attribute_filter.saliencyMapByExtinctionValue(
-        level,
-        extrema_to_keep=1024,
-    )
-    saliency64 = attribute_filter.saliencyMapByExtinctionValue(
-        level64,
-        min_extinction=float(np.finfo(level64.dtype).max),
-        unweighted=False,
-    )
-
     assert np.array_equal(filtered_keep_all, reconstructed)
     assert np.array_equal(filtered_value_keep_all, reconstructed)
     assert np.array_equal(filtered_value_keep_all_positional, reconstructed)
     assert np.array_equal(strongest_by_value, strongest_by_rank)
-    assert saliency.shape == image.shape
-    assert saliency.dtype == np.float32
-    assert saliency64.shape == image.shape
-    assert saliency64.dtype == np.float64
 
 
 def test_attribute_filter_extinction_validates_inputs():

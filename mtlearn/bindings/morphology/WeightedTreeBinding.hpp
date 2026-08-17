@@ -11,10 +11,32 @@
 #include "BindingSupport.hpp"
 
 #include <optional>
+#include <stdexcept>
+#include <variant>
 #include <vector>
 
 namespace mtlearn {
 namespace morphology_pybind {
+
+// The tree-of-shapes adjacency radii used to be plain accessors on the tree.
+// They now live inside the retained topographic convention, which keeps the
+// resolved complementary adjacencies whenever the immersion is a complementary
+// grid. A self-dual span immersion carries no adjacency pair at all.
+inline double treeOfShapesAdjacencyRadius(morphology::WeightedTree& tree, bool minimum)
+{
+    const auto* convention = morphology::detail::topology(tree).topographicConvention();
+    if (convention == nullptr) {
+        throw std::invalid_argument("tree was not built as a tree of shapes");
+    }
+
+    const auto* grid = std::get_if<mmcfilters::ComplementaryGridImmersion>(&convention->immersion);
+    if (grid == nullptr) {
+        throw std::invalid_argument("tree-of-shapes immersion carries no complementary adjacencies");
+    }
+
+    return minimum ? grid->complementaryAdjacencies.minAdjacency.getRadius()
+                   : grid->complementaryAdjacencies.maxAdjacency.getRadius();
+}
 
 // Convert backend traversal ranges into Python-friendly vectors. Backend
 // iterators are often lightweight views, so bindings materialize them before
@@ -235,7 +257,7 @@ void bindWeightedTreeQueries(PyClass& cls)
             return morphology::detail::topology(self).isNode(nodeId);
         }, "nodeId"_a, "Return whether ``nodeId`` is a topology node slot.")
         .def("isProperPart", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
-            return morphology::detail::topology(self).isProperPart(nodeId);
+            return morphology::detail::topology(self).isPixel(nodeId);
         }, "nodeId"_a, "Return whether the id is a proper-part/pixel slot.")
         .def("isAlive", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
             return morphology::detail::topology(self).isAlive(nodeId);
@@ -255,20 +277,24 @@ void bindWeightedTreeQueries(PyClass& cls)
         .def("mergeNodeIntoParent", [](morphology::WeightedTree& self, morphology::NodeId nodeId) {
             self.mergeNodeIntoParent(nodeId);
         }, "nodeId"_a, "Merge ``nodeId`` into its parent in place.")
+        // The backend replaced the flat tree-type enum and the two loose radii
+        // with a declared semantics record and a typed topographic convention.
+        // These accessors keep the previous Python shape by reading the new
+        // models here.
         .def_property_readonly("treeType", [](morphology::WeightedTree& self) {
-            return static_cast<int>(morphology::detail::topology(self).getTreeType());
+            return static_cast<int>(morphology::detail::topology(self).semantics().kind);
         })
         .def_property_readonly("hasAdjacencyRelation", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).hasAdjacencyRelation();
+            return morphology::detail::topology(self).sharedAdjacencyContext() != nullptr;
         })
         .def_property_readonly("hasTreeOfShapesAdjacencyPolicy", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).hasTreeOfShapesAdjacencyPolicy();
+            return morphology::detail::topology(self).topographicConvention() != nullptr;
         })
         .def("getTreeOfShapesMinTreeAdjacencyRadius", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getTreeOfShapesMinTreeAdjacencyRadius();
+            return treeOfShapesAdjacencyRadius(self, /*minimum=*/true);
         })
         .def("getTreeOfShapesMaxTreeAdjacencyRadius", [](morphology::WeightedTree& self) {
-            return morphology::detail::topology(self).getTreeOfShapesMaxTreeAdjacencyRadius();
+            return treeOfShapesAdjacencyRadius(self, /*minimum=*/false);
         })
         .def_property_readonly("numRows", [](morphology::WeightedTree& self) {
             return morphology::detail::topology(self).numRows();

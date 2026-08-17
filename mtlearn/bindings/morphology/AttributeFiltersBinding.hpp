@@ -9,11 +9,15 @@
 #include "BindingSupport.hpp"
 
 #include <mmcfilters/filters/AttributeFilters.hpp>
+#include <mmcfilters/filters/AttributeReconstructionFilters.hpp>
 #include <mmcfilters/filters/ExtinctionValues.hpp>
+#include <mmcfilters/filters/NodeDecisionMasks.hpp>
 
 #include <cmath>
 #include <concepts>
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -60,7 +64,7 @@ public:
     py::array_t<uint8_t> filteringMin(std::vector<bool> criterion)
     {
         requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(filter_.filteringByPruningMin(criterion));
+        return imageToNumpy(filter_.filteringByPruningMin(mmcfilters::NodePreservationMask(std::move(criterion))));
     }
 
     py::array_t<uint8_t> filteringMax(py::array attribute, double threshold)
@@ -74,33 +78,34 @@ public:
     py::array_t<uint8_t> filteringMax(std::vector<bool> criterion)
     {
         requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(filter_.filteringByPruningMax(criterion));
+        return imageToNumpy(filter_.filteringByPruningMax(mmcfilters::NodePreservationMask(std::move(criterion))));
     }
 
     py::array_t<uint8_t> filteringDirectRule(std::vector<bool> criterion)
     {
         requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(filter_.filteringByDirectRule(criterion));
+        return imageToNumpy(mmcfilters::applyDirectAttributeFilter(
+            morphology::detail::backend(*tree_),
+            mmcfilters::NodePreservationMask(std::move(criterion))));
     }
 
-    py::array_t<uint8_t> filteringSubtractiveRule(std::vector<bool> criterion)
+    // The hard subtractive rule can produce residues outside the source range,
+    // so the backend publishes them in the wider signed altitude-difference type
+    // and mtlearn exposes that type unchanged rather than saturating it.
+    py::array_t<std::int64_t> filteringSubtractiveRule(std::vector<bool> criterion)
     {
         requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(filter_.filteringBySubtractiveRule(criterion));
+        return imageToNumpy(mmcfilters::applyHardSubtractiveAttributeFilter(
+            morphology::detail::backend(*tree_),
+            mmcfilters::NodePreservationMask(std::move(criterion))));
     }
 
     py::array_t<float> filteringSubtractiveScoreRule(std::vector<float> scores)
     {
         requireNodeScores(scores, "scores");
-        return imageToNumpy(filter_.filteringBySubtractiveScoreRule(scores));
-    }
-
-    // Adaptive criteria are returned as std::vector<bool> because the backend
-    // naturally operates on node-level boolean masks.
-    std::vector<bool> getAdaptiveCriterion(std::vector<bool> criterion, int delta)
-    {
-        requireNodeCriterion(criterion, "criterion");
-        return filter_.getAdaptiveCriterion(criterion, delta);
+        return imageToNumpy(mmcfilters::applySoftSubtractiveAttributeFilter<std::uint8_t, float>(
+            morphology::detail::backend(*tree_),
+            std::span<const float>(scores)));
     }
 
     py::array_t<uint8_t> filteringByExtinctionValue(
@@ -113,19 +118,6 @@ public:
             return filteringByExtinctionValueTyped<double>(std::move(attribute), selection);
         }
         return filteringByExtinctionValueTyped<float>(std::move(attribute), selection);
-    }
-
-    py::array saliencyMapByExtinctionValue(
-        py::array attribute,
-        py::object minExtinction,
-        bool unweighted,
-        py::object extremaToKeep)
-    {
-        const ExtinctionSelection selection = parseExtinctionSelection(std::move(minExtinction), std::move(extremaToKeep));
-        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
-            return saliencyMapByExtinctionValueTyped<double>(std::move(attribute), selection, unweighted);
-        }
-        return saliencyMapByExtinctionValueTyped<float>(std::move(attribute), selection, unweighted);
     }
 
 private:
@@ -200,19 +192,6 @@ private:
         }
     }
 
-    template <std::floating_point Real>
-    static int countExtremaAtLeast(mmcfilters::ExtinctionValues<std::uint8_t, Real>& extinction, double minExtinction)
-    {
-        int extremaToKeep = 0;
-        for (const auto& record : extinction.getExtinctionValues()) {
-            if (static_cast<double>(record.extinction) < minExtinction) {
-                break;
-            }
-            ++extremaToKeep;
-        }
-        return extremaToKeep;
-    }
-
     static ExtinctionSelection parseExtinctionSelection(py::object minExtinction, py::object extremaToKeep)
     {
         const bool hasMinExtinction = !minExtinction.is_none();
@@ -236,33 +215,24 @@ private:
             threshold};
     }
 
+    // The backend selection policy carries both modes natively, so the facade no
+    // longer walks the extrema to turn a minimum extinction into a count.
     template <std::floating_point Real>
-    static int resolveExtremaToKeep(
-        mmcfilters::ExtinctionValues<std::uint8_t, Real>& extinction,
-        const ExtinctionSelection& selection)
+    static mmcfilters::ExtinctionSelectionPolicy<Real> toSelectionPolicy(const ExtinctionSelection& selection)
     {
         if (selection.mode == ExtinctionSelectionMode::ExtremaToKeep) {
-            return selection.extremaToKeep;
+            return mmcfilters::ExtinctionSelectionPolicy<Real>::byTopK(selection.extremaToKeep);
         }
-        return countExtremaAtLeast(extinction, selection.minExtinction);
+        return mmcfilters::ExtinctionSelectionPolicy<Real>::byThreshold(static_cast<Real>(selection.minExtinction));
     }
 
     template <std::floating_point Real>
     py::array_t<uint8_t> filteringByExtinctionValueTyped(py::array attribute, const ExtinctionSelection& selection)
     {
         auto extinction = makeExtinctionValues<Real>(std::move(attribute));
-        return imageToNumpy(extinction.filtering(resolveExtremaToKeep(extinction, selection)));
+        return imageToNumpy(extinction.filtering(toSelectionPolicy<Real>(selection)));
     }
 
-    template <std::floating_point Real>
-    py::array saliencyMapByExtinctionValueTyped(
-        py::array attribute,
-        const ExtinctionSelection& selection,
-        bool unweighted)
-    {
-        auto extinction = makeExtinctionValues<Real>(std::move(attribute));
-        return imageToNumpy(extinction.saliencyMap(resolveExtremaToKeep(extinction, selection), unweighted));
-    }
 
     void requireNodeCriterion(const std::vector<bool>& criterion, std::string_view argumentName) const
     {
@@ -321,24 +291,12 @@ or node scores and return reconstructed NumPy images. Create instances through
             &AttributeFiltersPybind::filteringSubtractiveScoreRule,
             "scores"_a,
             "Apply the backend subtractive score rule and return a float image.")
-        .def("getAdaptiveCriterion",
-            &AttributeFiltersPybind::getAdaptiveCriterion,
-            "criterion"_a,
-            "delta"_a,
-            "Expand a node criterion with the backend adaptive-criterion rule.")
         .def("filteringByExtinctionValue",
             &AttributeFiltersPybind::filteringByExtinctionValue,
             "attr"_a,
             "min_extinction"_a = py::none(),
             "extrema_to_keep"_a = py::none(),
-            "Filter by keeping extrema selected either by ``min_extinction`` or ``extrema_to_keep``.")
-        .def("saliencyMapByExtinctionValue",
-            &AttributeFiltersPybind::saliencyMapByExtinctionValue,
-            "attr"_a,
-            "min_extinction"_a = py::none(),
-            "unweighted"_a = false,
-            "extrema_to_keep"_a = py::none(),
-            "Build a contour saliency map from extrema selected either by ``min_extinction`` or ``extrema_to_keep``.");
+            "Filter by keeping extrema selected either by ``min_extinction`` or ``extrema_to_keep``.");
 }
 
 } // namespace morphology_pybind
