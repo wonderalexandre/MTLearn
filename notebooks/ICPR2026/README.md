@@ -7,6 +7,13 @@ This document supports the **Reproducible Research in Pattern Recognition (RRPR)
   Passat, Anderson H. R. Souza, Dennis J. Silva, Yukiko Kenmochi,
   *ICPR 2026, Lyon, France* (`hal-05575141`).
 
+<p>
+  <a href="https://iapr-tc22-rrl.github.io/icpr2026/results/"><img src="RRPR_badge.svg" alt="ICPR 2026 RRPR reproducibility badge" width="110" align="left" hspace="14" vspace="4" /></a>
+  <b>Reproducibility badge.</b> This work was awarded the ICPR 2026 reproducibility badge by the
+  IAPR TC22 Reproducible Research Label initiative. Full evaluation results are published at
+  <a href="https://iapr-tc22-rrl.github.io/icpr2026/results/">iapr-tc22-rrl.github.io/icpr2026/results</a>.
+</p>
+
 Its scope is reviewer-centric: provide the minimum, complete steps to reproduce the reported paper results from the same artifacts used in the evaluation campaign.
 
 ## Purpose and Scope
