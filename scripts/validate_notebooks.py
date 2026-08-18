@@ -17,8 +17,6 @@ GRADCHECK_NOTEBOOKS = (
     "notebooks/gradchecks/GradCheck_Implicit_Jacobian.ipynb",
 )
 
-SCREWS_EXAMPLE_NOTEBOOK = "notebooks/experiments/CFP_linear_vs_mlp_scoring_screws_filtering.ipynb"
-
 
 @dataclass(frozen=True)
 class NotebookRun:
@@ -117,11 +115,12 @@ def read_notebook(path: Path) -> nbformat.NotebookNode:
 
 
 def write_smoke_notebook(
-    source: Path,
     cells: list[nbformat.NotebookNode],
     destination: Path,
 ) -> Path:
-    nb = read_notebook(source)
+    # The smoke cells replace the notebook body entirely, so build a fresh
+    # notebook instead of borrowing one from the repository.
+    nb = nbformat.v4.new_notebook()
     nb.cells = cells
     nb.metadata.setdefault(
         "kernelspec",
@@ -184,7 +183,6 @@ def make_screws_example_smoke(
     smoke_dir: Path,
     output_dir: Path,
 ) -> NotebookRun:
-    source = repo_root / SCREWS_EXAMPLE_NOTEBOOK
     cells = [
         source_cell(
             "import numpy as np\n"
@@ -213,8 +211,8 @@ def make_screws_example_smoke(
         ),
         facade_assertion_cell("screws example smoke"),
     ]
-    smoke_input = smoke_dir / "CFP_linear_vs_mlp_scoring_screws_filtering_smoke.ipynb"
-    write_smoke_notebook(source, cells, smoke_input)
+    smoke_input = smoke_dir / "screws_example_smoke.ipynb"
+    write_smoke_notebook(cells, smoke_input)
     return NotebookRun(
         source=smoke_input,
         output=output_dir / "experiments" / smoke_input.name,
