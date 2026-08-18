@@ -109,8 +109,13 @@ Meaning of generated files:
 Use a clean environment (`venv` or `conda`) with Python `>=3.9`.
 The RRPR reference environment used Python `3.12`.
 
+**Validated version.** The reproduction campaign in this guide was validated
+against MTLearn `v1.1.0`. The notebooks target the current API and do not run on
+`1.0.x`, whose attribute vocabulary and CFP layer arguments differ. To reproduce
+against the validated state, check out the tag:
+
 ```bash
-git clone --recurse-submodules https://github.com/wonderalexandre/MTLearn.git
+git clone --recurse-submodules --branch v1.1.0 https://github.com/wonderalexandre/MTLearn.git
 cd MTLearn
 python -m pip install -U pip
 python scripts/install_release_dependencies.py --build-tools
