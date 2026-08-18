@@ -1,8 +1,8 @@
 Datasets
 ========
 
-``mtlearn.datasets`` contains PyTorch dataset helpers for image-pair and
-attribute-filter experiments.
+``mtlearn.datasets`` contains PyTorch helpers for paired image datasets and
+datasets that generate targets from input images with a callable.
 
 .. automodule:: mtlearn.datasets
    :members:

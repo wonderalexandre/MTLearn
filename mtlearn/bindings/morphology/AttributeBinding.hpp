@@ -35,7 +35,6 @@ inline const std::vector<morphology::Attribute>& allAttributes()
         morphology::Attribute::AREA,
         morphology::Attribute::VOLUME,
         morphology::Attribute::RELATIVE_VOLUME,
-        morphology::Attribute::LEVEL,
         morphology::Attribute::GRAY_HEIGHT,
         morphology::Attribute::MEAN_LEVEL,
         morphology::Attribute::VARIANCE_LEVEL,
@@ -181,7 +180,7 @@ std::pair<py::dict, py::array> computeAttributesTyped(
     morphology::NodeIdSpace outputSpace)
 {
     if (!tree) {
-        throw py::value_error("invalid WeightedMorphologicalTree");
+        throw py::value_error("invalid ValuedMorphologicalTree");
     }
 
     const auto backendAttributes = toBackend(attributes);
@@ -218,7 +217,7 @@ py::array computeSingleAttributeTyped(
     morphology::NodeIdSpace outputSpace)
 {
     if (!tree) {
-        throw py::value_error("invalid WeightedMorphologicalTree");
+        throw py::value_error("invalid ValuedMorphologicalTree");
     }
 
     auto [attributeNames, buffer] =
@@ -318,17 +317,21 @@ Returns:
         .value("AREA", morphology::Attribute::AREA)
         .value("VOLUME", morphology::Attribute::VOLUME)
         .value("RELATIVE_VOLUME", morphology::Attribute::RELATIVE_VOLUME)
-        .value("LEVEL", morphology::Attribute::LEVEL)
-        .value("ALTITUDE", morphology::Attribute::LEVEL)
         .value("GRAY_HEIGHT", morphology::Attribute::GRAY_HEIGHT)
+        .value("GRAY_LEVEL_HEIGHT", morphology::Attribute::GRAY_HEIGHT)  // alias: vocabulario novo do backend
         .value("MEAN_LEVEL", morphology::Attribute::MEAN_LEVEL)
+        .value("MEAN_GRAY_LEVEL", morphology::Attribute::MEAN_LEVEL)  // alias: vocabulario novo do backend
         .value("VARIANCE_LEVEL", morphology::Attribute::VARIANCE_LEVEL)
+        .value("GRAY_LEVEL_VARIANCE", morphology::Attribute::VARIANCE_LEVEL)  // alias: vocabulario novo do backend
         .value("BOX_WIDTH", morphology::Attribute::BOX_WIDTH)
         .value("BOX_HEIGHT", morphology::Attribute::BOX_HEIGHT)
+        .value("BOUNDING_BOX_HEIGHT", morphology::Attribute::BOX_HEIGHT)  // alias: vocabulario novo do backend
         .value("RECTANGULARITY", morphology::Attribute::RECTANGULARITY)
         .value("DIAGONAL_LENGTH", morphology::Attribute::DIAGONAL_LENGTH)
         .value("BOX_COL_MIN", morphology::Attribute::BOX_COL_MIN)
+        .value("BOX_COLUMN_MIN", morphology::Attribute::BOX_COL_MIN)  // alias: vocabulario novo do backend
         .value("BOX_COL_MAX", morphology::Attribute::BOX_COL_MAX)
+        .value("BOX_COLUMN_MAX", morphology::Attribute::BOX_COL_MAX)  // alias: vocabulario novo do backend
         .value("BOX_ROW_MIN", morphology::Attribute::BOX_ROW_MIN)
         .value("BOX_ROW_MAX", morphology::Attribute::BOX_ROW_MAX)
         .value("RATIO_WH", morphology::Attribute::RATIO_WH)
@@ -354,6 +357,7 @@ Returns:
         .value("HU_MOMENT_6", morphology::Attribute::HU_MOMENT_6)
         .value("HU_MOMENT_7", morphology::Attribute::HU_MOMENT_7)
         .value("HEIGHT_NODE", morphology::Attribute::HEIGHT_NODE)
+        .value("SUBTREE_HEIGHT", morphology::Attribute::HEIGHT_NODE)  // alias: vocabulario novo do backend
         .value("DEPTH_NODE", morphology::Attribute::DEPTH_NODE)
         .value("IS_LEAF_NODE", morphology::Attribute::IS_LEAF_NODE)
         .value("IS_ROOT_NODE", morphology::Attribute::IS_ROOT_NODE)
@@ -365,14 +369,23 @@ Returns:
         .value("BALANCE_NODE", morphology::Attribute::BALANCE_NODE)
         .value("AVG_CHILD_HEIGHT_NODE", morphology::Attribute::AVG_CHILD_HEIGHT_NODE)
         .value("BITQUADS_AREA", morphology::Attribute::BITQUADS_AREA)
+        .value("BITQUAD_AREA", morphology::Attribute::BITQUADS_AREA)  // alias: vocabulario novo do backend
         .value("BITQUADS_NUMBER_EULER", morphology::Attribute::BITQUADS_NUMBER_EULER)
+        .value("BITQUAD_NUMBER_EULER", morphology::Attribute::BITQUADS_NUMBER_EULER)  // alias: vocabulario novo do backend
         .value("BITQUADS_NUMBER_HOLES", morphology::Attribute::BITQUADS_NUMBER_HOLES)
+        .value("BITQUAD_NUMBER_HOLES", morphology::Attribute::BITQUADS_NUMBER_HOLES)  // alias: vocabulario novo do backend
         .value("BITQUADS_PERIMETER", morphology::Attribute::BITQUADS_PERIMETER)
+        .value("BITQUAD_PERIMETER", morphology::Attribute::BITQUADS_PERIMETER)  // alias: vocabulario novo do backend
         .value("BITQUADS_PERIMETER_CONTINUOUS", morphology::Attribute::BITQUADS_PERIMETER_CONTINUOUS)
+        .value("BITQUAD_PERIMETER_CONTINUOUS", morphology::Attribute::BITQUADS_PERIMETER_CONTINUOUS)  // alias: vocabulario novo do backend
         .value("BITQUADS_CIRCULARITY", morphology::Attribute::BITQUADS_CIRCULARITY)
+        .value("BITQUAD_CIRCULARITY", morphology::Attribute::BITQUADS_CIRCULARITY)  // alias: vocabulario novo do backend
         .value("BITQUADS_PERIMETER_AVERAGE", morphology::Attribute::BITQUADS_PERIMETER_AVERAGE)
+        .value("BITQUAD_PERIMETER_AVERAGE", morphology::Attribute::BITQUADS_PERIMETER_AVERAGE)  // alias: vocabulario novo do backend
         .value("BITQUADS_LENGTH_AVERAGE", morphology::Attribute::BITQUADS_LENGTH_AVERAGE)
+        .value("BITQUAD_LENGTH_AVERAGE", morphology::Attribute::BITQUADS_LENGTH_AVERAGE)  // alias: vocabulario novo do backend
         .value("BITQUADS_WIDTH_AVERAGE", morphology::Attribute::BITQUADS_WIDTH_AVERAGE)
+        .value("BITQUAD_WIDTH_AVERAGE", morphology::Attribute::BITQUADS_WIDTH_AVERAGE)  // alias: vocabulario novo do backend
         .value("MAX_DIST", morphology::Attribute::MAX_DIST)
         .value("CONTOUR_PIXELS", morphology::Attribute::CONTOUR_PIXELS)
         .value("CONTOUR_PERIMETER", morphology::Attribute::CONTOUR_PERIMETER)

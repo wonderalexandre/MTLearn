@@ -70,7 +70,6 @@ enum class Attribute {
     AREA,                         ///< Component area.
     VOLUME,                       ///< Component volume.
     RELATIVE_VOLUME,              ///< Volume relative to its parent context.
-    LEVEL,                        ///< Node gray-level altitude.
     GRAY_HEIGHT,                  ///< Gray-level height.
     MEAN_LEVEL,                   ///< Mean gray-level value.
     VARIANCE_LEVEL,               ///< Gray-level variance.
@@ -217,15 +216,19 @@ public:
 
     /// Build a tree of shapes from a 2D uint8 image.
     ///
-    /// The infinity seed controls backend boundary handling and should normally
-    /// remain at the default unless the caller needs exact compatibility with a
-    /// previous experiment.
+    /// The infinity seed is the pixel the backend floods from, expressed in the
+    /// coordinates of `image` itself; mtlearn converts it to the interpolated
+    /// domain. It should normally remain at the default unless the caller needs
+    /// exact compatibility with a previous experiment.
+    ///
+    /// The tree is always built without an exterior ring, which keeps the
+    /// published altitudes on the source 8-bit lattice.
     ///
     /// @param image Non-owning image view. `image.data` must not be null and
     /// `image.rows` and `image.cols` must be positive.
     /// @param interpolation Tree-of-shapes interpolation policy.
-    /// @param infinitySeedRow Boundary infinity seed row.
-    /// @param infinitySeedCol Boundary infinity seed column.
+    /// @param infinitySeedRow Infinity seed row, in `image` coordinates.
+    /// @param infinitySeedCol Infinity seed column, in `image` coordinates.
     /// @return A weighted tree-of-shapes facade owning its backend tree.
     /// @throws std::invalid_argument if the image view is null or has invalid
     /// dimensions, or if an unknown interpolation value is supplied.

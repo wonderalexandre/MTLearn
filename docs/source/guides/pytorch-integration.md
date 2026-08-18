@@ -14,7 +14,7 @@ from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
 
 class SmallModel(torch.nn.Module):
-    def __init__(self, *, cfp_scale_mode="hybrid", cfp_device="cpu"):
+    def __init__(self, *, cfp_scale_mode="dataset_clipped_zscore01", cfp_device="cpu"):
         super().__init__()
         self.cfp = ConnectedFilterPreprocessingLayer(
             in_channels=1,
@@ -50,9 +50,9 @@ The CFP output channel count is `in_channels * len(filter_specs)`. Use
 
 ## Cache Dataset Statistics
 
-For `scale_mode="hybrid"`, build a cached DataLoader before training. The
-wrapped loader yields `((x, idx), y)` so the CFP layer can reuse tree payloads
-by stable dataset index.
+For statistical modes (`"dataset_clipped_zscore01"`, `"dataset_minmax01"`, and `"dataset_zscore"`), build a
+cached DataLoader before training. The wrapped loader yields `((x, idx), y)` so
+the CFP layer can reuse tree payloads by stable dataset index.
 
 ```python
 from torch.utils.data import DataLoader
@@ -75,12 +75,13 @@ for epoch in range(10):
         optimizer.step()
 ```
 
-If you do not use the cached loader, pass ordinary tensors to the model. This
-is useful for quick checks, but direct forward passes do not update hybrid
-dataset statistics.
+For smoke tests that intentionally avoid cached statistics, pass ordinary
+tensors to a model constructed with `scale_mode="none"`. In that mode CFP uses
+raw attribute scale, so it is a diagnostic shortcut rather than the recommended
+training path.
 
 ```python
-debug_model = SmallModel(cfp_scale_mode="minmax01")
+debug_model = SmallModel(cfp_scale_mode="none")
 logits = debug_model(torch.rand(2, 1, 32, 32))
 ```
 
@@ -152,12 +153,12 @@ evaluation.
 ```python
 model.eval()
 with torch.no_grad():
-    features = model.cfp.predict(x, beta_f=1000.0)
+    features = model.cfp.predict(x, score_sharpness=1000.0)
     logits = model.head(features)
 ```
 
-If the model was trained with cached hybrid statistics, load stats or restore a
-checkpoint before inference.
+If the model was trained with cached dataset normalization statistics, load
+stats or restore a checkpoint before inference.
 
 ```python
 model.cfp.save_stats("cfp-stats.pt")
@@ -182,7 +183,7 @@ for name, spec_report in report["specs"].items():
 
 Common issues:
 
-- `scale_mode="hybrid"` without cached or loaded stats raises at forward time.
+- Statistical `scale_mode` values without cached or loaded stats raise at forward time.
 - Reordered unnamed specs can make old checkpoints incompatible.
 - Inputs outside `[0, 1]` may be cast to uint8 directly.
 - Tree construction is CPU-side preprocessing, so very large batches can spend

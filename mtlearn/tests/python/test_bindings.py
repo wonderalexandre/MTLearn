@@ -100,32 +100,149 @@ def test_dataset_split_indices_match_expected_sizes():
     assert test_idx.tolist() == [7, 8, 9]
 
 
-def test_attribute_filter_dataset_accepts_tree_of_shapes_options(tmp_path):
+def test_paired_image_dataset_reads_matching_pairs(tmp_path):
     cv2 = pytest.importorskip("cv2")
-    from mtlearn.datasets import AttributeFilterDataset
+    from mtlearn.datasets import PairedImageDataset
 
-    img = np.array([[1, 2], [3, 4]], dtype=np.uint8)
-    path = tmp_path / "sample.png"
-    assert cv2.imwrite(str(path), img)
+    assert PairedImageDataset.__module__ == "mtlearn.datasets"
 
-    dataset = AttributeFilterDataset(
-        root=str(tmp_path),
-        tree_type="tos",
-        attributes=[morphology.AttributeType.AREA],
-        thresholds={"AREA": 0.0},
-        top_hat=True,
-        tos_interpolation="min4c-max8c",
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    target = np.array([[0, 255], [255, 0]], dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "01_in.png"), image)
+    assert cv2.imwrite(str(tmp_path / "01_target.png"), target)
+    assert cv2.imwrite(str(tmp_path / "02_in.png"), image)
+
+    dataset = PairedImageDataset(
+        str(tmp_path),
+        invert_in=True,
+        suffix_in="_in",
+        suffix_target="_target",
     )
 
-    img_in, img_out, name = dataset[0]
+    tensor_in, tensor_target, name = dataset[0]
 
-    assert dataset.tree_type == "tree-of-shapes"
-    assert dataset.tos_interpolation == morphology.ToSInterpolation.Min4cMax8c
-    assert name == "sample.png"
-    assert img_in.shape == (1, 2, 2)
-    assert img_out.shape == (1, 2, 2)
-    assert img_in.dtype == torch.float32
-    assert img_out.dtype == torch.float32
+    assert len(dataset) == 1
+    assert name == "01_in.png"
+    assert tensor_in.shape == (1, 2, 2)
+    assert tensor_target.shape == (1, 2, 2)
+    assert tensor_in.dtype == torch.float32
+    assert tensor_target.dtype == torch.float32
+    expected_in = torch.from_numpy(255 - image).to(torch.float32).unsqueeze(0) / 255.0
+    expected_target = torch.from_numpy(target).to(torch.float32).unsqueeze(0) / 255.0
+    assert torch.allclose(tensor_in, expected_in)
+    assert torch.allclose(tensor_target, expected_target)
+
+
+def test_paired_image_dataset_uses_snake_case_resize_shape(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    from mtlearn.datasets import PairedImageDataset
+
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    target = np.array([[0, 255], [255, 0]], dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "01_in.png"), image)
+    assert cv2.imwrite(str(tmp_path / "01_target.png"), target)
+
+    dataset = PairedImageDataset(
+        str(tmp_path),
+        num_rows=4,
+        num_cols=4,
+        suffix_in="_in",
+        suffix_target="_target",
+    )
+
+    tensor_in, tensor_target, _ = dataset[0]
+
+    assert dataset.num_rows == 4
+    assert dataset.num_cols == 4
+    assert tensor_in.shape == (1, 4, 4)
+    assert tensor_target.shape == (1, 4, 4)
+
+
+def test_generated_target_image_dataset_applies_callable_without_resize(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    from mtlearn.datasets import GeneratedTargetImageDataset
+
+    assert GeneratedTargetImageDataset.__module__ == "mtlearn.datasets"
+
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    ignored = np.full((2, 2), 255, dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "sample_in.png"), image)
+    assert cv2.imwrite(str(tmp_path / "sample_target.png"), ignored)
+
+    dataset = GeneratedTargetImageDataset(
+        str(tmp_path),
+        target_fn=lambda img: np.where(img > 127, 255, 0).astype(np.uint8),
+        suffix_in="_in",
+    )
+
+    tensor_in, tensor_target, name = dataset[0]
+
+    assert len(dataset) == 1
+    assert name == "sample_in.png"
+    assert dataset.num_rows is None
+    assert dataset.num_cols is None
+    assert tensor_in.shape == (1, 2, 2)
+    assert tensor_target.shape == (1, 2, 2)
+    assert tensor_in.dtype == torch.float32
+    assert tensor_target.dtype == torch.float32
+    assert 0.0 <= float(tensor_in.min()) <= float(tensor_in.max()) <= 1.0
+    assert set(torch.unique(tensor_target).tolist()).issubset({0.0, 1.0})
+
+
+def test_generated_target_image_dataset_uses_optional_resize(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    from mtlearn.datasets import GeneratedTargetImageDataset
+
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "sample_in.png"), image)
+
+    dataset = GeneratedTargetImageDataset(
+        str(tmp_path),
+        target_fn=lambda img: np.where(img > 127, 255, 0).astype(np.uint8),
+        num_rows=4,
+        num_cols=4,
+        suffix_in="_in",
+    )
+
+    tensor_in, tensor_target, _ = dataset[0]
+
+    assert dataset.num_rows == 4
+    assert dataset.num_cols == 4
+    assert tensor_in.shape == (1, 4, 4)
+    assert tensor_target.shape == (1, 4, 4)
+
+
+def test_datasets_reject_partial_resize_shape(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    from mtlearn.datasets import GeneratedTargetImageDataset, PairedImageDataset
+
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    assert cv2.imwrite(str(tmp_path / "sample_in.png"), image)
+    assert cv2.imwrite(str(tmp_path / "sample_target.png"), image)
+
+    with pytest.raises(ValueError, match="num_rows and num_cols"):
+        PairedImageDataset(
+            str(tmp_path),
+            num_rows=4,
+            suffix_in="_in",
+            suffix_target="_target",
+        )
+
+    with pytest.raises(ValueError, match="num_rows and num_cols"):
+        GeneratedTargetImageDataset(
+            str(tmp_path),
+            target_fn=lambda img: img,
+            num_cols=4,
+            suffix_in="_in",
+        )
+
+
+def test_attribute_filter_dataset_is_not_public():
+    import mtlearn.datasets as datasets
+
+    assert "AttributeFilterDataset" not in datasets.__all__
+    with pytest.raises(AttributeError):
+        getattr(datasets, "AttributeFilterDataset")
 
 
 def test_build_tree_returns_weighted_tree_for_supported_types():
@@ -151,7 +268,6 @@ def test_morphology_facade_computes_attributes_and_filters():
     assert not hasattr(morphology.AttributeGroup, "GEOMETRIC")
     assert morphology.TreeType.MAX_TREE.value == "max-tree"
     assert morphology.normalize_tree_type(morphology.TreeType.TREE_OF_SHAPES) == "tree-of-shapes"
-    assert morphology.AttributeType.ALTITUDE == morphology.AttributeType.LEVEL
     assert hasattr(morphology.AttributeType, "CONTOUR_PERIMETER")
     boundary_attributes = morphology.expand_attribute_group(morphology.AttributeGroup.BOUNDARY)
     assert morphology.AttributeType.BITQUADS_AREA in boundary_attributes
@@ -225,29 +341,41 @@ def test_connected_filter_preprocessing_tree_tensors_have_consistent_shapes():
 
 
 def test_connected_filter_preprocessing_public_aliases():
-    assert mtlearn.layers.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
-    assert (
-        mtlearn.layers.CFPLayerWithExplicitJacobian
-        is mtlearn.layers.ConnectedFilterPreprocessingLayerWithExplicitJacobian
+    from mtlearn.layers.cfp.runtime import (
+        ConnectedFilterPreprocessingImplicitJacobianFunction,
+        TreeReconstructionFunction,
     )
-    assert (
-        mtlearn.layers.CFPExplicitJacobianFunction
-        is mtlearn.layers.ConnectedFilterPreprocessingExplicitJacobianFunction
-    )
-    assert (
-        mtlearn.layers.CFPLayerWithCPUTreeTraversal
-        is mtlearn.layers.ConnectedFilterPreprocessingLayerWithCPUTreeTraversal
-    )
-    assert mtlearn.layers.CFPLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
-    assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingLayerLegacy")
-    assert hasattr(mtlearn.layers, "CFPValuation")
-    assert hasattr(mtlearn.layers.CFPValuation, "ALTITUDE")
-    assert hasattr(mtlearn.layers.CFPValuation, "ALTITUDE_TOPHAT")
+
+    assert mtlearn.layers.cfp.ConnectedFilterPreprocessingLayer is mtlearn.layers.ConnectedFilterPreprocessingLayer
+    assert not hasattr(mtlearn.layers, "CFPLayer")
+    assert not hasattr(mtlearn.layers.cfp, "CFPLayer")
+    assert hasattr(mtlearn.layers.cfp, "LinearSigmoidScorer")
+    assert not hasattr(mtlearn.layers.cfp, "LayerOwnedLinearParameterInitializer")
+    assert not hasattr(mtlearn.layers.cfp, "LegacyLinearParameterInitializer")
+    assert hasattr(mtlearn.layers.cfp, "PathScoreMonotonicityRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "AttributeOrderScoreMonotonicityRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "EdgeScoreMonotonicityRegularizer")
+    assert not hasattr(mtlearn.layers.cfp, "AncestorConsistencyRegularizer")
+    assert not hasattr(mtlearn.layers.cfp, "AttributeOrderMonotonicityRegularizer")
+    assert not hasattr(mtlearn.layers.cfp, "MonotoneScoresRegularizer")
+    assert hasattr(mtlearn.layers.cfp, "PreserveRootConstraint")
+    assert ConnectedFilterPreprocessingImplicitJacobianFunction is mtlearn.layers.ConnectedFilterPreprocessingImplicitJacobianFunction
+    assert TreeReconstructionFunction.__name__ == "TreeReconstructionFunction"
+    assert not hasattr(mtlearn.layers.cfp, "ConnectedFilterPreprocessingImplicitJacobianFunction")
+    assert not hasattr(mtlearn.layers.cfp, "TreeReconstructionFunction")
+    assert not hasattr(mtlearn.layers, "CFPLayerWithExplicitJacobian")
+    assert not hasattr(mtlearn.layers, "CFPExplicitJacobianFunction")
+    assert not hasattr(mtlearn.layers, "CFPLayerWithCPUTreeTraversal")
+    assert not hasattr(mtlearn.layers, "ConnectedFilterPreprocessingLayerLegacy")
+    assert not hasattr(mtlearn.layers, "ConnectedFilterPreprocessingLayerWithExplicitJacobian")
+    assert not hasattr(mtlearn.layers, "ConnectedFilterPreprocessingExplicitJacobianFunction")
+    assert not hasattr(mtlearn.layers, "ConnectedFilterPreprocessingLayerWithCPUTreeTraversal")
+    assert not hasattr(mtlearn.layers, "CFPValuation")
     assert hasattr(mtlearn.layers, "collect_cfp_configs")
     assert hasattr(mtlearn.layers, "save_checkpoint")
     assert hasattr(mtlearn.layers, "load_checkpoint")
     assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingImplicitJacobianFunction")
-    assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingCPUTreeTraversalFunction")
+    assert not hasattr(mtlearn.layers, "ConnectedFilterPreprocessingCPUTreeTraversalFunction")
     assert not hasattr(mtlearn.layers, "ConnectedFilterLayerByThresholds")
     assert not hasattr(mtlearn.layers, "ConnectedFilterLayerWithImplicitJacobian")
     assert not hasattr(mtlearn.layers, "ConnectedFilterLayerWithJacobian")

@@ -12,6 +12,8 @@ examples below use the default reconstructed signal.
 
 ```python
 import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 from mtlearn import morphology
 from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
@@ -27,11 +29,16 @@ layer = ConnectedFilterPreprocessingLayer(
             ],
         },
     ],
-    scale_mode="minmax01",
 )
 
 x = torch.rand(4, 1, 32, 32)
-y = layer(x)
+dataset = TensorDataset(x, torch.zeros(len(x)))
+loader = DataLoader(dataset, batch_size=4, shuffle=False)
+cached_loader = layer.build_dataloader_cached(loader)
+
+for batch_inputs, _ in cached_loader:
+    y = layer(batch_inputs)
+
 assert y.shape == (4, 1, 32, 32)
 ```
 
@@ -69,14 +76,147 @@ filter_specs = [
 ]
 ```
 
+## Scoring Models
+
+Each spec has a scoring model that maps normalized node attributes to one score
+per tree node. The default is the layer-owned linear sigmoid gate:
+
+```python
+linear_spec = {
+    "name": "area_linear",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "scoring": {"kind": "linear_sigmoid"},
+}
+```
+
+The linear default keeps trainable parameters under `_weights.<spec_name>` and
+`_biases.<spec_name>`, which makes simple linear filters easy to inspect and
+export.
+
+Use an MLP scorer when the keep/discard criterion should combine attributes
+nonlinearly:
+
+```python
+mlp_spec = {
+    "name": "shape_mlp",
+    "tree_type": "max-tree",
+    "attributes": [
+        morphology.AttributeType.AREA,
+        morphology.AttributeType.COMPACTNESS,
+    ],
+    "scoring": {
+        "kind": "mlp",
+        "hidden_units": [8],
+        "activation": "tanh",
+    },
+}
+```
+
+MLP parameters are owned by the scorer module and appear in
+`get_parameter_contract()["scoring_models"]`.
+
+## Altitude Signal
+
+Scoring decides which nodes contribute to the reconstructed altitude-residue
+signal:
+
+```python
+altitude_spec = {
+    "name": "altitude",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+}
+```
+
+CFP does not expose alternative signal projections as a Python extension point.
+The forward signal is fixed to morphology-tree altitude residues.
+
+
+## Constraints and Regularizers
+
+Constraints post-process scores before reconstruction. The current built-in
+constraint preserves the root score:
+
+```python
+constrained_spec = {
+    "name": "preserve_root_area",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "constraints": [{"kind": "preserve_root"}],
+}
+```
+
+Regularizers add training penalties. They are not included in the inference
+contract, so changing a training regularizer does not change forward
+semantics.
+
+```python
+regularized_spec = {
+    "name": "monotone_area",
+    "tree_type": "max-tree",
+    "attributes": [morphology.AttributeType.AREA],
+    "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.1}],
+}
+
+layer = ConnectedFilterPreprocessingLayer(
+    in_channels=1,
+    filter_specs=[regularized_spec],
+)
+
+# Use the same batch_inputs object yielded by build_dataloader_cached(...).
+loss = task_loss + layer.regularization_penalty(batch_inputs)
+```
+
+Other registered morphological regularizers include
+`attribute_order_score_monotonicity`, which penalizes score inversions after sorting
+nodes by one normalized attribute, and `path_score_monotonicity`, which penalizes
+descendants that score higher than their ancestors.
+
+## Extension Registries
+
+The `mtlearn.layers.cfp` package exposes the default registries used by the
+layer:
+
+- `SCORING_MODEL_REGISTRY` for `ScoringModel` factories;
+- `SCORE_CONSTRAINT_REGISTRY` for score post-processing constraints;
+- `REGULARIZER_REGISTRY` for training penalties.
+
+Register a new component kind by implementing the matching CFP interface and a
+factory that accepts serializable config fields. Specs can then reference
+registry-backed scoring models, constraints, and regularizers with
+`{"kind": "your_kind", ...}`.
+
+## Configs and Contracts
+
+`get_config()` stores the architecture needed by `from_config()`. It includes
+tree type, attributes, scoring, constraints, normalization, and training-only
+regularizer settings.
+
+```python
+config = layer.get_config()
+restored = ConnectedFilterPreprocessingLayer.from_config(config)
+```
+
+Use named contracts when comparing checkpoints or exported parameters:
+
+```python
+contracts = layer.get_contracts()
+inference = contracts["inference_contract"]
+parameters = contracts["parameter_contract"]
+training = contracts["training_contract"]
+```
+
 ## Normalization and Caching
 
-The default `scale_mode` is `"hybrid"`. It uses dataset-level z-score
-statistics, clips values to `[-hybrid_k, hybrid_k]`, and rescales them into a
-positive interval controlled by `hybrid_floor_a`.
+The default `scale_mode` is `"dataset_clipped_zscore01"`. It uses dataset-level z-score
+statistics, clips values to `[-clipped_zscore_radius, clipped_zscore_radius]`, and rescales them into a
+positive interval controlled by `clipped_zscore_floor`.
 
-For `"hybrid"`, call `build_dataloader_cached` or `load_stats` before normal
-forward passes.
+For statistical modes (`"dataset_clipped_zscore01"`, `"dataset_minmax01"`, and `"dataset_zscore"`), fit or
+load normalization statistics before normal forward passes. Use
+`build_dataloader_cached` on the training split to estimate statistics and
+precompute tree payloads.
 
 ```python
 from torch.utils.data import DataLoader
@@ -88,26 +228,26 @@ for (x, idx), target in cached_loader:
     y = layer((x, idx))
 ```
 
-For quick experiments that should not require a stats prepass, use
-`scale_mode="minmax01"`, `"zscore_tree"`, or `"none"`.
+For smoke tests or diagnostics that intentionally avoid a stats prepass, use
+`scale_mode="none"` explicitly. In this mode, the scorer receives raw
+attributes and the caller is responsible for their scale. Do not use this as
+the default training setup for attribute-comparable experiments.
 
 ```python
 debug_layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
     filter_specs=filter_specs,
-    scale_mode="minmax01",
+    scale_mode="none",
 )
 ```
 
 ## Initialization
 
-Two helpers initialize filters close to identity.
+Initialize scoring models close to identity when CFP should start by preserving
+the input image.
 
 ```python
-layer.init_identity_with_bias(p0=0.995)
-
-# Alternative for hybrid-normalized attributes with positive floor.
-layer.init_identity_bias_zero(p0=0.99)
+layer.init_identity(p0=0.995)
 ```
 
 Use an identity-like initialization when CFP is placed before a pretrained or
@@ -117,13 +257,13 @@ block is meant to discover strong filtering behavior from scratch.
 ## Inference
 
 `predict` temporarily switches to evaluation mode, runs without gradients, and
-uses a caller-provided sigmoid gain. A large `beta_f` makes gates closer to
-hard decisions.
+uses a caller-provided score sharpness. A large `score_sharpness` makes gates
+closer to hard decisions.
 
 ```python
 with torch.no_grad():
     y_soft = layer(x)
-    y_hard = layer.predict(x, beta_f=1000.0)
+    y_hard = layer.predict(x, score_sharpness=1000.0)
 ```
 
 ## Inspect One Sample
@@ -149,7 +289,6 @@ Dataset statistics are separate from ordinary model weights.
 layer.save_stats("cfp-stats.pt")
 layer.load_stats("cfp-stats.pt")
 
-weights, biases = layer.get_params()
 layer.export_params("cfp-params.pt")
 ```
 

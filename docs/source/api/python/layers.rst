@@ -2,9 +2,7 @@ Layers
 ======
 
 The primary trainable preprocessing layer is
-``ConnectedFilterPreprocessingLayer``. Reference and legacy implementations are
-documented as compatibility surfaces, but new experiments should prefer the
-primary layer.
+``ConnectedFilterPreprocessingLayer``.
 
 Primary CFP Layer
 -----------------
@@ -21,18 +19,3 @@ Checkpoint Helpers
 .. autofunction:: mtlearn.layers.save_checkpoint
 
 .. autofunction:: mtlearn.layers.load_checkpoint
-
-Reference Implementations
--------------------------
-
-.. autoclass:: mtlearn.layers.ConnectedFilterPreprocessingLayerLegacy
-   :members:
-   :show-inheritance:
-
-.. autoclass:: mtlearn.layers.ConnectedFilterPreprocessingLayerWithExplicitJacobian
-   :members:
-   :show-inheritance:
-
-.. autoclass:: mtlearn.layers.ConnectedFilterPreprocessingLayerWithCPUTreeTraversal
-   :members:
-   :show-inheritance:

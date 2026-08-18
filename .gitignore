@@ -16,6 +16,7 @@ htmlcov/
 .vscode/
 anaconda_projects/
 /dat/
+/downloads/
 /notebooks/icpr2016/
 /notebooks/ICPR2026_runs/
 /notebooks/.ipynb_checkpoints

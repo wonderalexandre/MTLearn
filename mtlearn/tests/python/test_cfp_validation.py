@@ -11,12 +11,11 @@ except Exception as exc:  # pragma: no cover
     pytest.skip(f"PyTorch unavailable: {exc}", allow_module_level=True)
 
 from mtlearn import morphology
-from mtlearn.layers import (
-    CFPValuation,
-    ConnectedFilterPreprocessingLayer,
-    ConnectedFilterPreprocessingLayerLegacy,
-)
-from mtlearn.layers._helpers import IndexedDatasetWrapper, deserialize_ds_stats
+from mtlearn.layers import cfp
+from mtlearn.layers import ConnectedFilterPreprocessingLayer
+from mtlearn.layers.cfp.runtime import CFPContext
+from mtlearn.layers.cfp.serialization import ConfigSerializer
+from mtlearn.layers._helpers import IndexedDatasetWrapper
 
 pytestmark = pytest.mark.integration
 
@@ -138,14 +137,13 @@ def test_constructor_rejects_invalid_attribute_dtype():
         )
 
 
-def test_attribute_dtype_controls_cached_attributes_and_valuations():
+def test_attribute_dtype_controls_cached_attributes():
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
             {
                 "tree_type": morphology.TreeType.MAX_TREE,
                 "attributes": (morphology.AttributeType.AREA,),
-                "valuation": CFPValuation.node_attribute(morphology.AttributeType.AREA),
             }
         ],
         device="cpu",
@@ -159,7 +157,7 @@ def test_attribute_dtype_controls_cached_attributes_and_valuations():
 
     assert inspected["base_attrs"].dtype == torch.float64
     assert inspected["norm_attrs"].dtype == torch.float64
-    assert inspected["valuation_increments"].dtype == torch.float64
+    assert inspected["altitude_increments"].dim() == 1
     assert output.dtype == torch.float32
 
 
@@ -201,7 +199,7 @@ def test_constructor_rejects_duplicate_filter_spec_names():
         )
 
 
-def test_constructor_rejects_removed_clamp_logits_parameter():
+def test_constructor_rejects_unknown_keyword_parameter():
     with pytest.raises(TypeError, match="clamp_logits"):
         ConnectedFilterPreprocessingLayer(
             in_channels=1,
@@ -342,13 +340,613 @@ def test_tree_of_shapes_forward_accepts_boundary_attributes():
     assert output.shape == (1, 2, 3, 3)
 
 
-def test_filter_spec_defaults_to_filtered_altitude_valuation():
+def test_filter_spec_defaults_to_filtered_altitude_signal():
     layer = _single_area_layer()
 
-    assert layer.filter_specs[0].valuation == CFPValuation.ALTITUDE
+    assert isinstance(layer.filter_specs[0].scoring_model, cfp.LinearSigmoidScorer)
+    assert layer.get_config()["filter_specs"][0]["scoring"] == {"kind": "linear_sigmoid"}
 
 
-def test_filter_specs_can_mix_tree_types_and_valuations():
+@pytest.mark.parametrize(
+    ("unsupported_key", "value"),
+    [
+        ("beta_f", 4.0),
+        ("monotonicity_weight", 0.25),
+        ("output_mode", "tophat"),
+        ("preserve_root", True),
+        ("valuation", "altitude"),
+    ],
+)
+def test_filter_spec_rejects_unsupported_keys(unsupported_key, value):
+    with pytest.raises(ValueError, match=f"unsupported filter spec key\\(s\\): {unsupported_key}"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    unsupported_key: value,
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+        )
+
+
+def test_filter_spec_accepts_explicit_linear_sigmoid_scoring_config():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "scoring": {"kind": "linear_sigmoid"},
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+
+    assert isinstance(layer.filter_specs[0].scoring_model, cfp.LinearSigmoidScorer)
+    assert restored.get_config() == layer.get_config()
+
+
+def test_filter_spec_accepts_mlp_scoring_config_and_registers_model_parameters():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "mlp_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (
+                    morphology.AttributeType.AREA,
+                    morphology.AttributeType.COMPACTNESS,
+                ),
+                "scoring": {
+                    "kind": "mlp",
+                    "hidden_units": [4],
+                    "activation": "tanh",
+                },
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    output = layer(image)
+    output.mean().backward()
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+    state_keys = set(layer.state_dict())
+    parameter_contract = layer.get_parameter_contract()
+
+    assert output.shape == (1, 1, 3, 3)
+    assert isinstance(layer.filter_specs[0].scoring_model, cfp.MLPScorer)
+    assert layer.get_config()["filter_specs"][0]["scoring"] == {
+        "kind": "mlp",
+        "hidden_units": [4],
+        "activation": "tanh",
+    }
+    assert restored.get_config() == layer.get_config()
+    assert set(layer._weights) == set()
+    assert set(layer._biases) == set()
+    assert "_weights.mlp_area" not in state_keys
+    assert "_biases.mlp_area" not in state_keys
+    assert any(key.startswith("_scoring_models.mlp_area.network") for key in state_keys)
+    assert parameter_contract["weights"] == {}
+    assert parameter_contract["biases"] == {}
+    assert "mlp_area" in parameter_contract["scoring_models"]
+    gradients = [parameter.grad for parameter in layer._scoring_models["mlp_area"].parameters()]
+    assert all(gradient is not None for gradient in gradients)
+    assert all(torch.isfinite(gradient).all() for gradient in gradients)
+
+
+def test_filter_spec_score_sharpness_controls_scoring_gain_and_roundtrips():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "soft_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "score_sharpness": 1.0,
+            },
+            {
+                "name": "sharp_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "score_sharpness": 4.0,
+            },
+        ],
+        device="cpu",
+        scale_mode="none",
+        score_sharpness=2.0,
+    )
+    info = {"tpre": torch.tensor([0, 1], dtype=torch.long)}
+    norm_attrs = {morphology.AttributeType.AREA: torch.ones(2, dtype=torch.float32)}
+    with torch.no_grad():
+        layer._weights["soft_area"].fill_(1.0)
+        layer._biases["soft_area"].zero_()
+        layer._weights["sharp_area"].fill_(1.0)
+        layer._biases["sharp_area"].zero_()
+
+    soft_scores = layer._score_nodes(
+        layer.filter_specs[0],
+        info,
+        norm_attrs,
+        layer._score_sharpness_for_spec(layer.filter_specs[0]),
+    )
+    sharp_scores = layer._score_nodes(
+        layer.filter_specs[1],
+        info,
+        norm_attrs,
+        layer._score_sharpness_for_spec(layer.filter_specs[1]),
+    )
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+
+    assert layer.filter_specs[0].score_sharpness == pytest.approx(1.0)
+    assert layer.filter_specs[1].score_sharpness == pytest.approx(4.0)
+    assert torch.allclose(soft_scores, torch.full((2,), torch.sigmoid(torch.tensor(1.0)).item()))
+    assert torch.allclose(sharp_scores, torch.full((2,), torch.sigmoid(torch.tensor(4.0)).item()))
+    assert layer.get_config()["filter_specs"][1]["score_sharpness"] == 4.0
+    assert restored.get_config() == layer.get_config()
+
+
+def test_layer_delegates_identity_initialization_to_scoring_models():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "linear_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "score_sharpness": 2.0,
+            },
+            {
+                "name": "mlp_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "scoring": {"kind": "mlp", "hidden_units": [2], "activation": "tanh"},
+                "score_sharpness": 4.0,
+            },
+        ],
+        device="cpu",
+        scale_mode="none",
+        score_sharpness=1.0,
+    )
+    features = torch.tensor([[0.0], [1.0]], dtype=torch.float32)
+
+    skipped = layer.init_identity(p0=0.8)
+    linear_scores = layer._scoring_models["linear_area"](
+        features,
+        weight=layer._weights["linear_area"],
+        bias=layer._biases["linear_area"],
+        score_sharpness=layer.filter_specs[0].score_sharpness,
+    )
+    mlp_scores = layer._scoring_models["mlp_area"](features, score_sharpness=layer.filter_specs[1].score_sharpness)
+
+    assert skipped == ()
+    assert torch.allclose(linear_scores, torch.full((2,), 0.8))
+    assert torch.allclose(mlp_scores, torch.full((2,), 0.8), atol=1e-3)
+
+
+def test_layer_identity_initialization_reports_unsupported_custom_scorer():
+    class NoIdentityScorer(cfp.ScoringModel):
+        def __init__(self):
+            super().__init__()
+            self.num_features = 1
+
+        def forward(self, features, tree_info=None, context=None, **kwargs):
+            return torch.ones(features.size(0), dtype=features.dtype, device=features.device)
+
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "custom_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "scoring": NoIdentityScorer(),
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+
+    with pytest.raises(NotImplementedError, match="custom_area"):
+        layer.init_identity()
+    assert layer.init_identity(strict=False) == ("custom_area",)
+
+
+def test_custom_scoring_model_receives_cfp_context():
+    class RecordingScorer(cfp.ScoringModel):
+        def __init__(self):
+            super().__init__()
+            self.num_features = 1
+            self.bias = torch.nn.Parameter(torch.zeros(1))
+            self.contexts = []
+
+        def forward(self, features, tree_info=None, context=None, **kwargs):
+            self.contexts.append(context)
+            return torch.sigmoid(features[:, 0] * 0.0 + self.bias)
+
+        def to_config(self):
+            return {"kind": "recording"}
+
+    scorer = RecordingScorer()
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "context_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "scoring": scorer,
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    image = torch.tensor(
+        [[[[0.0, 0.2], [0.8, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    layer(image)
+
+    assert len(scorer.contexts) == 1
+    context = scorer.contexts[0]
+    assert isinstance(context, CFPContext)
+    assert context.sample_key == "0_0"
+    assert context.batch_index == 0
+    assert context.channel_index == 0
+    assert context.mode == "forward"
+    assert context.spec_name == "context_area"
+    assert context.spec_index == 0
+    assert context.tree_type == morphology.TreeType.MAX_TREE
+    assert context.tree_key == layer.filter_specs[0].tree_key
+    assert context.attribute_types == (morphology.AttributeType.AREA,)
+    assert context.attribute_names == ("AREA",)
+    assert context.image_shape == (2, 2)
+    assert context.normalization_mode == "none"
+    assert context.score_sharpness == pytest.approx(layer.filter_specs[0].score_sharpness)
+    assert context.is_training is True
+    assert morphology.AttributeType.AREA in context.raw_attributes
+    assert morphology.AttributeType.AREA in context.normalized_attributes
+
+
+def test_filter_spec_rejects_unknown_scoring_config():
+    with pytest.raises(ValueError, match="scoring model"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "scoring": {"kind": "unknown"},
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+        )
+
+
+def test_filter_spec_accepts_declarative_constraints_and_regularizers():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "regularized_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "constraints": [{"kind": "preserve_root"}],
+                "regularizers": [{"kind": "edge_score_monotonicity", "weight": 2.0}],
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    with torch.no_grad():
+        layer._weights["regularized_area"].fill_(-4.0)
+        layer._biases["regularized_area"].zero_()
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    output = layer(image)
+    penalty = layer.regularization_penalty(image)
+    penalty.backward()
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+
+    assert output.shape == (1, 1, 3, 3)
+    assert layer.filter_specs[0].constraint_configs == ({"kind": "preserve_root"},)
+    assert layer.filter_specs[0].regularizer_configs == (
+        {"kind": "edge_score_monotonicity", "weight": 2.0},
+    )
+    assert len(layer._score_constraints["regularized_area"]) == 1
+    assert len(layer._regularizers["regularized_area"]) == 1
+    assert penalty.item() > 0.0
+    assert torch.isfinite(layer._weights["regularized_area"].grad).all()
+    assert layer.get_config()["filter_specs"][0]["constraints"] == [{"kind": "preserve_root"}]
+    assert layer.get_config()["filter_specs"][0]["regularizers"] == [
+        {"kind": "edge_score_monotonicity", "weight": 2.0}
+    ]
+    assert "regularizers" not in layer.get_inference_contract()["filter_specs"][0]
+    assert restored.get_config() == layer.get_config()
+
+
+def test_custom_regularizer_receives_rich_cfp_context():
+    class RecordingRegularizer(cfp.Regularizer):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def forward(self, scores, tree_info, features=None, context=None):
+            self.calls.append((scores, tree_info, features, context))
+            return scores.sum() * 0.0
+
+    regularizer = RecordingRegularizer()
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "context_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    layer._regularizers["context_area"] = torch.nn.ModuleList([regularizer])
+    image = torch.tensor(
+        [[[[0.0, 0.2], [0.8, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.regularization_penalty(image)
+
+    assert penalty.item() == pytest.approx(0.0)
+    assert len(regularizer.calls) == 1
+    scores, tree_info, features, context = regularizer.calls[0]
+    assert scores.dim() == 1
+    assert features.dim() == 2
+    assert isinstance(context, CFPContext)
+    assert context.sample_key == "0_0"
+    assert context.batch_index == 0
+    assert context.channel_index == 0
+    assert context.mode == "regularization_penalty"
+    assert context.spec_name == "context_area"
+    assert context.spec_index == 0
+    assert context.tree_type == morphology.TreeType.MAX_TREE
+    assert context.tree_key == layer.filter_specs[0].tree_key
+    assert context.attribute_types == (morphology.AttributeType.AREA,)
+    assert context.attribute_names == ("AREA",)
+    assert context.image_shape == (2, 2)
+    assert context.normalization_mode == "none"
+    assert context.score_sharpness == pytest.approx(layer.filter_specs[0].score_sharpness)
+    assert context.is_training is True
+    assert morphology.AttributeType.AREA in context.raw_attributes
+    assert morphology.AttributeType.AREA in context.normalized_attributes
+    assert tree_info["tree_type"] == context.tree_type
+
+
+def test_filter_spec_accepts_attribute_order_and_ancestor_regularizers():
+    regularizers = [
+        {
+            "kind": "attribute_order_score_monotonicity",
+            "weight": 0.5,
+            "feature_index": 0,
+        },
+        {
+            "kind": "path_score_monotonicity",
+            "weight": 0.25,
+            "max_depth": 2,
+        },
+    ]
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "name": "morphological_regularized_area",
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+                "regularizers": regularizers,
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    with torch.no_grad():
+        layer._weights["morphological_regularized_area"].fill_(-4.0)
+        layer._biases["morphological_regularized_area"].zero_()
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.regularization_penalty(image)
+    penalty.backward()
+    restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+
+    assert len(layer._regularizers["morphological_regularized_area"]) == 2
+    assert penalty.item() > 0.0
+    assert torch.isfinite(layer._weights["morphological_regularized_area"].grad).all()
+    assert layer.get_config()["filter_specs"][0]["regularizers"] == regularizers
+    assert "regularizers" not in layer.get_inference_contract()["filter_specs"][0]
+    assert restored.get_config() == layer.get_config()
+
+
+def test_filter_spec_rejects_unknown_constraint_and_regularizer_configs():
+    with pytest.raises(ValueError, match="constraint kind"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "constraints": [{"kind": "unknown"}],
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+        )
+
+    with pytest.raises(ValueError, match="regularizer kind"):
+        ConnectedFilterPreprocessingLayer(
+            in_channels=1,
+            filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "regularizers": [{"kind": "unknown"}],
+                }
+            ],
+            device="cpu",
+            scale_mode="none",
+        )
+
+
+def test_linear_sigmoid_scoring_uses_layer_owned_parameter_names():
+    layer = _single_area_layer()
+    state_keys = set(layer.state_dict())
+
+    assert "_weights.spec_000" in state_keys
+    assert "_biases.spec_000" in state_keys
+    assert not any(key.startswith("_scoring_models.spec_000") for key in state_keys)
+
+
+def test_cfp_package_preserves_default_layer_contract(tmp_path):
+    with pytest.raises((ModuleNotFoundError, FileNotFoundError)):
+        __import__("mtlearn.layers.ConnectedFilterPreprocessingLayer")
+
+    assert ConnectedFilterPreprocessingLayer is cfp.ConnectedFilterPreprocessingLayer
+    assert hasattr(mtlearn.layers, "ConnectedFilterPreprocessingImplicitJacobianFunction")
+    assert not hasattr(cfp, "ConnectedFilterPreprocessingImplicitJacobianFunction")
+
+    reference = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.MAX_TREE,
+                "attributes": (morphology.AttributeType.AREA,),
+            }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    restored = cfp.ConnectedFilterPreprocessingLayer.from_config(
+        reference.get_config(),
+        device="cpu",
+    )
+    restored.load_state_dict(reference.state_dict())
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    with torch.no_grad():
+        reference_output = reference(image)
+        restored_output = restored(image)
+
+    state_keys = set(reference.state_dict())
+    inference_contract = reference.get_inference_contract()
+    first_filter_contract = inference_contract["filter_specs"][0]
+    export_path = tmp_path / "default_params.pt"
+
+    reference.export_params(export_path)
+    payload = torch.load(export_path, map_location="cpu", weights_only=True)
+
+    assert torch.allclose(restored_output, reference_output)
+    assert "_weights.spec_000" in state_keys
+    assert "_biases.spec_000" in state_keys
+    assert not any(key.startswith("_scoring_models.spec_000") for key in state_keys)
+    assert "regularizers" not in first_filter_contract
+    assert "monotonicity_weight" not in first_filter_contract
+    assert "preserve_root" not in first_filter_contract
+    assert payload["weights"]["spec_000"].shape == torch.Size([1])
+    assert payload["biases"]["spec_000"].shape == torch.Size([1])
+    assert payload["inference_contract"] == inference_contract
+    assert payload["contracts"]["inference_contract"] == reference.get_inference_contract()
+
+
+def test_regularization_penalty_defaults_to_zero_without_building_payload():
+    layer = _single_area_layer()
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.regularization_penalty(image)
+
+    assert penalty.item() == 0.0
+    assert penalty.requires_grad
+    assert layer.cached_sample_count() == 0
+
+
+def test_regularization_penalty_is_positive_and_backpropagates_when_enabled():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "regularizers": [{"kind": "edge_score_monotonicity", "weight": 2.0}],
+                }
+        ],
+        device="cpu",
+        scale_mode="none",
+    )
+    with torch.no_grad():
+        layer._weights["spec_000"].fill_(-4.0)
+        layer._biases["spec_000"].zero_()
+    image = torch.tensor(
+        [[[[0.0, 0.2, 0.9], [0.1, 0.8, 0.3], [0.4, 0.7, 1.0]]]],
+        dtype=torch.float32,
+    )
+
+    penalty = layer.regularization_penalty(image)
+    penalty.backward()
+
+    assert penalty.item() > 0.0
+    assert torch.isfinite(layer._weights["spec_000"].grad).all()
+    assert torch.isfinite(layer._biases["spec_000"].grad).all()
+    assert layer._weights["spec_000"].grad.abs().sum().item() > 0.0
+
+
+def test_preserve_root_keeps_constant_image_when_enabled():
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+                {
+                    "tree_type": morphology.TreeType.MAX_TREE,
+                    "attributes": (morphology.AttributeType.AREA,),
+                    "constraints": [{"kind": "preserve_root"}],
+                }
+        ],
+        device="cpu",
+        scale_mode="none",
+        score_sharpness=1.0,
+        clamp=None,
+    )
+    with torch.no_grad():
+        layer._weights["spec_000"].zero_()
+        layer._biases["spec_000"].zero_()
+    image = torch.full((1, 1, 2, 2), 7.0, dtype=torch.float32)
+
+    output = layer(image)
+
+    assert layer.filter_specs[0].constraint_configs == ({"kind": "preserve_root"},)
+    assert layer.get_config()["filter_specs"][0]["constraints"] == [{"kind": "preserve_root"}]
+    assert torch.allclose(output, image)
+
+
+def test_filter_specs_can_mix_tree_types():
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -359,12 +957,10 @@ def test_filter_specs_can_mix_tree_types_and_valuations():
             {
                 "tree_type": morphology.TreeType.MIN_TREE,
                 "attributes": (morphology.AttributeType.AREA,),
-                "valuation": CFPValuation.ALTITUDE_TOPHAT,
             },
             {
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
                 "attributes": (morphology.AttributeGroup.BOUNDARY,),
-                "valuation": CFPValuation.node_attribute(morphology.AttributeType.MEAN_LEVEL),
             },
         ],
         device="cpu",
@@ -380,7 +976,8 @@ def test_filter_specs_can_mix_tree_types_and_valuations():
     assert output.shape == (1, 3, 3, 3)
 
 
-def test_hybrid_forward_requires_dataset_stats():
+@pytest.mark.parametrize("scale_mode", ["dataset_clipped_zscore01", "dataset_minmax01", "dataset_zscore"])
+def test_statistical_forward_requires_dataset_stats(scale_mode):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -390,31 +987,15 @@ def test_hybrid_forward_requires_dataset_stats():
             }
         ],
         device="cpu",
-        scale_mode="hybrid",
+        scale_mode=scale_mode,
     )
     image = torch.tensor([[[[1.0, 2.0], [3.0, 4.0]]]], dtype=torch.float32)
 
-    with pytest.raises(RuntimeError, match="scale_mode='hybrid' requires dataset statistics"):
+    with pytest.raises(RuntimeError, match=f"scale_mode='{scale_mode}' requires dataset statistics"):
         layer(image)
 
 
-def test_filter_spec_rejects_removed_output_mode():
-    with pytest.raises(ValueError, match="output_mode was removed"):
-        ConnectedFilterPreprocessingLayer(
-            in_channels=1,
-            filter_specs=[
-                {
-                    "tree_type": morphology.TreeType.MAX_TREE,
-                    "attributes": (morphology.AttributeType.AREA,),
-                    "output_mode": "tophat",
-                }
-            ],
-            device="cpu",
-            scale_mode="none",
-        )
-
-
-def test_save_params_includes_filter_specs_metadata(tmp_path):
+def test_export_params_includes_filter_specs_metadata(tmp_path):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -425,18 +1006,18 @@ def test_save_params_includes_filter_specs_metadata(tmp_path):
                     morphology.AttributeType.AREA,
                     morphology.AttributeType.COMPACTNESS,
                 ),
+                "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.25}],
             },
             {
                 "name": "tos_boundary",
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
                 "attributes": (morphology.AttributeGroup.BOUNDARY,),
-                "valuation": CFPValuation.ALTITUDE_TOPHAT,
                 "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
+                "constraints": [{"kind": "preserve_root"}],
             },
             {
                 "tree_type": morphology.TreeType.MAX_TREE,
                 "attributes": (morphology.AttributeType.AREA,),
-                "valuation": CFPValuation.node_attribute(morphology.AttributeType.MEAN_LEVEL),
             },
         ],
         device="cpu",
@@ -450,33 +1031,50 @@ def test_save_params_includes_filter_specs_metadata(tmp_path):
 
     assert "filter_specs" in payload
     assert payload["clamp"] == [-8.0, 10.0]
-    assert payload["weight_contract"] == layer.get_weight_contract()
+    assert payload["inference_contract"] == layer.get_inference_contract()
+    assert payload["contracts"] == layer.get_contracts()
+    assert payload["contracts"]["inference_contract"] == layer.get_inference_contract()
+    assert payload["contracts"]["parameter_contract"]["weights"] == {
+        "area_compactness": [2],
+        "tos_boundary": [15],
+        "spec_002": [1],
+    }
+    assert payload["contracts"]["training_contract"]["filter_specs"][0]["regularizers"] == [
+        {"kind": "edge_score_monotonicity", "weight": 0.25}
+    ]
+    assert "monotonicity_weight" not in payload["inference_contract"]["filter_specs"][0]
+    assert "preserve_root" not in payload["inference_contract"]["filter_specs"][0]
     assert set(payload["weights"]) == {"area_compactness", "tos_boundary", "spec_002"}
     assert payload["filter_specs"][0]["key"] == "area_compactness"
     assert payload["filter_specs"][0]["name"] == "area_compactness"
     assert payload["filter_specs"][0]["tree_type"] == "max-tree"
     assert payload["filter_specs"][0]["attributes"] == ["AREA", "COMPACTNESS"]
-    assert payload["filter_specs"][0]["valuation"]["kind"] == "altitude"
-    assert payload["filter_specs"][0]["valuation"]["attribute"] == "ALTITUDE"
+    assert "valuation" not in payload["filter_specs"][0]
+    assert "preserve_root" not in payload["filter_specs"][0]
+    assert "monotonicity_weight" not in payload["filter_specs"][0]
+    assert payload["filter_specs"][0]["regularizers"] == [
+        {"kind": "edge_score_monotonicity", "weight": 0.25}
+    ]
     assert payload["filter_specs"][1]["key"] == "tos_boundary"
     assert payload["filter_specs"][1]["name"] == "tos_boundary"
     assert payload["filter_specs"][1]["tree_type"] == "tree-of-shapes"
-    assert payload["filter_specs"][1]["valuation"]["kind"] == "altitude_tophat"
-    assert payload["filter_specs"][1]["valuation"]["attribute"] == "ALTITUDE"
+    assert "valuation" not in payload["filter_specs"][1]
+    assert "preserve_root" not in payload["filter_specs"][1]
+    assert "monotonicity_weight" not in payload["filter_specs"][1]
+    assert payload["filter_specs"][1]["constraints"] == [{"kind": "preserve_root"}]
     assert payload["filter_specs"][1]["tos_interpolation"] == "Min8cMax4c"
     assert payload["filter_specs"][2]["key"] == "spec_002"
     assert payload["filter_specs"][2]["name"] == "spec_002"
-    assert payload["filter_specs"][2]["valuation"]["kind"] == "node_attribute"
-    assert payload["filter_specs"][2]["valuation"]["attribute"] == "MEAN_LEVEL"
+    assert "valuation" not in payload["filter_specs"][2]
+    assert "preserve_root" not in payload["filter_specs"][2]
+    assert "monotonicity_weight" not in payload["filter_specs"][2]
     assert payload["config"]["clamp"] == [-8.0, 10.0]
     assert payload["config"]["filter_specs"][0]["name"] == "area_compactness"
+    assert payload["config"]["filter_specs"][0]["regularizers"] == [
+        {"kind": "edge_score_monotonicity", "weight": 0.25}
+    ]
+    assert payload["config"]["filter_specs"][1]["constraints"] == [{"kind": "preserve_root"}]
     assert payload["config"]["filter_specs"][1]["tos_interpolation"] == "Min8cMax4c"
-
-    alias_path = tmp_path / "params_alias.pt"
-    layer.save_params(alias_path)
-    alias_payload = torch.load(alias_path, map_location="cpu", weights_only=True)
-    assert alias_payload["weight_contract"] == payload["weight_contract"]
-
 
 def test_get_config_and_from_config_reconstruct_layer_contract():
     layer = ConnectedFilterPreprocessingLayer(
@@ -489,13 +1087,11 @@ def test_get_config_and_from_config_reconstruct_layer_contract():
                     morphology.AttributeType.AREA,
                     morphology.AttributeType.COMPACTNESS,
                 ),
-                "valuation": CFPValuation.node_attribute(morphology.AttributeType.VARIANCE_LEVEL),
             },
             {
-                "name": "tos_tophat",
+                "name": "tos_boundary",
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
                 "attributes": (morphology.AttributeGroup.BOUNDARY,),
-                "valuation": CFPValuation.ALTITUDE_TOPHAT,
                 "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
                 "tos_infinity_seed_row": 1,
                 "tos_infinity_seed_col": 2,
@@ -504,18 +1100,25 @@ def test_get_config_and_from_config_reconstruct_layer_contract():
         device="cpu",
         scale_mode="none",
         eps=1e-5,
-        beta_f=2.5,
+        score_sharpness=2.5,
         clamp=(-8, 10),
-        hybrid_k=4.0,
-        hybrid_floor_a=0.1,
+        clipped_zscore_radius=4.0,
+        clipped_zscore_floor=0.1,
     )
 
     restored = ConnectedFilterPreprocessingLayer.from_config(layer.get_config(), device="cpu")
+    serializer = ConfigSerializer()
 
+    assert serializer.layer_config(layer) == layer.get_config()
+    assert serializer.inference_contract(layer) == layer.get_inference_contract()
+    assert serializer.training_contract(layer) == layer.get_training_contract()
+    assert serializer.parameter_contract(layer) == layer.get_parameter_contract()
     assert restored.get_config() == layer.get_config()
-    assert restored.get_weight_contract() == layer.get_weight_contract()
+    assert restored.get_inference_contract() == layer.get_inference_contract()
+    assert restored.get_training_contract() == layer.get_training_contract()
+    assert restored.get_parameter_contract() == layer.get_parameter_contract()
     assert restored.out_channels == layer.out_channels
-    assert set(restored._weights) == {"variance_max", "tos_tophat"}
+    assert set(restored._weights) == {"variance_max", "tos_boundary"}
 
 
 def test_forward_orders_outputs_by_input_channel_then_filter_spec(monkeypatch):
@@ -544,18 +1147,18 @@ def test_forward_orders_outputs_by_input_channel_then_filter_spec(monkeypatch):
         dtype=torch.float32,
     )
 
-    def fake_compute_tree_payload(img_np, tree_key, *, update_stats):
+    def fake_compute_payload(img_np, tree_key, *, update_stats):
         return {
             "info": {"channel_marker": int(img_np[0, 0])},
+            "base_attrs": {},
             "norm_attrs": {},
-            "valuation_increments": {},
         }
 
-    def fake_apply_spec(spec, info, norm_attrs, valuation_increments, beta_f):
+    def fake_apply_spec(spec, info, norm_attrs, score_sharpness):
         value = 10 * info["channel_marker"] + spec.index
         return torch.full((2, 2), value, dtype=next(layer.parameters()).dtype)
 
-    monkeypatch.setattr(layer, "_compute_tree_payload", fake_compute_tree_payload)
+    monkeypatch.setattr(layer._tree_payload_provider, "compute_payload", fake_compute_payload)
     monkeypatch.setattr(layer, "_apply_spec", fake_apply_spec)
 
     output = layer(image)
@@ -565,25 +1168,6 @@ def test_forward_orders_outputs_by_input_channel_then_filter_spec(monkeypatch):
     assert torch.equal(output[0, 1], torch.full((2, 2), 21.0))
     assert torch.equal(output[0, 2], torch.full((2, 2), 30.0))
     assert torch.equal(output[0, 3], torch.full((2, 2), 31.0))
-
-
-def test_legacy_layer_preserves_old_attributes_spec_contract():
-    layer = ConnectedFilterPreprocessingLayerLegacy(
-        in_channels=1,
-        attributes_spec=[
-            (morphology.AttributeType.AREA,),
-            (morphology.AttributeType.GRAY_HEIGHT,),
-        ],
-        tree_type="max-tree",
-        device="cpu",
-        scale_mode="none",
-    )
-    image = torch.tensor([[[[1.0, 2.0], [3.0, 4.0]]]], dtype=torch.float32)
-
-    output = layer(image)
-
-    assert layer.out_channels == 2
-    assert output.shape == (1, 2, 2, 2)
 
 
 def test_forward_rejects_non_batched_input_shape():
@@ -627,8 +1211,3 @@ def test_indexed_dataset_wrapper_rejects_scalar_samples():
 
     with pytest.raises(ValueError, match="Dataset samples must be"):
         wrapper[0]
-
-
-def test_deserialize_stats_rejects_unknown_attribute_key():
-    with pytest.raises(ValueError, match="unknown serialized attribute key"):
-        deserialize_ds_stats({"NOT_A_PUBLIC_ATTRIBUTE": {}}, torch.device("cpu"))

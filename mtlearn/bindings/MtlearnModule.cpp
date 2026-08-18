@@ -15,7 +15,7 @@
 namespace mtlearn {
 
 // Register morphology-related symbols before CFP symbols because CFP Python
-// classes accept WeightedMorphologicalTree handles produced by this binding.
+// classes accept ValuedMorphologicalTree handles produced by this binding.
 void init_Morphology(py::module& m)
 {
     using namespace morphology_pybind;

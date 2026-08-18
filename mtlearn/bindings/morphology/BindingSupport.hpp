@@ -83,7 +83,7 @@ inline FloatingDType parseFloatingArrayDType(const py::array& array, std::string
 template <typename PixelType>
 py::array_t<PixelType> imageToNumpy(mmcfilters::ImagePtr<PixelType> image)
 {
-    const int numCols = image->getNumCols();
+    const int numCols = image->getNumColumns();
     const int numRows = image->getNumRows();
     std::shared_ptr<PixelType[]> buffer = image->rawDataPtr();
 
@@ -231,9 +231,9 @@ inline mmcfilters::NodeIdSpace toBackend(morphology::NodeIdSpace outputSpace)
 {
     switch (outputSpace) {
     case morphology::NodeIdSpace::MORPHOLOGICAL_TREE:
-        return mmcfilters::NodeIdSpace::MORPHOLOGICAL_TREE;
+        return mmcfilters::NodeIdSpace::MorphologicalTree;
     case morphology::NodeIdSpace::HIGRA:
-        return mmcfilters::NodeIdSpace::HIGRA;
+        return mmcfilters::NodeIdSpace::Higra;
     }
     throw std::invalid_argument("unknown NodeIdSpace");
 }
@@ -242,17 +242,17 @@ inline mmcfilters::AttributeGroup toBackend(morphology::AttributeGroup group)
 {
     switch (group) {
     case morphology::AttributeGroup::ALL:
-        return mmcfilters::AttributeGroup::ALL;
+        return mmcfilters::AttributeGroup::All;
     case morphology::AttributeGroup::GRAY_LEVEL:
-        return mmcfilters::AttributeGroup::GRAY_LEVEL;
+        return mmcfilters::AttributeGroup::GrayLevel;
     case morphology::AttributeGroup::SHAPE:
-        return mmcfilters::AttributeGroup::SHAPE;
+        return mmcfilters::AttributeGroup::Shape;
     case morphology::AttributeGroup::MOMENTS:
-        return mmcfilters::AttributeGroup::MOMENTS;
+        return mmcfilters::AttributeGroup::Moments;
     case morphology::AttributeGroup::BOUNDARY:
-        return mmcfilters::AttributeGroup::BOUNDARY;
+        return mmcfilters::AttributeGroup::Boundary;
     case morphology::AttributeGroup::TREE_TOPOLOGY:
-        return mmcfilters::AttributeGroup::TREE_TOPOLOGY;
+        return mmcfilters::AttributeGroup::TreeTopology;
     }
     throw std::invalid_argument("unknown AttributeGroup");
 }
@@ -261,208 +261,209 @@ inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
 {
     switch (attribute) {
     case morphology::Attribute::AREA:
-        return mmcfilters::Attribute::AREA;
+        return mmcfilters::Attribute::Area;
     case morphology::Attribute::VOLUME:
-        return mmcfilters::Attribute::VOLUME;
+        return mmcfilters::Attribute::Volume;
     case morphology::Attribute::RELATIVE_VOLUME:
-        return mmcfilters::Attribute::RELATIVE_VOLUME;
-    case morphology::Attribute::LEVEL:
-        return mmcfilters::Attribute::LEVEL;
+        return mmcfilters::Attribute::RelativeVolume;
+    // The backend dropped the plain node-altitude attribute, so the facade no
+    // longer publishes LEVEL/ALTITUDE either.
     case morphology::Attribute::GRAY_HEIGHT:
-        return mmcfilters::Attribute::GRAY_HEIGHT;
+        return mmcfilters::Attribute::GrayLevelHeight;
     case morphology::Attribute::MEAN_LEVEL:
-        return mmcfilters::Attribute::MEAN_LEVEL;
+        return mmcfilters::Attribute::MeanGrayLevel;
     case morphology::Attribute::VARIANCE_LEVEL:
-        return mmcfilters::Attribute::VARIANCE_LEVEL;
+        return mmcfilters::Attribute::GrayLevelVariance;
     case morphology::Attribute::BOX_WIDTH:
-        return mmcfilters::Attribute::BOX_WIDTH;
+        return mmcfilters::Attribute::BoxWidth;
     case morphology::Attribute::BOX_HEIGHT:
-        return mmcfilters::Attribute::BOX_HEIGHT;
+        return mmcfilters::Attribute::BoundingBoxHeight;
     case morphology::Attribute::DIAGONAL_LENGTH:
-        return mmcfilters::Attribute::DIAGONAL_LENGTH;
+        return mmcfilters::Attribute::DiagonalLength;
     case morphology::Attribute::RECTANGULARITY:
-        return mmcfilters::Attribute::RECTANGULARITY;
+        return mmcfilters::Attribute::Rectangularity;
     case morphology::Attribute::RATIO_WH:
-        return mmcfilters::Attribute::RATIO_WH;
+        return mmcfilters::Attribute::RatioWh;
     case morphology::Attribute::BOX_COL_MIN:
-        return mmcfilters::Attribute::BOX_COL_MIN;
+        return mmcfilters::Attribute::BoxColumnMin;
     case morphology::Attribute::BOX_COL_MAX:
-        return mmcfilters::Attribute::BOX_COL_MAX;
+        return mmcfilters::Attribute::BoxColumnMax;
     case morphology::Attribute::BOX_ROW_MIN:
-        return mmcfilters::Attribute::BOX_ROW_MIN;
+        return mmcfilters::Attribute::BoxRowMin;
     case morphology::Attribute::BOX_ROW_MAX:
-        return mmcfilters::Attribute::BOX_ROW_MAX;
+        return mmcfilters::Attribute::BoxRowMax;
     case morphology::Attribute::CENTRAL_MOMENT_20:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_20;
+        return mmcfilters::Attribute::CentralMoment20;
     case morphology::Attribute::CENTRAL_MOMENT_02:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_02;
+        return mmcfilters::Attribute::CentralMoment02;
     case morphology::Attribute::CENTRAL_MOMENT_11:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_11;
+        return mmcfilters::Attribute::CentralMoment11;
     case morphology::Attribute::CENTRAL_MOMENT_30:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_30;
+        return mmcfilters::Attribute::CentralMoment30;
     case morphology::Attribute::CENTRAL_MOMENT_03:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_03;
+        return mmcfilters::Attribute::CentralMoment03;
     case morphology::Attribute::CENTRAL_MOMENT_21:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_21;
+        return mmcfilters::Attribute::CentralMoment21;
     case morphology::Attribute::CENTRAL_MOMENT_12:
-        return mmcfilters::Attribute::CENTRAL_MOMENT_12;
+        return mmcfilters::Attribute::CentralMoment12;
     case morphology::Attribute::HU_MOMENT_1:
-        return mmcfilters::Attribute::HU_MOMENT_1;
+        return mmcfilters::Attribute::HuMoment1;
     case morphology::Attribute::HU_MOMENT_2:
-        return mmcfilters::Attribute::HU_MOMENT_2;
+        return mmcfilters::Attribute::HuMoment2;
     case morphology::Attribute::HU_MOMENT_3:
-        return mmcfilters::Attribute::HU_MOMENT_3;
+        return mmcfilters::Attribute::HuMoment3;
     case morphology::Attribute::HU_MOMENT_4:
-        return mmcfilters::Attribute::HU_MOMENT_4;
+        return mmcfilters::Attribute::HuMoment4;
     case morphology::Attribute::HU_MOMENT_5:
-        return mmcfilters::Attribute::HU_MOMENT_5;
+        return mmcfilters::Attribute::HuMoment5;
     case morphology::Attribute::HU_MOMENT_6:
-        return mmcfilters::Attribute::HU_MOMENT_6;
+        return mmcfilters::Attribute::HuMoment6;
     case morphology::Attribute::HU_MOMENT_7:
-        return mmcfilters::Attribute::HU_MOMENT_7;
+        return mmcfilters::Attribute::HuMoment7;
     case morphology::Attribute::INERTIA:
-        return mmcfilters::Attribute::INERTIA;
+        return mmcfilters::Attribute::Inertia;
     case morphology::Attribute::COMPACTNESS:
-        return mmcfilters::Attribute::COMPACTNESS;
+        return mmcfilters::Attribute::Compactness;
     case morphology::Attribute::ECCENTRICITY:
-        return mmcfilters::Attribute::ECCENTRICITY;
+        return mmcfilters::Attribute::Eccentricity;
     case morphology::Attribute::LENGTH_MAJOR_AXIS:
-        return mmcfilters::Attribute::LENGTH_MAJOR_AXIS;
+        return mmcfilters::Attribute::LengthMajorAxis;
     case morphology::Attribute::LENGTH_MINOR_AXIS:
-        return mmcfilters::Attribute::LENGTH_MINOR_AXIS;
+        return mmcfilters::Attribute::LengthMinorAxis;
     case morphology::Attribute::AXIS_ORIENTATION:
-        return mmcfilters::Attribute::AXIS_ORIENTATION;
+        return mmcfilters::Attribute::AxisOrientation;
     case morphology::Attribute::CIRCULARITY:
-        return mmcfilters::Attribute::CIRCULARITY;
+        return mmcfilters::Attribute::Circularity;
     case morphology::Attribute::BITQUADS_AREA:
-        return mmcfilters::Attribute::BITQUADS_AREA;
+        return mmcfilters::Attribute::BitquadArea;
     case morphology::Attribute::BITQUADS_NUMBER_EULER:
-        return mmcfilters::Attribute::BITQUADS_NUMBER_EULER;
+        return mmcfilters::Attribute::BitquadNumberEuler;
     case morphology::Attribute::BITQUADS_NUMBER_HOLES:
-        return mmcfilters::Attribute::BITQUADS_NUMBER_HOLES;
+        return mmcfilters::Attribute::BitquadNumberHoles;
     case morphology::Attribute::BITQUADS_PERIMETER:
-        return mmcfilters::Attribute::BITQUADS_PERIMETER;
+        return mmcfilters::Attribute::BitquadPerimeter;
     case morphology::Attribute::BITQUADS_PERIMETER_CONTINUOUS:
-        return mmcfilters::Attribute::BITQUADS_PERIMETER_CONTINUOUS;
+        return mmcfilters::Attribute::BitquadPerimeterContinuous;
     case morphology::Attribute::BITQUADS_CIRCULARITY:
-        return mmcfilters::Attribute::BITQUADS_CIRCULARITY;
+        return mmcfilters::Attribute::BitquadCircularity;
     case morphology::Attribute::BITQUADS_PERIMETER_AVERAGE:
-        return mmcfilters::Attribute::BITQUADS_PERIMETER_AVERAGE;
+        return mmcfilters::Attribute::BitquadPerimeterAverage;
     case morphology::Attribute::BITQUADS_LENGTH_AVERAGE:
-        return mmcfilters::Attribute::BITQUADS_LENGTH_AVERAGE;
+        return mmcfilters::Attribute::BitquadLengthAverage;
     case morphology::Attribute::BITQUADS_WIDTH_AVERAGE:
-        return mmcfilters::Attribute::BITQUADS_WIDTH_AVERAGE;
+        return mmcfilters::Attribute::BitquadWidthAverage;
     case morphology::Attribute::HEIGHT_NODE:
-        return mmcfilters::Attribute::HEIGHT_NODE;
+        return mmcfilters::Attribute::SubtreeHeight;
     case morphology::Attribute::DEPTH_NODE:
-        return mmcfilters::Attribute::DEPTH_NODE;
+        return mmcfilters::Attribute::DepthNode;
     case morphology::Attribute::IS_LEAF_NODE:
-        return mmcfilters::Attribute::IS_LEAF_NODE;
+        return mmcfilters::Attribute::IsLeafNode;
     case morphology::Attribute::IS_ROOT_NODE:
-        return mmcfilters::Attribute::IS_ROOT_NODE;
+        return mmcfilters::Attribute::IsRootNode;
     case morphology::Attribute::NUM_CHILDREN_NODE:
-        return mmcfilters::Attribute::NUM_CHILDREN_NODE;
+        return mmcfilters::Attribute::NumChildrenNode;
     case morphology::Attribute::NUM_SIBLINGS_NODE:
-        return mmcfilters::Attribute::NUM_SIBLINGS_NODE;
+        return mmcfilters::Attribute::NumSiblingsNode;
     case morphology::Attribute::NUM_DESCENDANTS_NODE:
-        return mmcfilters::Attribute::NUM_DESCENDANTS_NODE;
+        return mmcfilters::Attribute::NumDescendantsNode;
     case morphology::Attribute::NUM_LEAF_DESCENDANTS_NODE:
-        return mmcfilters::Attribute::NUM_LEAF_DESCENDANTS_NODE;
+        return mmcfilters::Attribute::NumLeafDescendantsNode;
     case morphology::Attribute::LEAF_RATIO_NODE:
-        return mmcfilters::Attribute::LEAF_RATIO_NODE;
+        return mmcfilters::Attribute::LeafRatioNode;
     case morphology::Attribute::BALANCE_NODE:
-        return mmcfilters::Attribute::BALANCE_NODE;
+        return mmcfilters::Attribute::BalanceNode;
     case morphology::Attribute::MAX_DIST:
-        return mmcfilters::Attribute::MAX_DIST;
+        return mmcfilters::Attribute::MaxDist;
     case morphology::Attribute::AVG_CHILD_HEIGHT_NODE:
-        return mmcfilters::Attribute::AVG_CHILD_HEIGHT_NODE;
+        return mmcfilters::Attribute::AvgChildHeightNode;
     case morphology::Attribute::CONTOUR_PIXELS:
-        return mmcfilters::Attribute::CONTOUR_PIXELS;
+        return mmcfilters::Attribute::ContourPixels;
     case morphology::Attribute::CONTOUR_PERIMETER:
-        return mmcfilters::Attribute::CONTOUR_PERIMETER;
+        return mmcfilters::Attribute::ContourPerimeter;
     case morphology::Attribute::CONTOUR_SIDE_NORTH:
-        return mmcfilters::Attribute::CONTOUR_SIDE_NORTH;
+        return mmcfilters::Attribute::ContourSideNorth;
     case morphology::Attribute::CONTOUR_SIDE_WEST:
-        return mmcfilters::Attribute::CONTOUR_SIDE_WEST;
+        return mmcfilters::Attribute::ContourSideWest;
     case morphology::Attribute::CONTOUR_SIDE_EAST:
-        return mmcfilters::Attribute::CONTOUR_SIDE_EAST;
+        return mmcfilters::Attribute::ContourSideEast;
     case morphology::Attribute::CONTOUR_SIDE_SOUTH:
-        return mmcfilters::Attribute::CONTOUR_SIDE_SOUTH;
+        return mmcfilters::Attribute::ContourSideSouth;
     }
     throw std::invalid_argument("unknown Attribute");
 }
 
 inline morphology::Attribute fromBackend(mmcfilters::Attribute attribute)
 {
-#define MTLEARN_FROM_BACKEND_ATTRIBUTE(name) \
-    case mmcfilters::Attribute::name:        \
-        return morphology::Attribute::name
+// The facade keeps its own SCREAMING_CASE vocabulary, so the backend and facade
+// enumerators no longer share a spelling and must both be named explicitly.
+#define MTLEARN_FROM_BACKEND_ATTRIBUTE(backendName, facadeName) \
+    case mmcfilters::Attribute::backendName:                    \
+        return morphology::Attribute::facadeName
 
     switch (attribute) {
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(AREA);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(VOLUME);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(RELATIVE_VOLUME);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(LEVEL);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(GRAY_HEIGHT);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(MEAN_LEVEL);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(VARIANCE_LEVEL);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_WIDTH);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_HEIGHT);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(DIAGONAL_LENGTH);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(RECTANGULARITY);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(RATIO_WH);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_COL_MIN);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_COL_MAX);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_ROW_MIN);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BOX_ROW_MAX);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_20);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_02);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_11);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_30);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_03);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_21);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CENTRAL_MOMENT_12);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_1);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_2);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_3);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_4);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_5);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_6);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HU_MOMENT_7);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(INERTIA);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(COMPACTNESS);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(ECCENTRICITY);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(LENGTH_MAJOR_AXIS);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(LENGTH_MINOR_AXIS);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(AXIS_ORIENTATION);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CIRCULARITY);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_AREA);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_NUMBER_EULER);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_NUMBER_HOLES);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_PERIMETER);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_PERIMETER_CONTINUOUS);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_CIRCULARITY);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_PERIMETER_AVERAGE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_LENGTH_AVERAGE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BITQUADS_WIDTH_AVERAGE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(HEIGHT_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(DEPTH_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(IS_LEAF_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(IS_ROOT_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_CHILDREN_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_SIBLINGS_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_DESCENDANTS_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(NUM_LEAF_DESCENDANTS_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(LEAF_RATIO_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BALANCE_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(MAX_DIST);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(AVG_CHILD_HEIGHT_NODE);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_PIXELS);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_PERIMETER);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_NORTH);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_WEST);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_EAST);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(CONTOUR_SIDE_SOUTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Area, AREA);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Volume, VOLUME);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(RelativeVolume, RELATIVE_VOLUME);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelHeight, GRAY_HEIGHT);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(MeanGrayLevel, MEAN_LEVEL);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelVariance, VARIANCE_LEVEL);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxWidth, BOX_WIDTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoundingBoxHeight, BOX_HEIGHT);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(DiagonalLength, DIAGONAL_LENGTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Rectangularity, RECTANGULARITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(RatioWh, RATIO_WH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxColumnMin, BOX_COL_MIN);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxColumnMax, BOX_COL_MAX);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxRowMin, BOX_ROW_MIN);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxRowMax, BOX_ROW_MAX);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment20, CENTRAL_MOMENT_20);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment02, CENTRAL_MOMENT_02);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment11, CENTRAL_MOMENT_11);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment30, CENTRAL_MOMENT_30);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment03, CENTRAL_MOMENT_03);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment21, CENTRAL_MOMENT_21);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(CentralMoment12, CENTRAL_MOMENT_12);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment1, HU_MOMENT_1);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment2, HU_MOMENT_2);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment3, HU_MOMENT_3);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment4, HU_MOMENT_4);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment5, HU_MOMENT_5);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment6, HU_MOMENT_6);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(HuMoment7, HU_MOMENT_7);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Inertia, INERTIA);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Compactness, COMPACTNESS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Eccentricity, ECCENTRICITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LengthMajorAxis, LENGTH_MAJOR_AXIS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LengthMinorAxis, LENGTH_MINOR_AXIS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(AxisOrientation, AXIS_ORIENTATION);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(Circularity, CIRCULARITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadArea, BITQUADS_AREA);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadNumberEuler, BITQUADS_NUMBER_EULER);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadNumberHoles, BITQUADS_NUMBER_HOLES);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadPerimeter, BITQUADS_PERIMETER);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadPerimeterContinuous, BITQUADS_PERIMETER_CONTINUOUS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadCircularity, BITQUADS_CIRCULARITY);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadPerimeterAverage, BITQUADS_PERIMETER_AVERAGE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadLengthAverage, BITQUADS_LENGTH_AVERAGE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BitquadWidthAverage, BITQUADS_WIDTH_AVERAGE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(SubtreeHeight, HEIGHT_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(DepthNode, DEPTH_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(IsLeafNode, IS_LEAF_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(IsRootNode, IS_ROOT_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NumChildrenNode, NUM_CHILDREN_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NumSiblingsNode, NUM_SIBLINGS_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NumDescendantsNode, NUM_DESCENDANTS_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(NumLeafDescendantsNode, NUM_LEAF_DESCENDANTS_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(LeafRatioNode, LEAF_RATIO_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BalanceNode, BALANCE_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(MaxDist, MAX_DIST);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(AvgChildHeightNode, AVG_CHILD_HEIGHT_NODE);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ContourPixels, CONTOUR_PIXELS);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ContourPerimeter, CONTOUR_PERIMETER);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ContourSideNorth, CONTOUR_SIDE_NORTH);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ContourSideWest, CONTOUR_SIDE_WEST);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ContourSideEast, CONTOUR_SIDE_EAST);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(ContourSideSouth, CONTOUR_SIDE_SOUTH);
     }
 
 #undef MTLEARN_FROM_BACKEND_ATTRIBUTE

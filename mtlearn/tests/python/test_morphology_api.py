@@ -158,7 +158,7 @@ def _assert_all_attributes_finite(image: np.ndarray, label: str):
             assert values.dtype == np.dtype(dtype), f"{label}: {tree_name}: expected {dtype}"
             assert values.shape == (tree.numInternalNodeSlots, len(layout))
             assert "ECCENTRICITY" in layout
-            assert "BITQUADS_CIRCULARITY" in layout
+            assert "BITQUAD_CIRCULARITY" in layout
             assert "MAX_DIST" in layout
 
             examples = _non_finite_examples(values, layout)
@@ -193,7 +193,7 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         infinity_seed_col=0,
     )
 
-    assert tree.treeType == 2
+    assert tree.treeType == "tree-of-shapes"
     assert tree.hasTreeOfShapesAdjacencyPolicy is True
     assert tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.0
     assert tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.5
@@ -204,7 +204,7 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
     )
 
-    assert enum_tree.treeType == 2
+    assert enum_tree.treeType == "tree-of-shapes"
     assert enum_tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.5
     assert enum_tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.0
 
@@ -361,6 +361,83 @@ def test_attribute_filter_accepts_float64_attributes():
     assert filtered_max.dtype == np.uint8
 
 
+def test_attribute_filter_extinction_methods():
+    image = _small_image()
+    tree = morphology.create_max_tree(image)
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_LEVEL)
+    level64 = morphology.compute_single_attribute(
+        tree,
+        morphology.AttributeType.MEAN_LEVEL,
+        dtype=np.float64,
+    )
+    attribute_filter = morphology.create_attribute_filter(tree)
+    assert not hasattr(attribute_filter, "filteringByExtinction")
+    assert not hasattr(attribute_filter, "saliencyMapByExtinction")
+
+    reconstructed = tree.reconstructionImage()
+    filtered_keep_all = attribute_filter.filteringByExtinctionValue(
+        level,
+        extrema_to_keep=1024,
+    )
+    filtered_value_keep_all = attribute_filter.filteringByExtinctionValue(
+        level,
+        min_extinction=0.0,
+    )
+    filtered_value_keep_all_positional = attribute_filter.filteringByExtinctionValue(level, 0.0)
+    strongest_by_rank = attribute_filter.filteringByExtinctionValue(
+        level,
+        extrema_to_keep=1,
+    )
+    strongest_by_value = attribute_filter.filteringByExtinctionValue(
+        level,
+        min_extinction=float(np.finfo(level.dtype).max),
+    )
+    assert np.array_equal(filtered_keep_all, reconstructed)
+    assert np.array_equal(filtered_value_keep_all, reconstructed)
+    assert np.array_equal(filtered_value_keep_all_positional, reconstructed)
+    assert np.array_equal(strongest_by_value, strongest_by_rank)
+
+
+def test_attribute_filter_extinction_validates_inputs():
+    tree = morphology.create_max_tree(_small_image())
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_LEVEL)
+    attribute_filter = morphology.create_attribute_filter(tree)
+
+    with pytest.raises(ValueError, match="attr must have length"):
+        attribute_filter.filteringByExtinctionValue(
+            np.ones(1, dtype=np.float32),
+            extrema_to_keep=1,
+        )
+
+    with pytest.raises(ValueError, match="non-negative extremaToKeep"):
+        attribute_filter.filteringByExtinctionValue(level, extrema_to_keep=-1)
+
+    with pytest.raises(ValueError, match="min_extinction must be finite"):
+        attribute_filter.filteringByExtinctionValue(level, np.inf)
+
+    with pytest.raises(ValueError, match="exactly one of min_extinction or extrema_to_keep"):
+        attribute_filter.filteringByExtinctionValue(level)
+
+    with pytest.raises(ValueError, match="exactly one of min_extinction or extrema_to_keep"):
+        attribute_filter.filteringByExtinctionValue(
+            level,
+            min_extinction=0.0,
+            extrema_to_keep=1,
+        )
+
+    non_finite_level = level.copy()
+    non_finite_level[0] = np.nan
+    with pytest.raises(ValueError, match="attr must contain only finite values"):
+        attribute_filter.filteringByExtinctionValue(non_finite_level, extrema_to_keep=1)
+
+    tos = morphology.create_tree_of_shapes(_small_image())
+    tos_attribute_filter = morphology.create_attribute_filter(tos)
+    tos_attr = np.ones(tos.numInternalNodeSlots, dtype=np.float32)
+
+    with pytest.raises(ValueError, match="requires a globally monotone altitude order"):
+        tos_attribute_filter.filteringByExtinctionValue(tos_attr, extrema_to_keep=1)
+
+
 def test_attribute_filter_rejects_non_float_attribute_array():
     tree = morphology.create_max_tree(_small_image())
     attribute_filter = morphology.create_attribute_filter(tree)
@@ -385,3 +462,40 @@ def test_removed_backend_symbols_are_not_reexported():
     for name in removed_symbols:
         assert not hasattr(mtlearn, name)
         assert not hasattr(mtlearn._bindings, name)
+
+
+def test_backend_vocabulary_aliases_keep_the_canonical_names():
+    """The new backend spellings are accepted, but never become the canonical name.
+
+    CFP normalization statistics are keyed by the enum name (see
+    ``ConnectedFilterPreprocessingLayer._stat_key``) and those keys are written
+    into checkpoints. If an alias ever displaced the canonical name, saved
+    statistics would stop matching and be silently recomputed.
+    """
+    aliases = {
+        "BITQUADS_AREA": "BITQUAD_AREA",
+        "BITQUADS_CIRCULARITY": "BITQUAD_CIRCULARITY",
+        "BITQUADS_LENGTH_AVERAGE": "BITQUAD_LENGTH_AVERAGE",
+        "BITQUADS_NUMBER_EULER": "BITQUAD_NUMBER_EULER",
+        "BITQUADS_NUMBER_HOLES": "BITQUAD_NUMBER_HOLES",
+        "BITQUADS_PERIMETER": "BITQUAD_PERIMETER",
+        "BITQUADS_PERIMETER_AVERAGE": "BITQUAD_PERIMETER_AVERAGE",
+        "BITQUADS_PERIMETER_CONTINUOUS": "BITQUAD_PERIMETER_CONTINUOUS",
+        "BITQUADS_WIDTH_AVERAGE": "BITQUAD_WIDTH_AVERAGE",
+        "BOX_COL_MAX": "BOX_COLUMN_MAX",
+        "BOX_COL_MIN": "BOX_COLUMN_MIN",
+        "BOX_HEIGHT": "BOUNDING_BOX_HEIGHT",
+        "GRAY_HEIGHT": "GRAY_LEVEL_HEIGHT",
+        "HEIGHT_NODE": "SUBTREE_HEIGHT",
+        "MEAN_LEVEL": "MEAN_GRAY_LEVEL",
+        "VARIANCE_LEVEL": "GRAY_LEVEL_VARIANCE",
+    }
+
+    for canonical, alias in aliases.items():
+        canonical_value = getattr(morphology.AttributeType, canonical)
+        alias_value = getattr(morphology.AttributeType, alias)
+        assert alias_value == canonical_value, f"{alias} must alias {canonical}"
+        assert canonical_value.name == canonical, (
+            f"{canonical} lost its canonical name to {canonical_value.name}; "
+            "this would change persisted CFP statistic keys"
+        )

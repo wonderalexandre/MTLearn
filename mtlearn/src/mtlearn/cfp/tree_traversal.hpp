@@ -35,23 +35,23 @@ public:
     static torch::Tensor filtering(WeightedTreePtr weightedTree, torch::Tensor sigmoid)
     {
         if (!weightedTree) {
-            throw std::invalid_argument("Invalid WeightedMorphologicalTree");
+            throw std::invalid_argument("Invalid ValuedMorphologicalTree");
         }
 
         const TreeTopology& tree = morphology::detail::topology(*weightedTree);
-        int numRows = tree.getNumRowsOfImage();
-        int numCols = tree.getNumColsOfImage();
+        int numRows = tree.numRows();
+        int numCols = tree.numColumns();
         float* sigmoid_ptr = sigmoid.data_ptr<float>();
 
-        std::unique_ptr<float[]> mapLevel(new float[tree.getNumInternalNodeSlots()]);
+        std::unique_ptr<float[]> mapLevel(new float[tree.numInternalNodeSlots()]);
 
         // The root is always kept, and all descendants are expressed as
         // accumulated residue offsets relative to their parent.
-        NodeId rootId = tree.getRoot();
+        NodeId rootId = tree.root();
         mapLevel[rootId] = morphology::altitude(*weightedTree, rootId) * sigmoid_ptr[rootId];
-        for (NodeId nodeId : tree.getIteratorBreadthFirstTraversal()) {
+        for (NodeId nodeId : tree.breadthFirstTraversal()) {
             if (!tree.isRoot(nodeId)) {
-                NodeId parentId = tree.getNodeParent(nodeId);
+                NodeId parentId = tree.parent(nodeId);
                 float residue = morphology::residue(*weightedTree, nodeId);
                 mapLevel[nodeId] = mapLevel[parentId] + (residue * sigmoid_ptr[nodeId]);
             }
@@ -61,8 +61,8 @@ public:
         float* imgOutput = out.data_ptr<float>();
         // Each pixel belongs to exactly one proper part. Writing only proper
         // parts avoids overwriting pixels repeatedly for ancestor nodes.
-        for (NodeId nodeId : tree.getAliveNodeIds()) {
-            for (int pixel : tree.getProperParts(nodeId)) {
+        for (NodeId nodeId : tree.aliveNodeIds()) {
+            for (int pixel : tree.properPart(nodeId)) {
                 imgOutput[pixel] = mapLevel[nodeId];
             }
         }
@@ -81,7 +81,7 @@ public:
         torch::Tensor gradientOfLoss)
     {
         if (!weightedTree) {
-            throw std::invalid_argument("Invalid WeightedMorphologicalTree");
+            throw std::invalid_argument("Invalid ValuedMorphologicalTree");
         }
 
         float* attributes = attrs.data_ptr<float>();
@@ -97,7 +97,7 @@ public:
         float* gradFilterWeights_ptr = gradFilterWeights.data_ptr<float>();
         float* gradFilterBias_ptr = gradFilterBias.data_ptr<float>();
 
-        for (NodeId nodeId : tree.getAliveNodeIds()) {
+        for (NodeId nodeId : tree.aliveNodeIds()) {
             float dSigmoid = sigmoid_ptr[nodeId] * (1 - sigmoid_ptr[nodeId]);
             float residue = morphology::residue(*weightedTree, nodeId);
 
@@ -121,13 +121,13 @@ public:
         // Sum loss gradients for each connected component and accumulate them
         // with the local derivative. Post-order traversal is required because
         // every ancestor receives contributions from all descendant pixels.
-        std::unique_ptr<float[]> summationGrad_ptr(new float[tree.getNumInternalNodeSlots()]);
+        std::unique_ptr<float[]> summationGrad_ptr(new float[tree.numInternalNodeSlots()]);
         morphology::detail::traversePostOrder(
             tree,
-            tree.getRoot(),
+            tree.root(),
             [&](NodeId nodeId) -> void {
                 summationGrad_ptr[nodeId] = 0;
-                for (int p : tree.getProperParts(nodeId)) {
+                for (int p : tree.properPart(nodeId)) {
                     summationGrad_ptr[nodeId] += gradLoss[p];
                 }
             },

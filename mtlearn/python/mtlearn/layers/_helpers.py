@@ -6,9 +6,7 @@ implementations:
 - conversion of PyTorch image tensors to ``np.uint8`` arrays accepted by the
   morphology backend;
 - morphology-tree construction through the public ``mtlearn.morphology``
-  facade;
-- dataset-statistics updates for supported normalization modes;
-- cache refresh of normalized attributes when dataset statistics change.
+  facade.
 
 The connected filtering operation exposed by
 ``mtlearn.ConnectedFilterPreprocessingTreeTraversal`` is differentiable. Tree
@@ -18,8 +16,7 @@ dictionaries explicitly.
 """
 from __future__ import annotations
 
-import pickle
-from typing import Dict, Any, Tuple, Iterable, Mapping, Optional
+from typing import Any, Tuple, Iterable, Optional
 
 import numpy as np
 import torch
@@ -200,212 +197,10 @@ def validate_attributes_for_tree_type(attributes: Iterable[Any], tree_type: str)
         )
 
 
-# ---------------------- dataset-statistics normalization ----------------------
-
-def update_ds_stats(ds_stats: Dict[Any, Dict[str, torch.Tensor]],
-                    scale_mode: str,
-                    attr_type: Any,
-                    a_raw_1d: torch.Tensor) -> bool:
-    """Update dataset-level statistics for one raw attribute vector.
-
-    Returns ``True`` when the stored statistics changed. Supported modes:
-
-    - ``minmax01`` expands the stored ``[amin, amax]`` range as samples arrive;
-    - ``zscore_tree`` accumulates ``count``, ``sum``, and ``sumsq``;
-    - ``none`` leaves the statistics unchanged.
-    """
-    if scale_mode == "minmax01":
-        amin_new = torch.min(a_raw_1d.detach())
-        amax_new = torch.max(a_raw_1d.detach())
-        changed = False
-        if attr_type not in ds_stats:
-            ds_stats[attr_type] = {"amin": amin_new, "amax": amax_new}
-            changed = True
-        else:
-            st = ds_stats[attr_type]
-            if amin_new < st["amin"]:
-                st["amin"] = amin_new
-                changed = True
-            if amax_new > st["amax"]:
-                st["amax"] = amax_new
-                changed = True
-        return changed
-    elif scale_mode == "zscore_tree":
-        v = a_raw_1d.detach()
-        cnt = torch.tensor(v.numel(), dtype=torch.long, device=v.device)
-        sm = torch.sum(v)
-        sq = torch.sum(v * v)
-        if attr_type not in ds_stats:
-            ds_stats[attr_type] = {"count": cnt, "sum": sm, "sumsq": sq}
-        else:
-            ds_stats[attr_type]["count"] = ds_stats[attr_type]["count"] + cnt
-            ds_stats[attr_type]["sum"]   = ds_stats[attr_type]["sum"] + sm
-            ds_stats[attr_type]["sumsq"] = ds_stats[attr_type]["sumsq"] + sq
-        return True
-    elif scale_mode == "none":
-        return False
-    else:
-        raise ValueError(f"unknown scale_mode: {scale_mode}")
-
-
-def normalize_with_ds_stats(ds_stats: Mapping[Any, Dict[str, torch.Tensor]],
-                            scale_mode: str,
-                            eps: float,
-                            attr_type: Any,
-                            a_raw_1d: torch.Tensor) -> torch.Tensor:
-    """Normalize a raw 1D attribute vector with dataset statistics.
-
-    Supported modes:
-
-    - ``minmax01``: ``(x - amin) / (amax - amin)``;
-    - ``zscore_tree``: ``(x - mean) / std``;
-    - ``none``: identity.
-    """
-    if scale_mode == "minmax01":
-        stats = ds_stats.get(attr_type, None)
-        if stats is None:
-            amin = torch.min(a_raw_1d)
-            amax = torch.max(a_raw_1d)
-        else:
-            amin = stats["amin"]
-            amax = stats["amax"]
-        denom = torch.clamp(amax - amin, min=eps)
-        return (a_raw_1d - amin) / denom
-    elif scale_mode == "zscore_tree":
-        stats = ds_stats.get(attr_type, None)
-        if stats is None or stats["count"].item() == 0:
-            mean = torch.mean(a_raw_1d)
-            std  = torch.std(a_raw_1d).clamp_min(eps)
-        else:
-            count = stats["count"].to(dtype=stats["sum"].dtype, device=stats["sum"].device)
-            mean  = stats["sum"] / count
-            var   = stats["sumsq"] / count - mean * mean
-            std   = torch.sqrt(torch.clamp(var, min=eps))
-        return (a_raw_1d - mean) / std
-    elif scale_mode == "none":
-        return a_raw_1d
-    else:
-        raise ValueError(f"unknown scale_mode: {scale_mode}")
-
-
-def maybe_refresh_norm_for_key(key: str,
-                               base_attrs: Dict[Any, Dict[Any, torch.Tensor]],
-                               norm_attrs: Dict[Any, Dict[Any, torch.Tensor]],
-                               all_attr_types: Iterable[Any],
-                               ds_stats: Mapping[Any, Dict[str, torch.Tensor]],
-                               scale_mode: str,
-                               eps: float,
-                               norm_epoch_by_key: Dict[str, int],
-                               current_epoch: int) -> None:
-    """Refresh normalized attributes for one cache key when stats advance."""
-    last_epoch = norm_epoch_by_key.get(key, -1)
-    if last_epoch == current_epoch:
-        return
-    per_attr_raw = base_attrs[key]
-    per_attr_norm = {}
-    for attr_type in all_attr_types:
-        a_raw_1d = per_attr_raw[attr_type].squeeze(1)
-        a_norm   = normalize_with_ds_stats(ds_stats, scale_mode, eps, attr_type, a_raw_1d)
-        per_attr_norm[attr_type] = a_norm
-    norm_attrs[key] = per_attr_norm
-    norm_epoch_by_key[key] = current_epoch
-
-
-# ------------------------- stats serialization helpers -------------------------
-
-def _attribute_key(attr_type: Any) -> str:
-    """Return the stable serialized key for an attribute enum value."""
-    return getattr(attr_type, "name", str(attr_type))
-
-
-def _attribute_from_key(key: Any) -> Any:
-    """Convert a serialized attribute key back to the public enum value."""
-    if not isinstance(key, str):
-        # Legacy payloads loaded with weights_only=False may already contain
-        # pybind enum instances as dictionary keys.
-        return key
-    try:
-        return getattr(morphology.AttributeType, key)
-    except AttributeError as exc:
-        raise ValueError(f"unknown serialized attribute key: {key}") from exc
-
-
-def serialize_ds_stats(ds_stats: Mapping[Any, Mapping[str, torch.Tensor]]) -> Dict[str, Dict[str, torch.Tensor]]:
-    """Convert dataset stats to a torch-safe payload.
-
-    PyTorch 2.6 changed ``torch.load`` to default to ``weights_only=True``.
-    Pybind enum keys are rejected by that safe loader, so new stats files store
-    attribute names as plain strings and tensors as CPU tensors.
-    """
-    serialized = {}
-    for attr_type, stats in ds_stats.items():
-        serialized[_attribute_key(attr_type)] = {
-            name: value.detach().cpu() if torch.is_tensor(value) else value
-            for name, value in stats.items()
-        }
-    return serialized
-
-
-def deserialize_ds_stats(serialized: Mapping[Any, Mapping[str, torch.Tensor]], device) -> Dict[Any, Dict[str, torch.Tensor]]:
-    """Convert serialized stats back to enum-keyed dictionaries."""
-    ds_stats = {}
-    for key, stats in serialized.items():
-        attr_type = _attribute_from_key(key)
-        ds_stats[attr_type] = {
-            name: value.to(device) if torch.is_tensor(value) else value
-            for name, value in stats.items()
-        }
-    return ds_stats
-
-
-def make_stats_payload(ds_stats: Mapping[Any, Mapping[str, torch.Tensor]], scale_mode: str) -> Dict[str, Any]:
-    """Build the versioned payload saved by CFP ``save_stats`` methods."""
-    return {
-        "format_version": 2,
-        "ds_stats": serialize_ds_stats(ds_stats),
-        "scale_mode": scale_mode,
-    }
-
-
-def load_stats_payload(path: str, device, *, trusted_legacy_format: bool = False) -> Dict[str, Any]:
-    """Load a CFP stats payload using PyTorch's safe loader when possible.
-
-    Files written by current mtlearn versions use string keys and load with
-    ``weights_only=True``. Older files may contain pybind enum keys and require
-    ``trusted_legacy_format=True`` so callers opt into PyTorch's unsafe legacy
-    pickle path explicitly.
-    """
-    try:
-        payload = torch.load(path, map_location=device, weights_only=True)
-    except TypeError:
-        # Older PyTorch versions do not support the weights_only argument.
-        payload = torch.load(path, map_location=device)
-    except pickle.UnpicklingError as exc:
-        if not trusted_legacy_format:
-            raise RuntimeError(
-                "This stats file uses the legacy enum-keyed format. "
-                "Re-save it with a current mtlearn version, or call "
-                "load_stats(..., trusted_legacy_format=True) only for files "
-                "you trust."
-            ) from exc
-        payload = torch.load(path, map_location=device, weights_only=False)
-
-    return {
-        "format_version": payload.get("format_version", 1),
-        "scale_mode": payload.get("scale_mode"),
-        "ds_stats": deserialize_ds_stats(payload.get("ds_stats", {}), device),
-    }
-
-
 __all__ = [
     "group_name",
     "normalize_attributes_spec",
     "to_numpy_u8",
     "build_tree",
     "validate_attributes_for_tree_type",
-    "update_ds_stats",
-    "normalize_with_ds_stats",
-    "maybe_refresh_norm_for_key",
-    "make_stats_payload",
-    "load_stats_payload",
 ]
