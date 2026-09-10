@@ -81,7 +81,7 @@ def _two_group_layer(*, tree_type="max-tree", tos_interpolation=None):
             },
             {
                 "tree_type": tree_type,
-                "attributes": (morphology.AttributeType.GRAY_HEIGHT,),
+                "attributes": (morphology.AttributeType.GRAY_LEVEL_HEIGHT,),
                 "tos_interpolation": tos_interpolation,
             },
         ],
@@ -106,13 +106,13 @@ def test_implicit_metadata_reconstructs_like_explicit_jacobian():
     )
     filtered_residues = residues * torch.linspace(0.1, 0.9, residues.numel())
 
-    explicit = (jacobian.T @ filtered_residues).reshape(tree.numRows, tree.numCols)
+    explicit = (jacobian.T @ filtered_residues).reshape(tree.num_rows, tree.num_columns)
     implicit = ConnectedFilterPreprocessingImplicitJacobianFunction.forward_from_info(
         filtered_residues,
         tpre,
         tpost,
         node_of_pixel,
-    ).reshape(tree.numRows, tree.numCols)
+    ).reshape(tree.num_rows, tree.num_columns)
 
     assert torch.allclose(implicit, explicit)
 
@@ -136,7 +136,7 @@ def test_implicit_unfiltered_residues_reconstruct_input(tree_type):
         tpre,
         tpost,
         node_of_pixel,
-    ).reshape(tree.numRows, tree.numCols)
+    ).reshape(tree.num_rows, tree.num_columns)
 
     assert torch.equal(reconstructed, torch.as_tensor(image, dtype=residues.dtype))
 
@@ -163,7 +163,7 @@ def test_implicit_forward_and_parameter_gradients_match_explicit_jacobian(tree_t
     explicit_weight = torch.tensor([0.25], dtype=torch.float64, requires_grad=True)
     explicit_bias = torch.tensor([-0.1], dtype=torch.float64, requires_grad=True)
     explicit_scores = torch.sigmoid(score_sharpness * (attributes @ explicit_weight + explicit_bias))
-    explicit_output = (jacobian.T @ (residues * explicit_scores)).reshape(tree.numRows, tree.numCols)
+    explicit_output = (jacobian.T @ (residues * explicit_scores)).reshape(tree.num_rows, tree.num_columns)
 
     implicit_weight = explicit_weight.detach().clone().requires_grad_(True)
     implicit_bias = explicit_bias.detach().clone().requires_grad_(True)
@@ -175,8 +175,8 @@ def test_implicit_forward_and_parameter_gradients_match_explicit_jacobian(tree_t
         tpost,
         node_of_pixel,
         attributes,
-        tree.numRows,
-        tree.numCols,
+        tree.num_rows,
+        tree.num_columns,
         score_sharpness,
     )
 
@@ -271,7 +271,7 @@ def test_predict_matches_forward_for_tree_of_shapes_multiple_groups():
     x = torch.as_tensor(_small_image_np(), dtype=torch.float32).reshape(1, 1, 3, 3)
     layer = _two_group_layer(
         tree_type="tree-of-shapes",
-        tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
+        tos_interpolation=morphology.ToSInterpolation.MIN8_MAX4,
     )
     indexed_x = (x, torch.tensor([0]))
 

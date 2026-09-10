@@ -89,8 +89,9 @@ train summaries -> StatisticsSnapshot -> layer -> normalized active payload
 scorer, normalizer or accelerator. `fit_stats` performs a finite streaming fit;
 SSD preparation can instead collect summaries in the same pass as tree building.
 The layer owns frozen normalization and learned parameters. See
-[preparation and cache migration](source/guides/cfp-cache-migration.md) for storage
-policies, ownership, invalidation, recovery and process limits.
+[normalization and caching](source/guides/connected-filter-preprocessing.md#normalization-and-caching)
+for layer usage and the [preparation and storage reference](source/api/python/cfp_preparation.rst)
+for the public preparation and storage APIs.
 
 ## Forward Flow
 

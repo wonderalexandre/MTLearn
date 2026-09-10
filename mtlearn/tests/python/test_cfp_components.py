@@ -530,7 +530,7 @@ def test_config_deserializer_resolves_serialized_layer_kwargs():
                     "name": "tos_mean",
                     "tree_type": "tree-of-shapes",
                     "attributes": ["BOUNDARY"],
-                    "tos_interpolation": "Min8cMax4c",
+                    "tos_interpolation": "MIN8_MAX4",
                     "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.25}],
                 }
             ],
@@ -544,7 +544,7 @@ def test_config_deserializer_resolves_serialized_layer_kwargs():
     assert kwargs["scale_mode"] == "none"
     assert spec["name"] == "tos_mean"
     assert spec["attributes"] == (morphology.AttributeGroup.BOUNDARY,)
-    assert spec["tos_interpolation"] == morphology.ToSInterpolation.Min8cMax4c
+    assert spec["tos_interpolation"] == morphology.ToSInterpolation.MIN8_MAX4
     assert spec["regularizers"] == [{"kind": "edge_score_monotonicity", "weight": 0.25}]
 
 
@@ -572,7 +572,7 @@ def test_filter_spec_normalizer_builds_internal_spec_contract():
                 "scoring": {"kind": "linear_sigmoid"},
                 "constraints": ["preserve_root"],
                 "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.25}],
-                "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
+                "tos_interpolation": morphology.ToSInterpolation.MIN8_MAX4,
                 "tos_infinity_seed_row": 1,
                 "tos_infinity_seed_col": 2,
             }
@@ -587,7 +587,7 @@ def test_filter_spec_normalizer_builds_internal_spec_contract():
     assert spec.index == 0
     assert spec.key == "tos_boundary"
     assert spec.tree_type == "tree-of-shapes"
-    assert spec.tree_key == "tree-of-shapes|Min8cMax4c|1|2"
+    assert spec.tree_key == "tree-of-shapes|MIN8_MAX4|1|2"
     assert morphology.AttributeType.MAX_DIST not in spec.attributes
     assert isinstance(spec.scoring_model, cfp.LinearSigmoidScorer)
     assert spec.constraint_configs == ({"kind": "preserve_root"},)

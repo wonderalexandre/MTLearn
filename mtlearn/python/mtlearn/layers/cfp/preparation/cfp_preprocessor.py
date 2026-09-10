@@ -138,7 +138,7 @@ class CFPPreprocessor:
         return {
             "residues": residues, "tpre": tpre, "tpost": tpost,
             "parent": parent, "node_of_pixel": node_of_pixel,
-            "num_rows": tree.numRows, "num_cols": tree.numCols,
+            "num_rows": tree.num_rows, "num_cols": tree.num_columns,
             "tree_type": spec.tree_type,
         }
 

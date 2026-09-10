@@ -3,8 +3,8 @@ CFP Preparation and Storage
 
 Import these public components from ``mtlearn.layers.cfp``. They separate fixed
 CPU morphology from learned parameters, normalization and optional retention.
-For policy choices and executable patterns, see
-:doc:`../../guides/cfp-cache-migration`. Layer methods such as ``fit_stats``,
+For fitting dataset statistics and using cached batches, see
+:doc:`../../guides/connected-filter-preprocessing`. Layer methods such as ``fit_stats``,
 ``set_stats`` and ``forward_prepared`` are documented in :doc:`layers`.
 
 Preparation

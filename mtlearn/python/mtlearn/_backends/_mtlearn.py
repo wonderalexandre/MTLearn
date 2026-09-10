@@ -37,15 +37,17 @@ _TREE_TYPE_ALIASES = {
 
 
 _TOS_INTERPOLATION_ALIASES = {
-    "selfdual": ToSInterpolation.SelfDual,
-    "self-dual": ToSInterpolation.SelfDual,
-    "self_dual": ToSInterpolation.SelfDual,
-    "min4cmax8c": ToSInterpolation.Min4cMax8c,
-    "min4c-max8c": ToSInterpolation.Min4cMax8c,
-    "min4c_max8c": ToSInterpolation.Min4cMax8c,
-    "min8cmax4c": ToSInterpolation.Min8cMax4c,
-    "min8c-max4c": ToSInterpolation.Min8cMax4c,
-    "min8c_max4c": ToSInterpolation.Min8cMax4c,
+    "min4_max8": ToSInterpolation.MIN4_MAX8,
+    "min8_max4": ToSInterpolation.MIN8_MAX4,
+    "selfdual": ToSInterpolation.SELF_DUAL,
+    "self-dual": ToSInterpolation.SELF_DUAL,
+    "self_dual": ToSInterpolation.SELF_DUAL,
+    "min4cmax8c": ToSInterpolation.MIN4_MAX8,
+    "min4c-max8c": ToSInterpolation.MIN4_MAX8,
+    "min4c_max8c": ToSInterpolation.MIN4_MAX8,
+    "min8cmax4c": ToSInterpolation.MIN8_MAX4,
+    "min8c-max4c": ToSInterpolation.MIN8_MAX4,
+    "min8c_max4c": ToSInterpolation.MIN8_MAX4,
 }
 
 
@@ -62,7 +64,7 @@ def normalize_tree_type(tree_type: str) -> str:
 
 def normalize_tos_interpolation(interpolation=None):
     if interpolation is None:
-        return ToSInterpolation.SelfDual
+        return ToSInterpolation.SELF_DUAL
     if isinstance(interpolation, ToSInterpolation):
         return interpolation
     key = str(interpolation).strip().lower()
@@ -74,11 +76,11 @@ def normalize_tos_interpolation(interpolation=None):
 
 
 def create_max_tree(image):
-    return WeightedMorphologicalTree.createMaxTree(image)
+    return WeightedMorphologicalTree.create_max_tree(image)
 
 
 def create_min_tree(image):
-    return WeightedMorphologicalTree.createMinTree(image)
+    return WeightedMorphologicalTree.create_min_tree(image)
 
 
 def create_tree_of_shapes(
@@ -87,7 +89,7 @@ def create_tree_of_shapes(
     infinity_seed_row: int = 0,
     infinity_seed_col: int = 0,
 ):
-    return WeightedMorphologicalTree.createTreeOfShapes(
+    return WeightedMorphologicalTree.create_tree_of_shapes(
         image,
         normalize_tos_interpolation(interpolation),
         int(infinity_seed_row),
@@ -122,7 +124,7 @@ def compute_attributes(
     output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
     dtype=None,
 ):
-    return Attribute.computeAttributes(tree, attributes, output_space, dtype)
+    return Attribute.compute_attributes(tree, attributes, output_space, dtype)
 
 
 def compute_single_attribute(
@@ -131,7 +133,7 @@ def compute_single_attribute(
     output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
     dtype=None,
 ):
-    return Attribute.computeSingleAttribute(tree, attribute, output_space, dtype)
+    return Attribute.compute_single_attribute(tree, attribute, output_space, dtype)
 
 
 def describe_attribute(attribute):
@@ -139,11 +141,11 @@ def describe_attribute(attribute):
 
 
 def describe_all_attributes():
-    return Attribute.describeAll()
+    return Attribute.describe_all()
 
 
 def expand_attribute_group(group):
-    return Attribute.expandGroup(group)
+    return Attribute.expand_group(group)
 
 
 def create_attribute_filter(tree):

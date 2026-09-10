@@ -101,7 +101,7 @@ def main() -> int:
 
     assert mtlearn.__version__ == args.expected_version
     assert attr_index["AREA"] == 0
-    assert attr_values.shape[0] == tree.numInternalNodeSlots
+    assert attr_values.shape[0] == tree.num_internal_node_slots
 
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,

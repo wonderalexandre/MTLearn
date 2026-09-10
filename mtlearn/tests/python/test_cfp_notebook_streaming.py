@@ -177,7 +177,9 @@ def test_original_protocol_dataset_and_loss_code_preserved():
         def node(source): return next(n for n in ast.parse(source).body if isinstance(n,ast.FunctionDef) and n.name==name)
         assert ast.dump(node(BEFORE['cells']['13']))==ast.dump(node(notebook.cells[13].source)),name
     original_screws=NOTEBOOK.with_name('CFP_linear_vs_mlp_scoring_screws_segmentation.ipynb')
-    assert hashlib.sha256(original_screws.read_bytes()).hexdigest()==BEFORE['source_screws_sha256']
+    source_before_rename = original_screws.read_bytes().replace(
+        b'Type.GRAY_LEVEL_HEIGHT', b'Type.GRAY_HEIGHT')
+    assert hashlib.sha256(source_before_rename).hexdigest()==BEFORE['source_screws_sha256']
     assert 'collect_responses_and_targets' not in '\n'.join(c.source for c in notebook.cells)
 
 
@@ -196,7 +198,7 @@ def test_shared_ssd_preserves_legacy_initialization_and_one_epoch(tmp_path,batch
     train=TensorDataset(images[:3],targets[:3]);test=TensorDataset(images[3:],targets[3:])
     def models():
         return {kind:Layer(1,[{'name':kind,'tree_type':morphology.TreeType.MAX_TREE,
-            'attributes':[morphology.AttributeType.AREA,morphology.AttributeType.GRAY_HEIGHT],
+            'attributes':[morphology.AttributeType.AREA,morphology.AttributeType.GRAY_LEVEL_HEIGHT],
             'scoring': {'kind':'linear_sigmoid'} if kind=='linear' else {'kind':'mlp','hidden_units':[8],'activation':'tanh'}}],
             scale_mode='dataset_clipped_zscore01',clamp=12.) for kind in ('linear','mlp')}
     torch.manual_seed(42);previous=models()

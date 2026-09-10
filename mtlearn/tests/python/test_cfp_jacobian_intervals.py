@@ -118,11 +118,11 @@ def test_compact_native_intervals_keep_inactive_node_slots_empty():
     import numpy as np
     tree = mtlearn.morphology.build_tree(np.array([[1, 2, 3, 4]], dtype=np.uint8), "max-tree")
     removed = next(node for node in tree.alive_node_ids if node != tree.root)
-    tree.pruneNode(removed)
+    tree.prune_node(removed)
     residues, pre, post, parent, pix = mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
-    assert residues.numel() == tree.numInternalNodeSlots > tree.numNodes
+    assert residues.numel() == tree.num_internal_node_slots > tree.num_nodes
     assert residues[removed] == pre[removed] == post[removed] == 0
-    assert int(post.max()) == tree.numNodes
+    assert int(post.max()) == tree.num_nodes
     J = mtlearn.ConnectedFilterPreprocessingTreeTensors.get_jacobian(tree).to_dense().double()
     signal = torch.linspace(-1, 1, residues.numel(), dtype=torch.float64)
     probe = torch.tensor([0.2, -0.7, 0.4, 0.9], dtype=torch.float64)

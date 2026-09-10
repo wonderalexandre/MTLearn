@@ -5,6 +5,7 @@ Do not regenerate these fixtures to accommodate a refactoring regression.
 """
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ pytestmark = pytest.mark.integration
 if not getattr(mtlearn, 'WITH_TORCH', False):
     pytest.skip('build has no LibTorch support', allow_module_level=True)
 
-FIXTURES = Path(__file__).parent / 'fixtures' / 'cfp_cache_p0'
+FIXTURES = Path(__file__).parent / 'fixtures' / 'cfp_cache_p0_mmcfilters_v5_2_0'
 MANIFEST = json.loads((FIXTURES / 'manifest.json').read_text())
 CASE_NAMES = MANIFEST['cases']
 
@@ -42,9 +43,46 @@ def assert_nested_close(actual, expected):
         assert actual == expected
 
 
-def test_frozen_file_integrity():
-    for name, expected in MANIFEST['files'].items():
-        assert hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest() == expected, name
+@pytest.mark.parametrize('fixture_name', ['cfp_cache_p0', 'cfp_cache_p0_mmcfilters_v5_2_0'])
+def test_frozen_file_integrity(fixture_name):
+    fixtures = FIXTURES.parent / fixture_name
+    manifest = json.loads((fixtures / 'manifest.json').read_text())
+    for name, expected in manifest['files'].items():
+        assert hashlib.sha256((fixtures / name).read_bytes()).hexdigest() == expected, name
+
+
+def test_backend_attribute_rename_preserves_all_reference_values():
+    original = FIXTURES.parent / 'cfp_cache_p0'
+
+    renames = MANIFEST['attribute_renames']
+    interpolation_names = MANIFEST['interpolation_renames']
+    names = {**renames, **interpolation_names}
+    pattern = re.compile(r'(?<![A-Z0-9_])(' + '|'.join(map(re.escape, names)) + r')(?![A-Z0-9_])')
+
+    def renamed(value):
+        return pattern.sub(lambda match: names[match[0]], value)
+
+    def compare(actual, expected):
+        if torch.is_tensor(expected):
+            torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+        elif isinstance(expected, dict):
+            keys = {renamed(key) for key in expected}
+            assert actual.keys() == keys
+            for key, value in expected.items():
+                compare(actual[renamed(key)], value)
+        elif isinstance(expected, (list, tuple)):
+            assert type(actual) is type(expected) and len(actual) == len(expected)
+            for actual_item, expected_item in zip(actual, expected):
+                compare(actual_item, expected_item)
+        elif isinstance(expected, str):
+            assert actual == renamed(expected)
+        else:
+            assert actual == expected
+
+    for name in MANIFEST['files']:
+        actual = torch.load(FIXTURES / name, map_location='cpu', weights_only=True)
+        expected = torch.load(original / name, map_location='cpu', weights_only=True)
+        compare(actual, expected)
 
 
 @pytest.mark.parametrize('execution', ['direct', 'cached'])

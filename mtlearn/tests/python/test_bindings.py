@@ -252,8 +252,8 @@ def test_build_tree_returns_weighted_tree_for_supported_types():
         tree = build_tree(img, tree_type)
 
         assert morphology.is_tree(tree)
-        assert tree.getRoot() >= 0
-        assert tree.getProperPartOwner(0) >= 0
+        assert tree.root >= 0
+        assert tree.smallest_node(0) >= 0
         assert not hasattr(tree, "getSmallestComponent")
 
 
@@ -270,7 +270,7 @@ def test_morphology_facade_computes_attributes_and_filters():
     assert morphology.normalize_tree_type(morphology.TreeType.TREE_OF_SHAPES) == "tree-of-shapes"
     assert hasattr(morphology.AttributeType, "CONTOUR_PERIMETER")
     boundary_attributes = morphology.expand_attribute_group(morphology.AttributeGroup.BOUNDARY)
-    assert morphology.AttributeType.BITQUADS_AREA in boundary_attributes
+    assert morphology.AttributeType.BITQUAD_AREA in boundary_attributes
     assert morphology.AttributeType.CONTOUR_PERIMETER in boundary_attributes
     assert morphology.AttributeType.MAX_DIST not in boundary_attributes
 
@@ -278,19 +278,19 @@ def test_morphology_facade_computes_attributes_and_filters():
         tree,
         [morphology.AttributeType.AREA, morphology.AttributeGroup.TREE_TOPOLOGY],
     )
-    single_attr = morphology.Attribute.computeSingleAttribute(
+    single_attr = morphology.Attribute.compute_single_attribute(
         tree,
         morphology.AttributeType.AREA,
         morphology.NodeIdSpace.MORPHOLOGICAL_TREE,
     )
-    single_attr64 = morphology.Attribute.computeSingleAttribute(
+    single_attr64 = morphology.Attribute.compute_single_attribute(
         tree,
         morphology.AttributeType.AREA,
         morphology.NodeIdSpace.MORPHOLOGICAL_TREE,
         np.float64,
     )
     attribute_filter = morphology.create_attribute_filter(tree)
-    filtered = attribute_filter.filteringSubtractiveRule(
+    filtered = attribute_filter.apply_subtractive_attribute_filter(
         np.ones(attr_values.shape[0], dtype=bool)
     )
 
@@ -301,7 +301,7 @@ def test_morphology_facade_computes_attributes_and_filters():
     assert filtered.shape == img.shape
 
     area_description = morphology.Attribute.describe(morphology.AttributeType.AREA)
-    all_descriptions = morphology.Attribute.describeAll()
+    all_descriptions = morphology.Attribute.describe_all()
     assert "Area:" in area_description
     assert all_descriptions["AREA"] == area_description
     assert "CIRCULARITY" in all_descriptions

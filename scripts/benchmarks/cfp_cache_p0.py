@@ -104,7 +104,7 @@ def provenance(build, extension):
 def layer(scoring, scale='dataset_clipped_zscore01', tree='max-tree', all_attrs=False,
           device='cpu'):
     attributes = ((morphology.AttributeGroup.ALL,) if all_attrs else
-                  (morphology.AttributeType.AREA, morphology.AttributeType.GRAY_HEIGHT))
+                  (morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVEL_HEIGHT))
     return Layer(in_channels=1, filter_specs=[{
         'name': 'baseline', 'tree_type': tree, 'attributes': attributes,
         'score_sharpness': 1.0,

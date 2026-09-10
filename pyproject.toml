@@ -118,6 +118,7 @@ include = [
   "/mtlearn/tests/cpp/*.cpp",
   "/mtlearn/tests/python/*.py",
   "/mtlearn/tests/python/fixtures/cfp_cache_p0/**",
+  "/mtlearn/tests/python/fixtures/cfp_cache_p0_mmcfilters_v5_2_0/**",
   "/scripts/*.py",
   "/docs/installation.md",
   "/docs/development.md",

@@ -23,10 +23,10 @@ from mtlearn.layers.cfp.preparation._identity import (image_identity, identity_k
 from mtlearn.layers.cfp.storage import _disk_format
 
 pytestmark = pytest.mark.integration
-FIXTURES = Path(__file__).parent / "fixtures/cfp_cache_p0"
+FIXTURES = Path(__file__).parent / "fixtures/cfp_cache_p0_mmcfilters_v5_2_0"
 MANIFEST = json.loads((FIXTURES / "manifest.json").read_text())
 ROOT = Path(__file__).resolve().parents[3]
-AREA, HEIGHT = morphology.AttributeType.AREA, morphology.AttributeType.GRAY_HEIGHT
+AREA, HEIGHT = morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVEL_HEIGHT
 QUOTA = 32 * 1024**2
 
 
@@ -334,7 +334,7 @@ ref.morphology = __import__("mtlearn", fromlist=["morphology"]).morphology
 from mtlearn.layers.cfp import CFPPreprocessor, DiskStore, PreparedDataset
 from torch.utils.data import TensorDataset
 import torch
-baseline=torch.load(Path(sys.argv[1])/"mtlearn/tests/python/fixtures/cfp_cache_p0/baseline.pt",weights_only=True)
+baseline=torch.load(Path(sys.argv[1])/"mtlearn/tests/python/fixtures/cfp_cache_p0_mmcfilters_v5_2_0/baseline.pt",weights_only=True)
 source=TensorDataset(baseline["images"][:1],baseline["targets"][:1])
 if sys.argv[3]=="crash":
     store=DiskStore(sys.argv[2],max_disk_bytes=32*1024**2)
@@ -532,3 +532,52 @@ def test_checksum_binds_the_validated_bytes_before_publication(baseline,tmp_path
         key=store._db.execute("SELECT key FROM entries").fetchone()[0]
         with pytest.raises(ValueError,match="checksum"):
             store.get(key)
+
+
+@pytest.mark.parametrize("group_name", ["DIST_TRANSF", "DIST_TRANSF_EXACT", "FILLED_SHAPE"])
+@pytest.mark.parametrize("tree_type", ["max-tree", "min-tree", "tree-of-shapes"])
+@pytest.mark.parametrize("device, dtype", [("cpu", np.float32), ("cpu", np.float64), ("mps", np.float32)])
+def test_distance_and_filled_shape_groups_preserve_cached_outputs_and_gradients(
+    tmp_path, monkeypatch, group_name, tree_type, dtype, device
+):
+    from mtlearn.layers.cfp.preparation._identity import preprocessor_config, preprocessor_from_config
+
+    if device == "mps" and not torch.backends.mps.is_available():
+        pytest.skip("MPS unavailable")
+    images = torch.zeros(2, 1, 7, 7)
+    images[:, :, 1:6, 1:6] = 200
+    images[1, 0, 2, 2] = 0
+    if tree_type == "min-tree":
+        images = 255 - images
+    layer = Layer(1, [{"tree_type": tree_type, "attributes": [getattr(morphology.AttributeGroup, group_name)]}],
+                  scale_mode="dataset_minmax01", attribute_dtype=dtype, device=device)
+    layer.fit_stats(DataLoader(TensorDataset(images), batch_size=2))
+    with torch.no_grad():
+        for parameter in layer.parameters():
+            parameter.fill_(0.01)
+    direct = layer(images)
+    probe = torch.linspace(-0.5, 0.75, direct.numel(), device=device).reshape_as(direct)
+    (direct * probe).sum().backward()
+    gradients = {name: parameter.grad.detach().clone() for name, parameter in layer.named_parameters()}
+    assert any(torch.count_nonzero(gradient) for gradient in gradients.values())
+    assert all(torch.isfinite(gradient).all() for gradient in gradients.values())
+
+    restored = Layer.from_config(layer.get_config(), device=device)
+    restored.load_state_dict(layer.state_dict())
+    prep = CFPPreprocessor.from_layer(restored)
+    prep = preprocessor_from_config(preprocessor_config(prep))
+    expected_attributes = set(morphology.expand_attribute_group(getattr(morphology.AttributeGroup, group_name)))
+    with DiskStore(tmp_path, max_disk_bytes=QUOTA) as store:
+        batch = prep.prepare_batch(images, store=store)
+        for sample in batch.samples:
+            for prepared in sample[0].values():
+                assert set(prepared.raw_attributes) == expected_attributes
+        del batch
+    monkeypatch.setattr(CFPPreprocessor, "prepare_u8", forbid)
+    with DiskStore(tmp_path, readonly=True) as store:
+        batch = prep.prepare_batch(images, store=store)
+        cached = restored(batch)
+        (cached * probe).sum().backward()
+    torch.testing.assert_close(cached, direct)
+    for name, parameter in restored.named_parameters():
+        torch.testing.assert_close(parameter.grad, gradients[name])

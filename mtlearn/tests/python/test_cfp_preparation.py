@@ -21,7 +21,7 @@ from mtlearn.layers.cfp import CFPPreprocessor, PreparedMorphology, StatisticsSn
 from mtlearn.layers.cfp.normalization import AttributeNormalizer
 from mtlearn.layers.cfp.normalization import attribute_statistics
 
-FIXTURES = Path(__file__).parent / "fixtures/cfp_cache_p0"
+FIXTURES = Path(__file__).parent / "fixtures/cfp_cache_p0_mmcfilters_v5_2_0"
 MANIFEST = json.loads((FIXTURES / "manifest.json").read_text())
 
 
@@ -36,7 +36,7 @@ def loader(images, *, batch_size=2, **kwargs):
 
 def model(*, mode="dataset_clipped_zscore01", tree="max-tree", scoring="linear_sigmoid", channels=1):
     return ConnectedFilterPreprocessingLayer(channels, [{"tree_type": tree,
-        "attributes": [morphology.AttributeType.AREA, morphology.AttributeType.GRAY_HEIGHT],
+        "attributes": [morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVEL_HEIGHT],
         "scoring": {"kind": scoring}}], scale_mode=mode, clamp=12)
 
 
@@ -252,7 +252,7 @@ def test_training_does_not_update_statistics_or_recompute_moments(baseline, monk
 
 def test_streaming_multichannel_shared_attributes_and_multiple_trees_match_legacy(baseline):
     specs = [{"tree_type": "max-tree", "attributes": [morphology.AttributeType.AREA]},
-             {"tree_type": "max-tree", "attributes": [morphology.AttributeType.AREA, morphology.AttributeType.GRAY_HEIGHT]},
+             {"tree_type": "max-tree", "attributes": [morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVEL_HEIGHT]},
              {"tree_type": "min-tree", "attributes": [morphology.AttributeType.AREA]}]
     images = baseline["images"][:3].repeat(1, 2, 1, 1)
     legacy = ConnectedFilterPreprocessingLayer(2, specs)

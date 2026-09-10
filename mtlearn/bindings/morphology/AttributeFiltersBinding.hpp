@@ -261,37 +261,37 @@ or node scores and return reconstructed NumPy images. Create instances through
 ``mtlearn.morphology.create_attribute_filter(tree)`` when possible.
 )pbdoc")
         .def(py::init<morphology::WeightedTreePtr>(), "tree"_a, "Create filters bound to ``tree``.")
-        .def("filteringMin",
+        .def("filtering_by_pruning_min",
             py::overload_cast<py::array, double>(&AttributeFiltersPybind::filteringMin),
             "attr"_a,
             "threshold"_a,
             "Prune by a minimum-threshold rule over one node attribute array.")
-        .def("filteringMin",
+        .def("filtering_by_pruning_min",
             py::overload_cast<std::vector<bool>>(&AttributeFiltersPybind::filteringMin),
             "criterion"_a,
             "Prune by a boolean minimum criterion with one value per node slot.")
-        .def("filteringMax",
+        .def("filtering_by_pruning_max",
             py::overload_cast<py::array, double>(&AttributeFiltersPybind::filteringMax),
             "attr"_a,
             "threshold"_a,
             "Prune by a maximum-threshold rule over one node attribute array.")
-        .def("filteringMax",
+        .def("filtering_by_pruning_max",
             py::overload_cast<std::vector<bool>>(&AttributeFiltersPybind::filteringMax),
             "criterion"_a,
             "Prune by a boolean maximum criterion with one value per node slot.")
-        .def("filteringDirectRule",
+        .def("apply_direct_attribute_filter",
             &AttributeFiltersPybind::filteringDirectRule,
             "criterion"_a,
             "Apply the backend direct-rule attribute filter.")
-        .def("filteringSubtractiveRule",
+        .def("apply_subtractive_attribute_filter",
             &AttributeFiltersPybind::filteringSubtractiveRule,
             "criterion"_a,
             "Apply the backend subtractive-rule attribute filter.")
-        .def("filteringSubtractiveScoreRule",
+        .def("apply_soft_subtractive_attribute_filter",
             &AttributeFiltersPybind::filteringSubtractiveScoreRule,
             "scores"_a,
             "Apply the backend subtractive score rule and return a float image.")
-        .def("filteringByExtinctionValue",
+        .def("filtering_by_extinction",
             &AttributeFiltersPybind::filteringByExtinctionValue,
             "attr"_a,
             "min_extinction"_a = py::none(),

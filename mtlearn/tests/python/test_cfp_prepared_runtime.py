@@ -20,9 +20,9 @@ pytestmark = pytest.mark.integration
 if not getattr(mtlearn, "WITH_TORCH", False):
     pytest.skip("build has no LibTorch support", allow_module_level=True)
 
-FIXTURES = Path(__file__).parent / "fixtures/cfp_cache_p0"
+FIXTURES = Path(__file__).parent / "fixtures/cfp_cache_p0_mmcfilters_v5_2_0"
 MANIFEST = json.loads((FIXTURES / "manifest.json").read_text())
-AREA, HEIGHT = morphology.AttributeType.AREA, morphology.AttributeType.GRAY_HEIGHT
+AREA, HEIGHT = morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVEL_HEIGHT
 
 
 @pytest.fixture(scope="module")

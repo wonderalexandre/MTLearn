@@ -180,7 +180,7 @@ def bind(store, manifest, index, *args):
 parallel._bind_sample = bind
 if __name__ == '__main__':
     torch.set_num_threads(1)
-    layer = Layer(1, [{{'tree_type':'max-tree', 'attributes':[morphology.AttributeType.AREA, morphology.AttributeType.GRAY_HEIGHT]}}])
+    layer = Layer(1, [{{'tree_type':'max-tree', 'attributes':[morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVEL_HEIGHT]}}])
     prep = CFPPreprocessor.from_layer(layer)
     source = [torch.arange(42).reshape(1,6,7).float()/42, torch.ones(1,6,7)]
     options = dict(manifest='train',source_version='v1',preprocessing_version='v1',collect_stats=True,num_workers=(2 if fault == 'order' else 1),worker_threads=2,max_retries=1)

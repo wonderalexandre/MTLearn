@@ -156,7 +156,7 @@ def _assert_all_attributes_finite(image: np.ndarray, label: str):
             )
 
             assert values.dtype == np.dtype(dtype), f"{label}: {tree_name}: expected {dtype}"
-            assert values.shape == (tree.numInternalNodeSlots, len(layout))
+            assert values.shape == (tree.num_internal_node_slots, len(layout))
             assert "ECCENTRICITY" in layout
             assert "BITQUAD_CIRCULARITY" in layout
             assert "MAX_DIST" in layout
@@ -177,10 +177,10 @@ def test_tree_constructors_return_public_facade_type():
     for tree in trees:
         assert morphology.is_tree(tree)
         assert isinstance(tree, morphology.WeightedMorphologicalTree)
-        assert tree.numRows == image.shape[0]
-        assert tree.numCols == image.shape[1]
-        assert tree.numNodes > 0
-        assert tree.numInternalNodeSlots >= tree.numNodes
+        assert tree.num_rows == image.shape[0]
+        assert tree.num_columns == image.shape[1]
+        assert tree.num_nodes > 0
+        assert tree.num_internal_node_slots >= tree.num_nodes
 
 
 def test_tree_of_shapes_facade_accepts_interpolation_options():
@@ -193,20 +193,20 @@ def test_tree_of_shapes_facade_accepts_interpolation_options():
         infinity_seed_col=0,
     )
 
-    assert tree.treeType == "tree-of-shapes"
-    assert tree.hasTreeOfShapesAdjacencyPolicy is True
-    assert tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.0
-    assert tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.5
+    assert tree.kind == "tree-of-shapes"
+    assert tree.has_tree_of_shapes_adjacency_policy is True
+    assert tree.tree_of_shapes_min_adjacency_radius() == 1.0
+    assert tree.tree_of_shapes_max_adjacency_radius() == 1.5
 
     enum_tree = morphology.build_tree(
         image,
         "tree-of-shapes",
-        tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
+        tos_interpolation=morphology.ToSInterpolation.MIN8_MAX4,
     )
 
-    assert enum_tree.treeType == "tree-of-shapes"
-    assert enum_tree.getTreeOfShapesMinTreeAdjacencyRadius() == 1.5
-    assert enum_tree.getTreeOfShapesMaxTreeAdjacencyRadius() == 1.0
+    assert enum_tree.kind == "tree-of-shapes"
+    assert enum_tree.tree_of_shapes_min_adjacency_radius() == 1.5
+    assert enum_tree.tree_of_shapes_max_adjacency_radius() == 1.0
 
 
 def test_build_tree_rejects_unknown_tree_type():
@@ -234,7 +234,7 @@ def test_compute_attributes_returns_sorted_index_and_expected_shape():
     )
 
     assert list(attr_index.values()) == sorted(attr_index.values())
-    assert attr_values.shape[0] == tree.numInternalNodeSlots
+    assert attr_values.shape[0] == tree.num_internal_node_slots
     assert attr_values.shape[1] == len(attr_index)
     assert "AREA" in attr_index
     assert "COMPACTNESS" in attr_index
@@ -282,7 +282,7 @@ def test_compute_single_attribute_matches_tree_node_space():
 
     area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA)
 
-    assert area.shape == (tree.numInternalNodeSlots,)
+    assert area.shape == (tree.num_internal_node_slots,)
     assert area.dtype == np.float32
 
 
@@ -337,10 +337,10 @@ def test_attribute_filter_validates_node_sized_inputs():
     attribute_filter = morphology.create_attribute_filter(tree)
 
     with pytest.raises(ValueError, match="criterion must have length"):
-        attribute_filter.filteringSubtractiveRule([True])
+        attribute_filter.apply_subtractive_attribute_filter([True])
 
     with pytest.raises(ValueError, match="attr must have length"):
-        attribute_filter.filteringMin(np.ones(1, dtype=np.float32), 1.0)
+        attribute_filter.filtering_by_pruning_min(np.ones(1, dtype=np.float32), 1.0)
 
 
 def test_attribute_filter_accepts_float64_attributes():
@@ -352,8 +352,8 @@ def test_attribute_filter_accepts_float64_attributes():
     )
     attribute_filter = morphology.create_attribute_filter(tree)
 
-    filtered_min = attribute_filter.filteringMin(area, float(np.median(area)))
-    filtered_max = attribute_filter.filteringMax(area, float(np.median(area)))
+    filtered_min = attribute_filter.filtering_by_pruning_min(area, float(np.median(area)))
+    filtered_max = attribute_filter.filtering_by_pruning_max(area, float(np.median(area)))
 
     assert filtered_min.shape == _small_image().shape
     assert filtered_max.shape == _small_image().shape
@@ -364,31 +364,31 @@ def test_attribute_filter_accepts_float64_attributes():
 def test_attribute_filter_extinction_methods():
     image = _small_image()
     tree = morphology.create_max_tree(image)
-    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_LEVEL)
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_GRAY_LEVEL)
     level64 = morphology.compute_single_attribute(
         tree,
-        morphology.AttributeType.MEAN_LEVEL,
+        morphology.AttributeType.MEAN_GRAY_LEVEL,
         dtype=np.float64,
     )
     attribute_filter = morphology.create_attribute_filter(tree)
     assert not hasattr(attribute_filter, "filteringByExtinction")
     assert not hasattr(attribute_filter, "saliencyMapByExtinction")
 
-    reconstructed = tree.reconstructionImage()
-    filtered_keep_all = attribute_filter.filteringByExtinctionValue(
+    reconstructed = tree.reconstruct_from_node_altitudes()
+    filtered_keep_all = attribute_filter.filtering_by_extinction(
         level,
         extrema_to_keep=1024,
     )
-    filtered_value_keep_all = attribute_filter.filteringByExtinctionValue(
+    filtered_value_keep_all = attribute_filter.filtering_by_extinction(
         level,
         min_extinction=0.0,
     )
-    filtered_value_keep_all_positional = attribute_filter.filteringByExtinctionValue(level, 0.0)
-    strongest_by_rank = attribute_filter.filteringByExtinctionValue(
+    filtered_value_keep_all_positional = attribute_filter.filtering_by_extinction(level, 0.0)
+    strongest_by_rank = attribute_filter.filtering_by_extinction(
         level,
         extrema_to_keep=1,
     )
-    strongest_by_value = attribute_filter.filteringByExtinctionValue(
+    strongest_by_value = attribute_filter.filtering_by_extinction(
         level,
         min_extinction=float(np.finfo(level.dtype).max),
     )
@@ -400,26 +400,26 @@ def test_attribute_filter_extinction_methods():
 
 def test_attribute_filter_extinction_validates_inputs():
     tree = morphology.create_max_tree(_small_image())
-    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_LEVEL)
+    level = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_GRAY_LEVEL)
     attribute_filter = morphology.create_attribute_filter(tree)
 
     with pytest.raises(ValueError, match="attr must have length"):
-        attribute_filter.filteringByExtinctionValue(
+        attribute_filter.filtering_by_extinction(
             np.ones(1, dtype=np.float32),
             extrema_to_keep=1,
         )
 
     with pytest.raises(ValueError, match="non-negative extremaToKeep"):
-        attribute_filter.filteringByExtinctionValue(level, extrema_to_keep=-1)
+        attribute_filter.filtering_by_extinction(level, extrema_to_keep=-1)
 
     with pytest.raises(ValueError, match="min_extinction must be finite"):
-        attribute_filter.filteringByExtinctionValue(level, np.inf)
+        attribute_filter.filtering_by_extinction(level, np.inf)
 
     with pytest.raises(ValueError, match="exactly one of min_extinction or extrema_to_keep"):
-        attribute_filter.filteringByExtinctionValue(level)
+        attribute_filter.filtering_by_extinction(level)
 
     with pytest.raises(ValueError, match="exactly one of min_extinction or extrema_to_keep"):
-        attribute_filter.filteringByExtinctionValue(
+        attribute_filter.filtering_by_extinction(
             level,
             min_extinction=0.0,
             extrema_to_keep=1,
@@ -428,14 +428,14 @@ def test_attribute_filter_extinction_validates_inputs():
     non_finite_level = level.copy()
     non_finite_level[0] = np.nan
     with pytest.raises(ValueError, match="attr must contain only finite values"):
-        attribute_filter.filteringByExtinctionValue(non_finite_level, extrema_to_keep=1)
+        attribute_filter.filtering_by_extinction(non_finite_level, extrema_to_keep=1)
 
     tos = morphology.create_tree_of_shapes(_small_image())
     tos_attribute_filter = morphology.create_attribute_filter(tos)
-    tos_attr = np.ones(tos.numInternalNodeSlots, dtype=np.float32)
+    tos_attr = np.ones(tos.num_internal_node_slots, dtype=np.float32)
 
     with pytest.raises(ValueError, match="requires a globally monotone altitude order"):
-        tos_attribute_filter.filteringByExtinctionValue(tos_attr, extrema_to_keep=1)
+        tos_attribute_filter.filtering_by_extinction(tos_attr, extrema_to_keep=1)
 
 
 def test_attribute_filter_rejects_non_float_attribute_array():
@@ -443,8 +443,8 @@ def test_attribute_filter_rejects_non_float_attribute_array():
     attribute_filter = morphology.create_attribute_filter(tree)
 
     with pytest.raises(ValueError, match="attr must be a 1D np.float32 or np.float64 array"):
-        attribute_filter.filteringMin(
-            np.ones(tree.numInternalNodeSlots, dtype=np.int32),
+        attribute_filter.filtering_by_pruning_min(
+            np.ones(tree.num_internal_node_slots, dtype=np.int32),
             1.0,
         )
 
@@ -464,38 +464,61 @@ def test_removed_backend_symbols_are_not_reexported():
         assert not hasattr(mtlearn._bindings, name)
 
 
-def test_backend_vocabulary_aliases_keep_the_canonical_names():
-    """The new backend spellings are accepted, but never become the canonical name.
+def test_attribute_enum_names_match_the_catalog_without_aliases():
+    descriptions = morphology.describe_all_attributes()
+    members = morphology.AttributeType.__members__
 
-    CFP normalization statistics are keyed by the enum name (see
-    ``ConnectedFilterPreprocessingLayer._stat_key``) and those keys are written
-    into checkpoints. If an alias ever displaced the canonical name, saved
-    statistics would stop matching and be silently recomputed.
-    """
-    aliases = {
-        "BITQUADS_AREA": "BITQUAD_AREA",
-        "BITQUADS_CIRCULARITY": "BITQUAD_CIRCULARITY",
-        "BITQUADS_LENGTH_AVERAGE": "BITQUAD_LENGTH_AVERAGE",
-        "BITQUADS_NUMBER_EULER": "BITQUAD_NUMBER_EULER",
-        "BITQUADS_NUMBER_HOLES": "BITQUAD_NUMBER_HOLES",
-        "BITQUADS_PERIMETER": "BITQUAD_PERIMETER",
-        "BITQUADS_PERIMETER_AVERAGE": "BITQUAD_PERIMETER_AVERAGE",
-        "BITQUADS_PERIMETER_CONTINUOUS": "BITQUAD_PERIMETER_CONTINUOUS",
-        "BITQUADS_WIDTH_AVERAGE": "BITQUAD_WIDTH_AVERAGE",
-        "BOX_COL_MAX": "BOX_COLUMN_MAX",
-        "BOX_COL_MIN": "BOX_COLUMN_MIN",
-        "BOX_HEIGHT": "BOUNDING_BOX_HEIGHT",
-        "GRAY_HEIGHT": "GRAY_LEVEL_HEIGHT",
-        "HEIGHT_NODE": "SUBTREE_HEIGHT",
-        "MEAN_LEVEL": "MEAN_GRAY_LEVEL",
-        "VARIANCE_LEVEL": "GRAY_LEVEL_VARIANCE",
-    }
+    assert len(members) == len(descriptions) == 132
+    assert set(members) == set(descriptions)
+    for name, value in members.items():
+        assert value.name == name
 
-    for canonical, alias in aliases.items():
-        canonical_value = getattr(morphology.AttributeType, canonical)
-        alias_value = getattr(morphology.AttributeType, alias)
-        assert alias_value == canonical_value, f"{alias} must alias {canonical}"
-        assert canonical_value.name == canonical, (
-            f"{canonical} lost its canonical name to {canonical_value.name}; "
-            "this would change persisted CFP statistic keys"
-        )
+
+def test_tree_queries_distinguish_pixels_proper_parts_and_nodes():
+    image = np.full((2, 3), 7, dtype=np.uint8)
+    tree = morphology.create_max_tree(image)
+
+    assert tree.num_pixels == image.size
+    assert tree.num_nodes == 1
+    assert tree.proper_part_cardinality(tree.root) == image.size
+    assert set(tree.proper_part(tree.root)) == set(range(image.size))
+    assert all(tree.smallest_node(pixel) == tree.root for pixel in range(image.size))
+    assert tree.children(tree.root) == []
+    assert tree.descendants(tree.root) == []
+    assert tree.ancestors(tree.root) == [tree.root]
+    assert tree.subtree_nodes(tree.root) == [tree.root]
+    np.testing.assert_array_equal(tree.reconstruct_from_node_altitudes(), image)
+
+
+def test_public_morphology_members_use_python_naming():
+    import inspect
+    import re
+
+    member_name = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$|^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$")
+    for cls in (morphology.WeightedMorphologicalTree, morphology.Attribute,
+                morphology.AttributeType, morphology.AttributeGroup,
+                morphology.AttributeFilters, morphology.ToSInterpolation):
+        for name in dir(cls):
+            if name.startswith('_') or isinstance(inspect.getattr_static(cls, name), type):
+                continue
+            assert member_name.fullmatch(name), (cls.__name__, name)
+
+
+def test_cfp_serializes_canonical_attribute_names_and_statistics():
+    import torch
+    from mtlearn.layers import ConnectedFilterPreprocessingLayer
+
+    names = ["GRAY_LEVEL_HEIGHT", "BOUNDING_BOX_HEIGHT", "SUBTREE_HEIGHT", "BITQUAD_AREA"]
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[{"name": "shape", "tree_type": "max-tree",
+                       "attributes": [getattr(morphology.AttributeType, name) for name in names]}],
+    )
+    image = torch.tensor([[[[0, 10], [20, 30]]]], dtype=torch.uint8)
+    layer.fit_stats([(image, torch.zeros(1))])
+    config = layer.get_config()
+    assert config["filter_specs"][0]["attributes"] == names
+    restored = ConnectedFilterPreprocessingLayer.from_config(config)
+    restored.load_state_dict(layer.state_dict())
+    assert {key.rsplit("::", 1)[1] for key in layer._ds_stats} == set(names)
+    torch.testing.assert_close(restored(image), layer(image))

@@ -23,7 +23,7 @@ layer = ConnectedFilterPreprocessingLayer(
             "tree_type": morphology.TreeType.MAX_TREE,
             "attributes": [
                 morphology.AttributeType.AREA,
-                morphology.AttributeType.GRAY_HEIGHT,
+                morphology.AttributeType.GRAY_LEVEL_HEIGHT,
             ],
         },
     ],

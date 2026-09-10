@@ -11,10 +11,10 @@ For the full attribute list, see {doc}`../concepts/attributes`.
 | Intent | Candidate attributes |
 | --- | --- |
 | Remove small components | `AREA`, `VOLUME` |
-| Prefer contrast in the tree | `GRAY_HEIGHT`, `RELATIVE_VOLUME` |
+| Prefer contrast in the tree | `GRAY_LEVEL_HEIGHT`, `RELATIVE_VOLUME` |
 | Prefer elongated or compact shapes | `COMPACTNESS`, `ECCENTRICITY`, `RATIO_WH` |
-| Use bounding-box geometry | `BOX_WIDTH`, `BOX_HEIGHT`, `RECTANGULARITY` |
-| Use tree position | `DEPTH_NODE`, `HEIGHT_NODE`, `NUM_CHILDREN_NODE` |
+| Use bounding-box geometry | `BOX_WIDTH`, `BOUNDING_BOX_HEIGHT`, `RECTANGULARITY` |
+| Use tree position | `DEPTH_NODE`, `SUBTREE_HEIGHT`, `NUM_CHILDREN_NODE` |
 | Use contours | `CONTOUR_PERIMETER`, `CONTOUR_PIXELS` |
 
 Example:
@@ -25,7 +25,7 @@ from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
 shape_and_contrast = [
     morphology.AttributeType.AREA,
-    morphology.AttributeType.GRAY_HEIGHT,
+    morphology.AttributeType.GRAY_LEVEL_HEIGHT,
     morphology.AttributeType.COMPACTNESS,
 ]
 ```
@@ -78,7 +78,7 @@ filter_specs = [
         "tree_type": "max-tree",
         "attributes": [
             morphology.AttributeType.AREA,
-            morphology.AttributeType.GRAY_HEIGHT,
+            morphology.AttributeType.GRAY_LEVEL_HEIGHT,
         ],
     },
     {
@@ -102,7 +102,7 @@ experiments matters.
 tos_spec = {
     "name": "tos_shape",
     "tree_type": "tree-of-shapes",
-    "tos_interpolation": morphology.ToSInterpolation.SelfDual,
+    "tos_interpolation": morphology.ToSInterpolation.SELF_DUAL,
     "attributes": [
         morphology.AttributeType.AREA,
         morphology.AttributeType.COMPACTNESS,
@@ -110,9 +110,8 @@ tos_spec = {
 }
 ```
 
-The current CFP validation rejects scalar attributes that are undefined for
-tree-of-shapes. Broad groups may be expanded with unsupported members removed
-when the backend exposes a safe group-level fallback.
+Groups expand to their complete scalar attribute sets for trees of shapes.
+Distance-transform attributes, including `MAX_DIST`, are supported.
 
 ## Config Round Trip
 
