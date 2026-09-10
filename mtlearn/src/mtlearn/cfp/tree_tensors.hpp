@@ -84,7 +84,8 @@ public:
     }
 
     // Return the compact tensor set used by the implicit-Jacobian CFP path:
-    // residues, preorder time, postorder time, parent id, and node-of-pixel.
+    // residues, compact preorder index, exclusive subtree end, parent id,
+    // and node-of-pixel. The backend retains its separate DFS event indices.
     // This avoids building a potentially large explicit sparse matrix during
     // training and allows the Python autograd function to traverse the tree.
     static std::list<torch::Tensor> getInfoForJacobian(morphology::WeightedTreePtr weightedTree)
@@ -115,18 +116,20 @@ public:
         int64_t* parentPtr = tParent.data_ptr<int64_t>();
         uint32_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<uint32_t>();
 
-        // Node-local metadata is independent per node, so the backend tree can
-        // be scanned in parallel. Values for inactive slots keep their zero
-        // defaults and are ignored by the traversal orders.
-        #pragma omp parallel for
-        for (morphology::NodeId nodeId = 0; nodeId < numNodes; ++nodeId) {
-            if (tree.isAlive(nodeId)) {
+        // Count entries only: each subtree occupies [pre, post) in preorder.
+        // Export CFP-specific indices in one O(T) traversal, leaving the
+        // backend's interleaved DFS event cache and node ids unchanged.
+        // Inactive slots retain the empty interval [0, 0) and zero residue.
+        int64_t nextPreorder = 0;
+        morphology::detail::traversePostOrder(
+            tree, tree.root(),
+            [&](morphology::NodeId nodeId) {
+                preOrderPtr[nodeId] = nextPreorder++;
                 residuesPtr[nodeId] = morphology::residue(*weightedTree, nodeId);
-                preOrderPtr[nodeId] = static_cast<int64_t>(tree.dfsEntryIndex(nodeId));
-                postOrderPtr[nodeId] = static_cast<int64_t>(tree.dfsExitIndex(nodeId));
                 parentPtr[nodeId] = static_cast<int64_t>(tree.parent(nodeId));
-            }
-        }
+            },
+            [](morphology::NodeId, morphology::NodeId) {},
+            [&](morphology::NodeId nodeId) { postOrderPtr[nodeId] = nextPreorder; });
 
         // nodeOfPixel is the final gather map used to reconstruct image pixels
         // from node-level filtered residues.

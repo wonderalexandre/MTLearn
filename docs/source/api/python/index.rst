@@ -11,6 +11,7 @@ extension, but user code should import through ``mtlearn.morphology`` and
 
    morphology
    layers
+   cfp_preparation
    native
    data
    datasets

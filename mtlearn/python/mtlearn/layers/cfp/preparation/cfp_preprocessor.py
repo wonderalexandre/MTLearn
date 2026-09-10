@@ -132,13 +132,14 @@ class CFPPreprocessor:
         residues, tpre, tpost, parent, node_of_pixel = (
             mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
         )
+        num_nodes = tpre.numel()
+        if int(tpost.max().item()) != num_nodes:
+            raise ValueError("CFP preparation requires compact preorder metadata; rebuild the native extension.")
         return {
             "residues": residues, "tpre": tpre, "tpost": tpost,
             "parent": parent, "node_of_pixel": node_of_pixel,
             "num_rows": tree.numRows, "num_cols": tree.numCols,
-            "num_times": int(tpost.max().item()) + 1, "tree_type": spec.tree_type,
-            "order_forward": torch.argsort(tpre, descending=False),
-            "order_backward": torch.argsort(tpre),
+            "tree_type": spec.tree_type,
         }
 
     @torch.no_grad()

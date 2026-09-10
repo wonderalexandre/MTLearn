@@ -1,0 +1,111 @@
+{
+  "stage": "P6",
+  "date": "2026-09-09",
+  "status": "complete",
+  "regression": {
+    "tests": 619,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0
+  },
+  "regression_seconds": 39.164,
+  "gradchecks": 19,
+  "new_checkpoint_tests": 24,
+  "fixture_files_verified": 25,
+  "baseline_native_sha256": "c84f7e6cb8b9a6677324de94fd9a8372eedb16e3980ed931379b2caaf5a2ff6c",
+  "original_screws_notebook_sha256": "0c736b20d2618c2b033279b30d6fd056e73a0349ab5f18ebf4f2ea26f343dd49",
+  "docs": [
+    {
+      "mode": "docs",
+      "strict_build": "passed",
+      "checked_pages": 6,
+      "local_links_and_anchors_checked": 274,
+      "public_preparation_objects": 10
+    },
+    {
+      "mode": "docs-mocked",
+      "strict_build": "passed",
+      "checked_pages": 6,
+      "local_links_and_anchors_checked": 273,
+      "public_preparation_objects": 10
+    }
+  ],
+  "migration_examples": "all three executed, including two CPU workers and final backward",
+  "package": {
+    "wheel": {
+      "path": "build/cfp-cache-p6-dist/mtlearn-1.1.0.post5-cp312-cp312-macosx_26_0_arm64.whl",
+      "sha256": "e0c17a18d547a1ae06d1e21cb96c28fabc201602d7f832186d6658e5aafde95b",
+      "bytes": 532113,
+      "members": 89,
+      "native_sha256": "eb0a7481e41b85dc92bb5a9d27b451a33cd52cb8701c35aba4a9f61129e629f9"
+    },
+    "sdist": {
+      "path": "build/cfp-cache-p6-dist/mtlearn-1.1.0.post5.tar.gz",
+      "sha256": "03e42b6ee93f3a09bcd30a7e89fa3b8f7964ffa06e707ed44015b43ebacf8fa0",
+      "bytes": 4279995,
+      "members": 798
+    },
+    "new_modules_verified": [
+      "mtlearn/layers/cfp/preparation/_statistics_fitter.py",
+      "mtlearn/layers/cfp/preparation/prepared_batch.py",
+      "mtlearn/layers/cfp/preparation/preparation_result.py",
+      "mtlearn/layers/cfp/preparation/_parallel_preparation.py",
+      "mtlearn/layers/cfp/preparation/__init__.py",
+      "mtlearn/layers/cfp/preparation/prepared_dataset.py",
+      "mtlearn/layers/cfp/preparation/_persistent_preparation.py",
+      "mtlearn/layers/cfp/preparation/cfp_preprocessor.py",
+      "mtlearn/layers/cfp/preparation/_identity.py",
+      "mtlearn/layers/cfp/preparation/prepared_morphology.py",
+      "mtlearn/layers/cfp/storage/_manifest.py",
+      "mtlearn/layers/cfp/storage/_disk_format.py",
+      "mtlearn/layers/cfp/storage/disk_store.py",
+      "mtlearn/layers/cfp/storage/null_store.py",
+      "mtlearn/layers/cfp/storage/memory_store.py",
+      "mtlearn/layers/cfp/storage/__init__.py",
+      "mtlearn/layers/cfp/storage/_writer_lock.py",
+      "mtlearn/layers/cfp/storage/_storages.py",
+      "mtlearn/layers/cfp/normalization/statistics_snapshot.py",
+      "mtlearn/layers/cfp/runtime/_prepared_lifetime.py"
+    ],
+    "source_python_modules_verified": 78,
+    "legacy_fixtures_in_sdist": true,
+    "release_exclusions_passed": true,
+    "wheel_built_from_sdist": true
+  },
+  "installed_wheel": {
+    "package_path": "/Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-install-final/mtlearn/__init__.py",
+    "native_path": "/Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-install-final/mtlearn/_mtlearn.cpython-312-darwin.so",
+    "native_sha256": "eb0a7481e41b85dc92bb5a9d27b451a33cd52cb8701c35aba4a9f61129e629f9",
+    "version": "1.1.0.post5",
+    "python": "3.12.3 | packaged by Anaconda, Inc. | (main, May  6 2024, 14:46:42) [Clang 14.0.6 ]",
+    "torch": "2.10.0",
+    "mps_available": true,
+    "cuda_available": false,
+    "release_smoke": "passed",
+    "checkpoint_pytest_exit": 0,
+    "source_package_used": false
+  },
+  "source_sha256": {
+    "scripts/benchmarks/cfp_cache_p6_finalize.py": "6ed68d7834aafe3fa03634494499b341eb9ff4ab22234aa2d47d7655caa2013a",
+    "scripts/smoke_test_release.py": "6323aeb2a446acdc76a82899e8ce422edd15a2709c55c563d2d898b495b671fa",
+    "scripts/benchmarks/cfp_cache_p6.py": "c4c9410c7ad4503dd96cae3536e46dea04ff9164e5c71cf15e99d42af110b97d",
+    "mtlearn/tests/python/test_cfp_checkpoint_independence.py": "b13f2e6408329b975cb0b0edaf241e61eb656cf137b5af26e89fe2a2d81f1304",
+    "pyproject.toml": "57a1221d058bed9758961881e1946646274c7f6cce00349027cc9a3415791d22",
+    "docs/cfp-architecture.md": "99691b7b5a3e6a4136a6549028843b6e24ae6bba4d0566a9d0f9e55d872a7aa2",
+    "docs/source/guides/cfp-cache-migration.md": "8671b9f68c3995a4ceb1041b5920589dc669757ddbeb4189b5942bb748bf4a5f",
+    "docs/source/guides/connected-filter-preprocessing.md": "afc8196a8a3c89c5fb4ba89ed103bfc5812e5aca0ad9ae0d11eb7dd81a266ef3",
+    "docs/source/guides/pytorch-integration.md": "57c6b39a68427e32dd59ddfe449a367800b5b62ae96c9d1bfec4e044169f7cdc",
+    "docs/source/guides/index.md": "493fe62e254298c51d47334c765f5e3d8185905f58f4b2fb0dd09732bf600cac",
+    "docs/source/api/python/cfp_preparation.rst": "43dd0f35983caf5a6d24c57c42af30105b1d670fcdd4b37ed58a81d5cf8af4d1",
+    "docs/source/api/python/index.rst": "25e3452d19ad5a1fdd3f424ab1813780aa4c8a8e9af069badf1ed360ee264f66",
+    "notebooks/experiments/CFP_linear_vs_mlp_scoring_205_SA_L3D14M3_segmentation.ipynb": "ee0cb66651c513fb7cfeff97c2c3c69e24148c533e474aa2153468c374289ef7"
+  },
+  "limitations": [
+    "CUDA unavailable",
+    "Linux/Windows and other Python/Torch versions not executed",
+    "No full 2041-image preparation or 100-epoch training",
+    "P0-P5 original-resolution measurements reused; no new large-data benchmark in P6",
+    "RSS does not represent total MPS/unified-memory peak",
+    "No external package/documentation publication"
+  ]
+}

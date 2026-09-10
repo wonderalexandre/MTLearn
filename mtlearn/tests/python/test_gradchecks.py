@@ -89,7 +89,6 @@ def test_implicit_jacobian_function_gradcheck():
             residues,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             attributes,
             tree.numRows,
@@ -106,22 +105,15 @@ def test_tree_reconstruction_function_gradcheck():
         mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
     )
     node_signal = residues.to(dtype=torch.float64).detach().requires_grad_(True)
-    order_forward = torch.argsort(tpre, descending=False)
-    order_backward = torch.argsort(tpre)
-    num_times = int(tpost.max().item()) + 1
 
     def reconstructed_mean(signal):
         return TreeReconstructionFunction.apply(
             signal,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             tree.numRows,
             tree.numCols,
-            order_forward,
-            order_backward,
-            num_times,
         ).mean()
 
     assert gradcheck(reconstructed_mean, (node_signal,), eps=1e-6, atol=1e-4)
@@ -151,7 +143,6 @@ def test_implicit_jacobian_function_gradcheck_with_clamp_bounds(clamp_min, clamp
             residues,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             attributes,
             tree.numRows,
@@ -180,7 +171,6 @@ def test_implicit_jacobian_function_clamp_saturates_backward():
         residues,
         tpre,
         tpost,
-        parent,
         node_of_pixel,
         attributes,
         tree.numRows,
@@ -214,7 +204,6 @@ def test_implicit_jacobian_function_gradcheck_tree_of_shapes():
             residues,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             attributes,
             tree.numRows,

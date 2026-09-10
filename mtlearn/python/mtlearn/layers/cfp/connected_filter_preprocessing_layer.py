@@ -516,13 +516,9 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             filtered_increments,
             info["tpre"],
             info["tpost"],
-            info["parent"],
             info["node_of_pixel"],
             info["num_rows"],
             info["num_cols"],
-            info["order_forward"],
-            info["order_backward"],
-            info["num_times"],
         )
 
         return y_ch

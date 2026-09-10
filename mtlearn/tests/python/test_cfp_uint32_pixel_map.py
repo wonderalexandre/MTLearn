@@ -51,7 +51,7 @@ def test_disk_retains_uint32_and_all_values(tmp_path, mmap):
         assert store.info()["disk_hits"] == 1
     files = list((tmp_path / "entries").glob("*.pt"))
     data = torch.load(files[0], weights_only=True, mmap=mmap)
-    assert data["format_version"] == 2
+    assert data["format_version"] == 4
     pixel_map = data["info"]["node_of_pixel"]
     assert pixel_map.dtype == torch.uint32
     assert pixel_map.nbytes == image.size * 4
@@ -70,9 +70,10 @@ def test_unsigned_range_survives_transfer_and_serialization(tmp_path, device):
     assert torch.equal(actual, expected)
 
 
-def test_old_store_rejected_without_rewriting_metadata(tmp_path):
+@pytest.mark.parametrize("old_version", [1, 2, 3])
+def test_old_store_rejected_without_rewriting_metadata(tmp_path, old_version):
     with DiskStore(tmp_path, max_disk_bytes=1024**2) as store:
-        old = canonical_json({"format_version": 1, "implementation": implementation_identity()})
+        old = canonical_json({"format_version": old_version, "implementation": implementation_identity()})
         store._db.execute("UPDATE metadata SET value=? WHERE key='contract'", (old,))
         store._db.commit()
     with pytest.raises(ValueError, match="incompatible"):

@@ -1,0 +1,4 @@
+{
+  "cell_index": 25,
+  "stage": "print(\"Final cache state:\", cache_store.info())"
+}

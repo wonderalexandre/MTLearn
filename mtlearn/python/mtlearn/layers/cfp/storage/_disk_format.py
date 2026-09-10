@@ -5,7 +5,7 @@ import torch
 
 from .... import morphology
 from ..normalization import AttributeNormalizer
-from ..preparation._identity import canonical_json, tree_config, tree_from_config, validate_identity
+from ..preparation._identity import FORMAT_VERSION, canonical_json, tree_config, tree_from_config, validate_identity
 from ..preparation.prepared_morphology import PreparedMorphology
 from ..specs import FeatureSpec
 
@@ -44,14 +44,14 @@ def pack(identity, prepared):
     hashes = {key: tensor_digest(tensor) for key, tensor in info.items() if torch.is_tensor(tensor)}
     hashes.update({"attr:" + key: tensor_digest(tensor) for key, tensor in attributes.items()})
     summary = summarize(prepared)
-    return {"format_version": 2, "identity": identity, "info": info, "attributes": attributes,
+    return {"format_version": FORMAT_VERSION, "identity": identity, "info": info, "attributes": attributes,
             "summary": summary, "tensor_sha256": hashes,
             "summary_sha256": hashlib.sha256(canonical_json(summary).encode()).hexdigest()}
 
 
 def unpack(data, *, full=False):
     expected = {"format_version", "identity", "info", "attributes", "summary", "tensor_sha256", "summary_sha256"}
-    if not isinstance(data, dict) or set(data) != expected or data["format_version"] != 2:
+    if not isinstance(data, dict) or set(data) != expected or data["format_version"] != FORMAT_VERSION:
         raise ValueError("Unsupported persistent morphology format.")
     identity = data["identity"]
     validate_identity(identity)

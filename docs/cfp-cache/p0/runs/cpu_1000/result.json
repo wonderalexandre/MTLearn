@@ -1,0 +1,1699 @@
+{
+  "image_id": 1000,
+  "input_sha256": "c0633e640c4945a51c3e822b9c964690e2ed6a45d3fa9c5a484a87ea18d2af26",
+  "target_sha256": "68f2821717d3289ca8d85aa0485bcee2c73f1a63e00434ae6d55d52f2aa32c8c",
+  "shape": [
+    1,
+    1,
+    2748,
+    2748
+  ],
+  "device": "cpu",
+  "attributes": [
+    "AREA",
+    "VOLUME",
+    "RELATIVE_VOLUME",
+    "GRAY_HEIGHT",
+    "MEAN_LEVEL",
+    "VARIANCE_LEVEL",
+    "BOX_WIDTH",
+    "BOX_HEIGHT",
+    "DIAGONAL_LENGTH",
+    "RECTANGULARITY",
+    "RATIO_WH",
+    "BOX_COL_MIN",
+    "BOX_COL_MAX",
+    "BOX_ROW_MIN",
+    "BOX_ROW_MAX",
+    "CENTRAL_MOMENT_20",
+    "CENTRAL_MOMENT_02",
+    "CENTRAL_MOMENT_11",
+    "CENTRAL_MOMENT_30",
+    "CENTRAL_MOMENT_03",
+    "CENTRAL_MOMENT_21",
+    "CENTRAL_MOMENT_12",
+    "HU_MOMENT_1",
+    "HU_MOMENT_2",
+    "HU_MOMENT_3",
+    "HU_MOMENT_4",
+    "HU_MOMENT_5",
+    "HU_MOMENT_6",
+    "HU_MOMENT_7",
+    "INERTIA",
+    "COMPACTNESS",
+    "ECCENTRICITY",
+    "LENGTH_MAJOR_AXIS",
+    "LENGTH_MINOR_AXIS",
+    "AXIS_ORIENTATION",
+    "CIRCULARITY",
+    "BITQUADS_AREA",
+    "BITQUADS_NUMBER_EULER",
+    "BITQUADS_NUMBER_HOLES",
+    "BITQUADS_PERIMETER",
+    "BITQUADS_PERIMETER_CONTINUOUS",
+    "BITQUADS_CIRCULARITY",
+    "BITQUADS_PERIMETER_AVERAGE",
+    "BITQUADS_LENGTH_AVERAGE",
+    "BITQUADS_WIDTH_AVERAGE",
+    "HEIGHT_NODE",
+    "DEPTH_NODE",
+    "IS_LEAF_NODE",
+    "IS_ROOT_NODE",
+    "NUM_CHILDREN_NODE",
+    "NUM_SIBLINGS_NODE",
+    "NUM_DESCENDANTS_NODE",
+    "NUM_LEAF_DESCENDANTS_NODE",
+    "LEAF_RATIO_NODE",
+    "BALANCE_NODE",
+    "MAX_DIST",
+    "AVG_CHILD_HEIGHT_NODE",
+    "CONTOUR_PIXELS",
+    "CONTOUR_PERIMETER",
+    "CONTOUR_SIDE_NORTH",
+    "CONTOUR_SIDE_WEST",
+    "CONTOUR_SIDE_EAST",
+    "CONTOUR_SIDE_SOUTH"
+  ],
+  "num_nodes": 627731,
+  "pixels": 7551504,
+  "raw_payload_bytes": 246220408,
+  "legacy_payload_bytes": 404408620,
+  "topology_bytes": 88032196,
+  "raw_attributes_bytes": 158188212,
+  "normalized_attributes_bytes": 158188212,
+  "sample_count_in_cache": 1,
+  "serialized_raw_bytes": 246240481,
+  "models": {
+    "linear": {
+      "loss": 0.89774489402771,
+      "gradient_l2": 0.0018713478930294514,
+      "response_sum": 864408310.7683069,
+      "parameters": 64
+    },
+    "mlp": {
+      "loss": 0.8977452516555786,
+      "gradient_l2": 0.00028204353293403983,
+      "response_sum": 864417523.5915326,
+      "parameters": 521
+    }
+  },
+  "status": "passed",
+  "timings": [
+    {
+      "stage": "read_and_decode",
+      "seconds": 0.058209125068970025,
+      "rss_end_bytes": 262635520,
+      "available_end_bytes": 3520266240
+    },
+    {
+      "stage": "input_and_mask_conversion",
+      "seconds": 0.0147481249878183,
+      "rss_end_bytes": 331251712,
+      "available_end_bytes": 3518021632
+    },
+    {
+      "stage": "tree_construction",
+      "seconds": 0.7755490830168128,
+      "rss_end_bytes": 519110656,
+      "available_end_bytes": 3625631744
+    },
+    {
+      "stage": "tree_tensors",
+      "seconds": 0.07714916602708399,
+      "rss_end_bytes": 608747520,
+      "available_end_bytes": 3469033472
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.00826462497934699,
+      "rss_end_bytes": 616087552,
+      "available_end_bytes": 3455746048
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0016067499527707696,
+      "rss_end_bytes": 626114560,
+      "available_end_bytes": 3448651776
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0019187910947948694,
+      "rss_end_bytes": 625868800,
+      "available_end_bytes": 3448717312
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.008609333075582981,
+      "rss_end_bytes": 630898688,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011287500383332372,
+      "rss_end_bytes": 637288448,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001110666897147894,
+      "rss_end_bytes": 637304832,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.01597974996548146,
+      "rss_end_bytes": 637304832,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0008264579810202122,
+      "rss_end_bytes": 637304832,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009322499390691519,
+      "rss_end_bytes": 637321216,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.01057087501976639,
+      "rss_end_bytes": 647151616,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007891249842941761,
+      "rss_end_bytes": 647151616,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011876249918714166,
+      "rss_end_bytes": 647184384,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.021690999972634017,
+      "rss_end_bytes": 652214272,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.001402582973241806,
+      "rss_end_bytes": 652214272,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0015851249918341637,
+      "rss_end_bytes": 652214272,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.027867084019817412,
+      "rss_end_bytes": 666615808,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0010712499497458339,
+      "rss_end_bytes": 666615808,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009204999078065157,
+      "rss_end_bytes": 666615808,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.06699570792261511,
+      "rss_end_bytes": 666632192,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0012770839966833591,
+      "rss_end_bytes": 666632192,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.00224754202645272,
+      "rss_end_bytes": 667680768,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07161812507547438,
+      "rss_end_bytes": 675201024,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0012099160812795162,
+      "rss_end_bytes": 680230912,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010836250148713589,
+      "rss_end_bytes": 680247296,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07247391704004258,
+      "rss_end_bytes": 684490752,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0016692919889464974,
+      "rss_end_bytes": 684490752,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0015120420139282942,
+      "rss_end_bytes": 684490752,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07921950006857514,
+      "rss_end_bytes": 684507136,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011534589575603604,
+      "rss_end_bytes": 684507136,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0012648749398067594,
+      "rss_end_bytes": 684523520,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07622833293862641,
+      "rss_end_bytes": 630898688,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0013979580253362656,
+      "rss_end_bytes": 630898688,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0019295420497655869,
+      "rss_end_bytes": 630898688,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07167720794677734,
+      "rss_end_bytes": 630898688,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0012869579950347543,
+      "rss_end_bytes": 635944960,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0033270829590037465,
+      "rss_end_bytes": 641007616,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07576412498019636,
+      "rss_end_bytes": 641024000,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011285420041531324,
+      "rss_end_bytes": 641024000,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.002647249959409237,
+      "rss_end_bytes": 641040384,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07063416694290936,
+      "rss_end_bytes": 641384448,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009761248948052526,
+      "rss_end_bytes": 641384448,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001025125035084784,
+      "rss_end_bytes": 641384448,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.061489916988648474,
+      "rss_end_bytes": 648953856,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0010622499976307154,
+      "rss_end_bytes": 648953856,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0013965419493615627,
+      "rss_end_bytes": 648970240,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.06482283398509026,
+      "rss_end_bytes": 700252160,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011434579500928521,
+      "rss_end_bytes": 700268544,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009769160533323884,
+      "rss_end_bytes": 700284928,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.059908166993409395,
+      "rss_end_bytes": 700284928,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0004677909892052412,
+      "rss_end_bytes": 700301312,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0006992920534685254,
+      "rss_end_bytes": 700317696,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.06336891697719693,
+      "rss_end_bytes": 700317696,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007115829503163695,
+      "rss_end_bytes": 705347584,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007142500253394246,
+      "rss_end_bytes": 705363968,
+      "available_end_bytes": 3450191872
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.07257395796477795,
+      "rss_end_bytes": 679460864,
+      "available_end_bytes": 3137011712
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009314169874414802,
+      "rss_end_bytes": 684490752,
+      "available_end_bytes": 3134324736
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009431249927729368,
+      "rss_end_bytes": 684507136,
+      "available_end_bytes": 3134472192
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.061824167030863464,
+      "rss_end_bytes": 684507136,
+      "available_end_bytes": 3141976064
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0006660419749096036,
+      "rss_end_bytes": 689537024,
+      "available_end_bytes": 3138846720
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007574170595034957,
+      "rss_end_bytes": 689553408,
+      "available_end_bytes": 3138977792
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.0706496249185875,
+      "rss_end_bytes": 689553408,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0027730410220101476,
+      "rss_end_bytes": 698679296,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010876250453293324,
+      "rss_end_bytes": 693190656,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.08013945899438113,
+      "rss_end_bytes": 686424064,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0017025829292833805,
+      "rss_end_bytes": 691486720,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001060917042195797,
+      "rss_end_bytes": 691503104,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.115077874972485,
+      "rss_end_bytes": 741916672,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009745830902829766,
+      "rss_end_bytes": 741916672,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009252909803763032,
+      "rss_end_bytes": 741933056,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.11260900006163865,
+      "rss_end_bytes": 746995712,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.001074999920092523,
+      "rss_end_bytes": 752041984,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007081669755280018,
+      "rss_end_bytes": 752074752,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.13964470801874995,
+      "rss_end_bytes": 762150912,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0006118329474702477,
+      "rss_end_bytes": 762150912,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010975420009344816,
+      "rss_end_bytes": 762167296,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.11496437503956258,
+      "rss_end_bytes": 767197184,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.001146750058978796,
+      "rss_end_bytes": 767213568,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010309170465916395,
+      "rss_end_bytes": 767229952,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.11513649998232722,
+      "rss_end_bytes": 777273344,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0013520419597625732,
+      "rss_end_bytes": 782319616,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0019442499615252018,
+      "rss_end_bytes": 782319616,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.10079929092898965,
+      "rss_end_bytes": 784138240,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0010624579153954983,
+      "rss_end_bytes": 789168128,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011227919021621346,
+      "rss_end_bytes": 789217280,
+      "available_end_bytes": 3136667648
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.11439670901745558,
+      "rss_end_bytes": 794247168,
+      "available_end_bytes": 3219800064
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.001145999995060265,
+      "rss_end_bytes": 794263552,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001021082978695631,
+      "rss_end_bytes": 794263552,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.10120879195164889,
+      "rss_end_bytes": 819396608,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011635830160230398,
+      "rss_end_bytes": 819396608,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0014260419411584735,
+      "rss_end_bytes": 819412992,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.09645175002515316,
+      "rss_end_bytes": 824459264,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0010545409750193357,
+      "rss_end_bytes": 824475648,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0016785829793661833,
+      "rss_end_bytes": 824508416,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.0979312090203166,
+      "rss_end_bytes": 824508416,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009838339174166322,
+      "rss_end_bytes": 829538304,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001510749920271337,
+      "rss_end_bytes": 829587456,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.09077958401758224,
+      "rss_end_bytes": 829587456,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007730000652372837,
+      "rss_end_bytes": 829603840,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008725420339033008,
+      "rss_end_bytes": 829620224,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.09555000008549541,
+      "rss_end_bytes": 834650112,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011428750585764647,
+      "rss_end_bytes": 834650112,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009805409936234355,
+      "rss_end_bytes": 834666496,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.09495870803948492,
+      "rss_end_bytes": 839696384,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007270839996635914,
+      "rss_end_bytes": 839696384,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007372499676421285,
+      "rss_end_bytes": 839712768,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.08530445897486061,
+      "rss_end_bytes": 844742656,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007202919805422425,
+      "rss_end_bytes": 844742656,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000828250078484416,
+      "rss_end_bytes": 844742656,
+      "available_end_bytes": 3219849216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6834319590125233,
+      "rss_end_bytes": 847642624,
+      "available_end_bytes": 3287367680
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0010337919229641557,
+      "rss_end_bytes": 849051648,
+      "available_end_bytes": 3287433216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0021059579448774457,
+      "rss_end_bytes": 849068032,
+      "available_end_bytes": 3287433216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6309027079259977,
+      "rss_end_bytes": 836272128,
+      "available_end_bytes": 3287433216
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007485420210286975,
+      "rss_end_bytes": 836272128,
+      "available_end_bytes": 3287433216
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010437499731779099,
+      "rss_end_bytes": 836304896,
+      "available_end_bytes": 3287433216
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6287736250087619,
+      "rss_end_bytes": 841334784,
+      "available_end_bytes": 3315253248
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.001990332966670394,
+      "rss_end_bytes": 841351168,
+      "available_end_bytes": 3315253248
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001206291955895722,
+      "rss_end_bytes": 841367552,
+      "available_end_bytes": 3315253248
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6319229999789968,
+      "rss_end_bytes": 817741824,
+      "available_end_bytes": 3235119104
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0005895830690860748,
+      "rss_end_bytes": 817741824,
+      "available_end_bytes": 3235217408
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007316248957067728,
+      "rss_end_bytes": 817741824,
+      "available_end_bytes": 3235217408
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6304618750000373,
+      "rss_end_bytes": 813121536,
+      "available_end_bytes": 3235217408
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0013701670104637742,
+      "rss_end_bytes": 818151424,
+      "available_end_bytes": 3235217408
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0014444589614868164,
+      "rss_end_bytes": 818167808,
+      "available_end_bytes": 3235217408
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6268200419144705,
+      "rss_end_bytes": 815038464,
+      "available_end_bytes": 3192619008
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0013226669980213046,
+      "rss_end_bytes": 820068352,
+      "available_end_bytes": 3192619008
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0014006249839439988,
+      "rss_end_bytes": 819675136,
+      "available_end_bytes": 3192619008
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6225615000585094,
+      "rss_end_bytes": 808960000,
+      "available_end_bytes": 3192619008
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0005373749881982803,
+      "rss_end_bytes": 808960000,
+      "available_end_bytes": 3192619008
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008397080237045884,
+      "rss_end_bytes": 808976384,
+      "available_end_bytes": 3192619008
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6226535830646753,
+      "rss_end_bytes": 792444928,
+      "available_end_bytes": 3212509184
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009776250226423144,
+      "rss_end_bytes": 797491200,
+      "available_end_bytes": 3212509184
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010788330109789968,
+      "rss_end_bytes": 797523968,
+      "available_end_bytes": 3212509184
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.6181702079484239,
+      "rss_end_bytes": 802553856,
+      "available_end_bytes": 3286466560
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007403750205412507,
+      "rss_end_bytes": 807600128,
+      "available_end_bytes": 3283484672
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011386669939383864,
+      "rss_end_bytes": 807600128,
+      "available_end_bytes": 3285434368
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.01091204199474305,
+      "rss_end_bytes": 810139648,
+      "available_end_bytes": 3286007808
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0014394159661605954,
+      "rss_end_bytes": 813776896,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010211250046268106,
+      "rss_end_bytes": 813793280,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.01058362505864352,
+      "rss_end_bytes": 818823168,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007074159802868962,
+      "rss_end_bytes": 823853056,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000727499951608479,
+      "rss_end_bytes": 823869440,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.009916209033690393,
+      "rss_end_bytes": 823885824,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007470420096069574,
+      "rss_end_bytes": 828915712,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007670409977436066,
+      "rss_end_bytes": 828932096,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.010062874993309379,
+      "rss_end_bytes": 828932096,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007498749764636159,
+      "rss_end_bytes": 833994752,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000691582914441824,
+      "rss_end_bytes": 834027520,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.009696041932329535,
+      "rss_end_bytes": 836550656,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007440410554409027,
+      "rss_end_bytes": 841580544,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0006984160281717777,
+      "rss_end_bytes": 841580544,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.009629665990360081,
+      "rss_end_bytes": 841580544,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009899999713525176,
+      "rss_end_bytes": 846626816,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007073750020936131,
+      "rss_end_bytes": 846643200,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.011201999965123832,
+      "rss_end_bytes": 851673088,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0004550840239971876,
+      "rss_end_bytes": 851673088,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007039998890832067,
+      "rss_end_bytes": 851689472,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.011519041960127652,
+      "rss_end_bytes": 856719360,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0003960840404033661,
+      "rss_end_bytes": 856719360,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0006930839736014605,
+      "rss_end_bytes": 856735744,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.013476292020641267,
+      "rss_end_bytes": 866795520,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007349579827859998,
+      "rss_end_bytes": 871825408,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000709333922713995,
+      "rss_end_bytes": 871874560,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.013859333004802465,
+      "rss_end_bytes": 869974016,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.000465832999907434,
+      "rss_end_bytes": 869990400,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010388330556452274,
+      "rss_end_bytes": 870039552,
+      "available_end_bytes": 3281879040
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 9.047171624959446,
+      "rss_end_bytes": 1100054528,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0009886249899864197,
+      "rss_end_bytes": 1100087296,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0013011249247938395,
+      "rss_end_bytes": 1100152832,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.01291816693264991,
+      "rss_end_bytes": 1100169216,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007820000173524022,
+      "rss_end_bytes": 1100169216,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010469169355928898,
+      "rss_end_bytes": 1100185600,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.22671812504995614,
+      "rss_end_bytes": 1100201984,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007388329831883311,
+      "rss_end_bytes": 1100201984,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008942499989643693,
+      "rss_end_bytes": 1100201984,
+      "available_end_bytes": 3172925440
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.21072516706772149,
+      "rss_end_bytes": 1100201984,
+      "available_end_bytes": 3206971392
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0007414999417960644,
+      "rss_end_bytes": 1100201984,
+      "available_end_bytes": 3207020544
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011323330691084266,
+      "rss_end_bytes": 1100218368,
+      "available_end_bytes": 3207069696
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.2114136249292642,
+      "rss_end_bytes": 1100333056,
+      "available_end_bytes": 3192717312
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0008628329960629344,
+      "rss_end_bytes": 1103314944,
+      "available_end_bytes": 3191488512
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008012080797925591,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.21048812509980053,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0010852080304175615,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007861659396439791,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.21037529094610363,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0011576659744605422,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001285957987420261,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "attribute_extraction",
+      "seconds": 0.21007766597904265,
+      "rss_end_bytes": 1104019456,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "statistics_update",
+      "seconds": 0.0012386669404804707,
+      "rss_end_bytes": 1109049344,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008362920489162207,
+      "rss_end_bytes": 1109065728,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011717090383172035,
+      "rss_end_bytes": 1096581120,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0006875409744679928,
+      "rss_end_bytes": 1096581120,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0006409999914467335,
+      "rss_end_bytes": 1096597504,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007712088990956545,
+      "rss_end_bytes": 1096597504,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009456669213250279,
+      "rss_end_bytes": 1096597504,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007650830084457994,
+      "rss_end_bytes": 1096597504,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009803749853745103,
+      "rss_end_bytes": 1096613888,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010320000583305955,
+      "rss_end_bytes": 1099874304,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010433329734951258,
+      "rss_end_bytes": 1102413824,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008358330233022571,
+      "rss_end_bytes": 1104936960,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0015454170061275363,
+      "rss_end_bytes": 1104936960,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009404169395565987,
+      "rss_end_bytes": 1104936960,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007845830405130982,
+      "rss_end_bytes": 1104936960,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000776166096329689,
+      "rss_end_bytes": 1104936960,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009288330329582095,
+      "rss_end_bytes": 1105920000,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007929159328341484,
+      "rss_end_bytes": 1105936384,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007732909871265292,
+      "rss_end_bytes": 1105952768,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011777079198509455,
+      "rss_end_bytes": 1108426752,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000940792029723525,
+      "rss_end_bytes": 1108443136,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010224169818684459,
+      "rss_end_bytes": 1108443136,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007814170094206929,
+      "rss_end_bytes": 1108443136,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008266660152003169,
+      "rss_end_bytes": 1108459520,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007852909620851278,
+      "rss_end_bytes": 1108475904,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007756659761071205,
+      "rss_end_bytes": 1108475904,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007739579305052757,
+      "rss_end_bytes": 1108508672,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008146660402417183,
+      "rss_end_bytes": 1109786624,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011621670564636588,
+      "rss_end_bytes": 1114800128,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0012001250870525837,
+      "rss_end_bytes": 1119240192,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007860410260036588,
+      "rss_end_bytes": 1120305152,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000802542082965374,
+      "rss_end_bytes": 1122631680,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.001048667007125914,
+      "rss_end_bytes": 1125154816,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008442909456789494,
+      "rss_end_bytes": 1127710720,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008604580070823431,
+      "rss_end_bytes": 1127743488,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010397500591352582,
+      "rss_end_bytes": 1132789760,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008473750203847885,
+      "rss_end_bytes": 1135312896,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007914999732747674,
+      "rss_end_bytes": 1137836032,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000794083927758038,
+      "rss_end_bytes": 1140359168,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007780829910188913,
+      "rss_end_bytes": 1142915072,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0007751249941065907,
+      "rss_end_bytes": 1145438208,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008163750171661377,
+      "rss_end_bytes": 1147961344,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008241659961640835,
+      "rss_end_bytes": 1150484480,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008900410030037165,
+      "rss_end_bytes": 1153007616,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008321249624714255,
+      "rss_end_bytes": 1155530752,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000793290906585753,
+      "rss_end_bytes": 1158070272,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000846958952024579,
+      "rss_end_bytes": 1160593408,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008544590091332793,
+      "rss_end_bytes": 1163132928,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008397080237045884,
+      "rss_end_bytes": 1165656064,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000787583994679153,
+      "rss_end_bytes": 1168179200,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008302080677822232,
+      "rss_end_bytes": 1170702336,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010184590937569737,
+      "rss_end_bytes": 1174994944,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0010848749661818147,
+      "rss_end_bytes": 1179582464,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008222090546041727,
+      "rss_end_bytes": 1182105600,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0012662078952416778,
+      "rss_end_bytes": 1187135488,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008717079181224108,
+      "rss_end_bytes": 1189658624,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008782910881564021,
+      "rss_end_bytes": 1190920192,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0011066669831052423,
+      "rss_end_bytes": 1195982848,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0009085000492632389,
+      "rss_end_bytes": 1198505984,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008324160007759929,
+      "rss_end_bytes": 1201029120,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008552500512450933,
+      "rss_end_bytes": 1203585024,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008031659526750445,
+      "rss_end_bytes": 1206108160,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008048330200836062,
+      "rss_end_bytes": 1208631296,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.0008434579940512776,
+      "rss_end_bytes": 1211154432,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "normalization",
+      "seconds": 0.000803791917860508,
+      "rss_end_bytes": 1213677568,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "legacy_cpu_preparation_total",
+      "seconds": 20.057922000065446,
+      "rss_end_bytes": 1213677568,
+      "available_end_bytes": 3192012800
+    },
+    {
+      "stage": "serialize_raw_to_ssd",
+      "seconds": 0.32548408408183604,
+      "rss_end_bytes": 1232289792,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "read_raw_from_ssd_warm_mmap",
+      "seconds": 0.035886417026631534,
+      "rss_end_bytes": 1450885120,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "linear_forward",
+      "seconds": 0.08710387500468642,
+      "rss_end_bytes": 1466580992,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "linear_segmentation_loss",
+      "seconds": 0.05501950008329004,
+      "rss_end_bytes": 1513848832,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "linear_backward",
+      "seconds": 0.1303365839412436,
+      "rss_end_bytes": 1287864320,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "mlp_transfer_payload",
+      "seconds": 0.0003760838881134987,
+      "rss_end_bytes": 1358446592,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "mlp_forward",
+      "seconds": 0.12381816597189754,
+      "rss_end_bytes": 1443053568,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "mlp_segmentation_loss",
+      "seconds": 0.05494983296375722,
+      "rss_end_bytes": 1502543872,
+      "available_end_bytes": 3335684096
+    },
+    {
+      "stage": "mlp_backward",
+      "seconds": 0.13020120793953538,
+      "rss_end_bytes": 1347649536,
+      "available_end_bytes": 3415015424
+    }
+  ]
+}

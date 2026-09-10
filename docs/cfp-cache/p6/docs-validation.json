@@ -1,0 +1,16 @@
+[
+  {
+    "mode": "docs",
+    "strict_build": "passed",
+    "checked_pages": 6,
+    "local_links_and_anchors_checked": 274,
+    "public_preparation_objects": 10
+  },
+  {
+    "mode": "docs-mocked",
+    "strict_build": "passed",
+    "checked_pages": 6,
+    "local_links_and_anchors_checked": 273,
+    "public_preparation_objects": 10
+  }
+]

@@ -31,6 +31,7 @@ scoring, score-constraint, and regularization guides.
 The CFP layer is organized so these concerns can evolve independently:
 
 - tree construction and dense tree tensors;
+- optional storage of scorer-independent CPU morphology and bounded preparation workers;
 - normalized node features used for scoring;
 - node scoring models;
 - score post-processing constraints;
@@ -50,6 +51,8 @@ to be extended or imported by downstream code.
 | Filter spec | One normalized CFP operator definition: tree type, attributes, scoring model, constraints, regularizers, and related settings. |
 | Tree payload | The per-sample, per-channel, per-spec data produced before scoring: tree metadata, raw attributes, and normalized attributes. |
 | `tree_info` | Dense tree tensors and metadata used by scoring, constraints, regularization, and reconstruction. |
+| `PreparedMorphology` / `PreparedBatch` | Read-only-by-contract CPU morphology for one image/channel/tree, or a batch of these objects; no normalized attributes or scorer state. |
+| `StatisticsSnapshot` | Detached, compatible normalization contract and CPU scalar statistics installed before training. |
 | Raw node attributes | Scalar morphology attributes computed on tree nodes before dataset normalization. |
 | Normalized node features | Tensor with shape `(num_nodes, K)`, where `K` is the number of attributes in the filter spec. |
 | Node scores | Differentiable tensor with shape `(num_nodes,)`; one score per tree node. |
@@ -70,13 +73,32 @@ the runtime call path.
 
 ![CFP class relationship diagram](assets/cfp-class-architecture.svg)
 
+This diagram covers the layer helpers and extension components. External
+preparation/storage adds the following boundary without changing the scoring,
+constraint or reconstruction path:
+
+```text
+CFPPreprocessor -> raw CPU morphology -> NullStore / MemoryStore / DiskStore
+                         |                         |
+                         +----> PreparedBatch <----+
+                                      |
+train summaries -> StatisticsSnapshot -> layer -> normalized active payload
+```
+
+`CFPPreprocessor.from_layer` copies morphology/feature contracts, not the layer,
+scorer, normalizer or accelerator. `fit_stats` performs a finite streaming fit;
+SSD preparation can instead collect summaries in the same pass as tree building.
+The layer owns frozen normalization and learned parameters. See
+[preparation and cache migration](source/guides/cfp-cache-migration.md) for storage
+policies, ownership, invalidation, recovery and process limits.
+
 ## Forward Flow
 
 At runtime, `ForwardExecutor` drives the layer. For each batch item, input
 channel, and filter spec, the flow is:
 
 ```text
-input image channel
+input image channel OR compatible PreparedBatch
  -> TreePayloadProvider
  -> AttributeNormalizer
  -> ScoringModel
@@ -100,16 +122,30 @@ The tree payload contains:
 The `info` mapping currently contains:
 
 - `residues`: altitude residues from the backend;
-- `tpre` and `tpost`: tree traversal entry and exit times;
+- `tpre` and `tpost`: compact preorder indices and exclusive subtree ends,
+  with `tpost - tpre` equal to the subtree node count;
 - `parent`: dense parent ids;
 - `node_of_pixel`: proper-part owner node id for each flattened pixel;
 - `num_rows` and `num_cols`: image shape;
-- `tree_type`: normalized tree type string;
-- `order_forward` and `order_backward`: traversal orders for reconstruction.
+- `tree_type`: normalized tree type string.
 
 The differentiable reconstruction boundary is `TreeReconstructionFunction`.
 It reconstructs pixels from one scalar per tree node without materializing a
-dense region-pixel Jacobian.
+dense region-pixel Jacobian. Native CFP extraction counts DFS entries only;
+its compact intervals do not change the backend's interleaved DFS events.
+Forward scatters signed node contributions at interval endpoints, scans them,
+and gathers at each pixel owner's preorder position. Backward accumulates pixel
+gradients at those positions and subtracts exclusive prefix sums at the node's
+endpoints. Both products are O(pixels + nodes), with no sorting or time-to-rank
+conversion. The interval helpers accept only compact preorder metadata and the
+pixel-owner map; parent ids, traversal permutations, and event extents are not
+reconstruction arguments. Buffers use the node tensor length, including the
+final sentinel in forward, without reading a device scalar on the CPU.
+
+Prepared morphology and DiskStore now use format 4. Older stores are rejected
+without rewriting them; prepare into a new directory after rebuilding the native
+extension. Learned parameters, model checkpoints, and normalization statistics
+keep their existing contracts.
 
 ## Package Layout
 
@@ -121,7 +157,9 @@ Use this map when deciding where a change belongs:
 | `scoring/` | Scoring base class and built-in scoring models. |
 | `constraints/` | Score post-processing constraints. |
 | `regularization/` | Training penalties over scores, tree tensors, and normalized features. |
-| `normalization/` | Attribute normalization and normalization-stat serialization. |
+| `preparation/` | Raw CPU contracts, finite preparation, bounded CPU workers and lazy prepared datasets. |
+| `storage/` | No retention, byte-bounded RAM, and versioned local SSD entries/manifests with recovery. |
+| `normalization/` | Streaming statistics, snapshots, frozen derived constants and attribute normalization. |
 | `specs/` | Filter-spec dataclasses, validation, normalization, and generic `SpecRegistry`. |
 | `runtime/` | Batch input handling, cached dataloaders, forward execution, tree payloads, reconstruction, context, and inspection. |
 | `serialization/` | Layer configs, deserialization, checkpoints, saved stats, and parameter exports. |
@@ -129,7 +167,8 @@ Use this map when deciding where a change belongs:
 
 New code should import public extension components from the aggregate
 `mtlearn.layers.cfp` namespace only when they are exported there: the layer,
-specs, scoring models, score constraints, regularizers, and registries. Runtime,
+specs, scoring models, score constraints, regularizers, registries, preparation
+objects, storage policies and `StatisticsSnapshot`. Runtime,
 normalization, and serialization infrastructure should be imported from their
 grouped packages (`cfp.runtime`, `cfp.normalization`, and `cfp.serialization`)
 when advanced or internal work needs them.
@@ -143,6 +182,8 @@ cfp/
   scoring/
   constraints/
   regularization/
+  preparation/
+  storage/
   normalization/
   specs/
   runtime/
@@ -338,8 +379,12 @@ not be hidden inside a filter spec.
 Do not put caches, dataset statistics, or runtime tensors in `get_config()`.
 Use `save_stats()` and `load_stats()` for normalization statistics.
 
-The layer cache is a runtime optimization, not serialized state. Use
-`cached_sample_count()` for inspection rather than depending on cache internals.
+Prepared data and caches are runtime resources, not serialized model state.
+Checkpoints carry parameters and normalization statistics and can consume ordinary
+images without any SSD store. Use `cached_sample_count()` for the compatibility
+cache and `store.info()` for explicit stores rather than depending on internals.
+RAM retention limits exclude active batches, autograd graphs and native workspace;
+raw buffers remain alive while a consumer or backward needs them.
 
 ## Public API and Utilities
 
@@ -350,7 +395,10 @@ breaking API change:
 | --- | --- |
 | `from mtlearn.layers import ConnectedFilterPreprocessingLayer` | Public layer import. |
 | `ConnectedFilterPreprocessingImplicitJacobianFunction` | Public differentiable reconstruction function. |
-| `build_dataloader_cached` | Build tree payload cache while estimating normalization statistics. |
+| `build_dataloader_cached` | Compatibility API: preload tree payloads while estimating normalization statistics. |
+| `fit_stats`, `get_stats`, `set_stats`, `get_statistics_contract` | Fit, inspect and install compatible frozen statistics independently of retained data. |
+| `forward_prepared` / `layer(prepared_batch)` | Consume compatible raw morphology without rebuilding trees. |
+| `CFPPreprocessor`, prepared data objects and stores | Public preparation/storage API under `mtlearn.layers.cfp`; see the [reference](source/api/python/cfp_preparation.rst). |
 | `build_dataloader_cached_fixed_stats` | Build cache while keeping existing normalization statistics fixed. |
 | `inspect_training_sample` | Debug tree payloads, attributes, and scores for one sample. |
 | `cached_sample_count` | Inspect cache size without accessing cache internals. |

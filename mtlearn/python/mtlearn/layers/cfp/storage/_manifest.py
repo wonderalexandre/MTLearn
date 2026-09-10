@@ -2,7 +2,7 @@
 import json
 import sqlite3
 
-from ..preparation._identity import canonical_json, implementation_identity
+from ..preparation._identity import FORMAT_VERSION, canonical_json, implementation_identity
 
 SCHEMA = """
 CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -42,7 +42,7 @@ def connect(path, *, readonly):
         if not readonly:
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
-        expected = {"format_version": 2, "implementation": implementation_identity()}
+        expected = {"format_version": FORMAT_VERSION, "implementation": implementation_identity()}
         tables = db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         if not tables and not readonly:
             # Schema and version marker commit together. An interruption during

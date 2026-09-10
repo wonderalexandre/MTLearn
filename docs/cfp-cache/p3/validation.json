@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-09-09T17:58:13.947521-03:00",
+  "tests": 523,
+  "passed": 523,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "by_module": {
+    "mtlearn.tests.python.test_bindings": 16,
+    "mtlearn.tests.python.test_data": 18,
+    "mtlearn.tests.python.test_cfp_preparation": 51,
+    "mtlearn.tests.python.test_cfp_prepared_runtime": 94,
+    "mtlearn.tests.python.test_cfp_disk_cache": 77,
+    "mtlearn.tests.python.test_cfp_components": 65,
+    "mtlearn.tests.python.test_cfp_deterministic": 11,
+    "mtlearn.tests.python.test_cfp_validation": 64,
+    "mtlearn.tests.python.test_cfp_cache": 22,
+    "mtlearn.tests.python.test_morphology_api": 19,
+    "mtlearn.tests.python.test_gradchecks": 19,
+    "mtlearn.tests.python.test_version": 3,
+    "mtlearn.tests.python.test_cfp_cache_baseline": 64
+  },
+  "measured_library_hashes_match_final": true,
+  "native_extension_sha256": "c84f7e6cb8b9a6677324de94fd9a8372eedb16e3980ed931379b2caaf5a2ff6c",
+  "frozen_p0_artifacts_unchanged": true,
+  "real_image_loss_and_gradient_norm_match_p2": true,
+  "syntax_checked": true,
+  "diff_whitespace_checked": true,
+  "cuda_available": false,
+  "mps_available": true,
+  "documentation_links_checked": true
+}

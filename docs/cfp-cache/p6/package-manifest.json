@@ -1,0 +1,41 @@
+{
+  "wheel": {
+    "path": "build/cfp-cache-p6-dist/mtlearn-1.1.0.post5-cp312-cp312-macosx_26_0_arm64.whl",
+    "sha256": "e0c17a18d547a1ae06d1e21cb96c28fabc201602d7f832186d6658e5aafde95b",
+    "bytes": 532113,
+    "members": 89,
+    "native_sha256": "eb0a7481e41b85dc92bb5a9d27b451a33cd52cb8701c35aba4a9f61129e629f9"
+  },
+  "sdist": {
+    "path": "build/cfp-cache-p6-dist/mtlearn-1.1.0.post5.tar.gz",
+    "sha256": "03e42b6ee93f3a09bcd30a7e89fa3b8f7964ffa06e707ed44015b43ebacf8fa0",
+    "bytes": 4279995,
+    "members": 798
+  },
+  "new_modules_verified": [
+    "mtlearn/layers/cfp/preparation/_statistics_fitter.py",
+    "mtlearn/layers/cfp/preparation/prepared_batch.py",
+    "mtlearn/layers/cfp/preparation/preparation_result.py",
+    "mtlearn/layers/cfp/preparation/_parallel_preparation.py",
+    "mtlearn/layers/cfp/preparation/__init__.py",
+    "mtlearn/layers/cfp/preparation/prepared_dataset.py",
+    "mtlearn/layers/cfp/preparation/_persistent_preparation.py",
+    "mtlearn/layers/cfp/preparation/cfp_preprocessor.py",
+    "mtlearn/layers/cfp/preparation/_identity.py",
+    "mtlearn/layers/cfp/preparation/prepared_morphology.py",
+    "mtlearn/layers/cfp/storage/_manifest.py",
+    "mtlearn/layers/cfp/storage/_disk_format.py",
+    "mtlearn/layers/cfp/storage/disk_store.py",
+    "mtlearn/layers/cfp/storage/null_store.py",
+    "mtlearn/layers/cfp/storage/memory_store.py",
+    "mtlearn/layers/cfp/storage/__init__.py",
+    "mtlearn/layers/cfp/storage/_writer_lock.py",
+    "mtlearn/layers/cfp/storage/_storages.py",
+    "mtlearn/layers/cfp/normalization/statistics_snapshot.py",
+    "mtlearn/layers/cfp/runtime/_prepared_lifetime.py"
+  ],
+  "source_python_modules_verified": 78,
+  "legacy_fixtures_in_sdist": true,
+  "release_exclusions_passed": true,
+  "wheel_built_from_sdist": true
+}

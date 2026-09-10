@@ -8,9 +8,10 @@ from typing import Any, Mapping
 import torch
 
 from ..specs import FeatureSpec, TreeSpec
+from ._identity import FORMAT_VERSION
 
-_INDEX_FIELDS = ("tpre", "tpost", "parent", "node_of_pixel", "order_forward", "order_backward")
-_INFO_FIELDS = set(_INDEX_FIELDS) | {"residues", "num_rows", "num_cols", "num_times", "tree_type"}
+_INDEX_FIELDS = ("tpre", "tpost", "parent", "node_of_pixel")
+_INFO_FIELDS = set(_INDEX_FIELDS) | {"residues", "num_rows", "num_cols", "tree_type"}
 
 
 @dataclass(frozen=True, eq=False)
@@ -27,7 +28,7 @@ class PreparedMorphology:
     info: Mapping[str, Any]
     raw_attributes: Mapping[Any, torch.Tensor]
     input_id: str | None = None
-    format_version: int = 2
+    format_version: int = FORMAT_VERSION
 
     def __post_init__(self):
         object.__setattr__(self, "info", MappingProxyType(dict(self.info)))
@@ -58,7 +59,7 @@ class PreparedMorphology:
 
     def validate(self, *, full: bool = False) -> None:
         """Check the schema; optionally scan values and traversal consistency."""
-        if self.format_version != 2 or not isinstance(self.tree_spec, TreeSpec):
+        if self.format_version != FORMAT_VERSION or not isinstance(self.tree_spec, TreeSpec):
             raise ValueError("Unsupported prepared morphology format/tree specification.")
         if not isinstance(self.feature_spec, FeatureSpec) or self.feature_spec.normalization is not None:
             raise ValueError("Prepared morphology must contain raw features without normalization.")
@@ -66,7 +67,7 @@ class PreparedMorphology:
             raise ValueError("Prepared morphology has missing or unexpected tree fields.")
         if self.info["tree_type"] != self.tree_spec.tree_type:
             raise ValueError("Prepared morphology tree type does not match its specification.")
-        for key in ("num_rows", "num_cols", "num_times"):
+        for key in ("num_rows", "num_cols"):
             if type(self.info[key]) is not int or self.info[key] <= 0:
                 raise ValueError(f"{key} must be a positive integer.")
         if self.input_id is not None and not isinstance(self.input_id, str):
@@ -103,26 +104,22 @@ class PreparedMorphology:
         for tensor in (self.info["residues"], *self.raw_attributes.values()):
             if not bool(torch.isfinite(tensor).all()):
                 raise ValueError("Prepared morphology contains non-finite values.")
-        for key in ("node_of_pixel", "order_forward", "order_backward"):
-            value = self.info[key]
-            # PyTorch unsigned comparison kernels are not available on all devices.
-            if value.dtype == torch.uint32:
-                value = value.to(torch.int64)
-            if bool(((value < 0) | (value >= n)).any()):
-                raise ValueError(f"{key} references an invalid node.")
+        # PyTorch unsigned comparison kernels are not available on all devices.
+        owners = self.info["node_of_pixel"].to(torch.int64)
+        if bool(((owners < 0) | (owners >= n)).any()):
+            raise ValueError("node_of_pixel references an invalid node.")
         pre, post, parent = (self.info[k] for k in ("tpre", "tpost", "parent"))
         if bool(((parent < -1) | (parent >= n)).any()):
             raise ValueError("parent references an invalid node.")
-        if bool(((pre < 0) | (post < pre)).any()) or int(post.max()) + 1 != self.info["num_times"]:
-            raise ValueError("Invalid preorder/postorder time bounds.")
-        expected_order = torch.argsort(pre)
-        if any(not torch.equal(self.info[key], expected_order) for key in ("order_forward", "order_backward")):
-            raise ValueError("Traversal orders do not match preorder times.")
-        if torch.unique(pre).numel() != n:
-            raise ValueError("Preorder times must identify distinct nodes.")
+        if bool(((pre < 0) | (pre >= n) | (post <= pre) | (post > n)).any()):
+            raise ValueError("Invalid compact preorder/subtree bounds.")
+        if bool((torch.bincount(pre, minlength=n) != 1).any()):
+            raise ValueError("Preorder indices must identify distinct nodes.")
         roots = (parent == -1) | (parent == torch.arange(n))
         if int(roots.sum()) != 1:
             raise ValueError("Prepared morphology must have one root.")
+        if int(pre[roots].item()) != 0 or int(post[roots].item()) != n:
+            raise ValueError("The root interval must cover the complete preorder.")
         children = (~roots).nonzero().flatten()
         if bool(((pre[parent[children]] >= pre[children]) | (post[parent[children]] < post[children])).any()):
             raise ValueError("Parent traversal intervals must contain their children.")

@@ -8,8 +8,8 @@ from .... import morphology
 from ...._native import load_bindings
 from ..specs import FeatureSpec, TreeSpec
 
-FORMAT_VERSION = 2
-PREPARATION_SEMANTICS = "cfp-cpu-u8-topology-attributes-node-u32-v2"
+FORMAT_VERSION = 4
+PREPARATION_SEMANTICS = "cfp-cpu-u8-topology-attributes-node-u32-compact-preorder-v4"
 
 
 def canonical_json(value):

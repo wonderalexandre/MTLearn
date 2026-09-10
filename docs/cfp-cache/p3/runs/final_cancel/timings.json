@@ -1,0 +1,26 @@
+[
+  {
+    "stage": "read_image_0",
+    "seconds": 0.059475041925907135,
+    "rss_end_bytes": 303759360,
+    "available_end_bytes": 3840655360
+  },
+  {
+    "stage": "prepare_0",
+    "seconds": 20.06318204093259,
+    "rss_end_bytes": 739721216,
+    "available_end_bytes": 3273097216
+  },
+  {
+    "stage": "summarize_0",
+    "seconds": 0.06616620800923556,
+    "rss_end_bytes": 859799552,
+    "available_end_bytes": 3320971264
+  },
+  {
+    "stage": "first_pass",
+    "seconds": 21.138609750079922,
+    "rss_end_bytes": 880214016,
+    "available_end_bytes": 3320971264
+  }
+]

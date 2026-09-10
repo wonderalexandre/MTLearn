@@ -74,6 +74,7 @@ The main documentation is built with Sphinx from `docs/source`.
 - [docs/installation.md](docs/installation.md)
 - [docs/development.md](docs/development.md)
 - [Attribute guide](docs/source/concepts/attributes.md)
+- [CFP preparation and streaming statistics](docs/source/guides/connected-filter-preprocessing.md#normalization-and-caching)
 - [RRPR guide](notebooks/ICPR2026/README.md)
 
 ## Examples and Reproducibility

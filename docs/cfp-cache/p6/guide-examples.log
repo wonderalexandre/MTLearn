@@ -1,0 +1,2 @@
+{'max_bytes': 268435456, 'retained_bytes': 5376, 'entries': 3, 'hits': 0, 'misses': 3, 'evictions': 0, 'oversized_entries': 0, 'active_entries': 1, 'active_bytes': 1792, 'active_not_retained_bytes': 0, 'live_bytes': 5376}
+All three migration examples and final backward passed

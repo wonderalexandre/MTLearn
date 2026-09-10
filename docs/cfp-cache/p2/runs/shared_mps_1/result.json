@@ -1,0 +1,155 @@
+{
+  "status": "passed",
+  "device": "mps",
+  "cache_max_bytes": 268435456,
+  "statistics_source": "docs/cfp-cache/p1/runs/fit_cpu_3_validated/result.json",
+  "statistics_source_sha256": "1465ced63686a646c255640ca30681d1d415355431c63a8267d436f4918afbbd",
+  "counts": {
+    "prepare": 1,
+    "statistics_updates": 0
+  },
+  "images": [
+    {
+      "image_id": 0,
+      "nodes": 699690,
+      "raw_bytes": 267520272,
+      "attributes": 63,
+      "shape": [
+        2748,
+        2748
+      ],
+      "store_before_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 267520272,
+        "entries": 1,
+        "hits": 1,
+        "misses": 1,
+        "evictions": 0,
+        "oversized_entries": 0,
+        "active_entries": 1,
+        "active_bytes": 267520272,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 267520272
+      },
+      "models": {
+        "linear": {
+          "loss": 0.13267183303833008,
+          "gradient_l2": 0.3222429946698602
+        },
+        "mlp": {
+          "loss": 0.07101897895336151,
+          "gradient_l2": 0.2190145378862795
+        }
+      },
+      "store_evicted_before_backward": {
+        "max_bytes": 268435456,
+        "retained_bytes": 0,
+        "entries": 0,
+        "hits": 1,
+        "misses": 1,
+        "evictions": 0,
+        "oversized_entries": 0,
+        "active_entries": 1,
+        "active_bytes": 267520272,
+        "active_not_retained_bytes": 267520272,
+        "live_bytes": 267520272
+      },
+      "store_after_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 0,
+        "entries": 0,
+        "hits": 1,
+        "misses": 1,
+        "evictions": 0,
+        "oversized_entries": 0,
+        "active_entries": 0,
+        "active_bytes": 0,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 0
+      }
+    }
+  ],
+  "final_store": {
+    "max_bytes": 268435456,
+    "retained_bytes": 0,
+    "entries": 0,
+    "hits": 1,
+    "misses": 1,
+    "evictions": 0,
+    "oversized_entries": 0,
+    "active_entries": 0,
+    "active_bytes": 0,
+    "active_not_retained_bytes": 0,
+    "live_bytes": 0
+  },
+  "timings": [
+    {
+      "stage": "read_image_0",
+      "seconds": 0.25777024996932596,
+      "rss_end_bytes": 248184832,
+      "available_end_bytes": 4083187712
+    },
+    {
+      "stage": "prepare_cold_0",
+      "seconds": 19.304328082944266,
+      "rss_end_bytes": 1199325184,
+      "available_end_bytes": 3574628352
+    },
+    {
+      "stage": "prepare_hit_0",
+      "seconds": 0.004110999987460673,
+      "rss_end_bytes": 1199341568,
+      "available_end_bytes": 3574628352
+    },
+    {
+      "stage": "linear_forward_0",
+      "seconds": 0.33435195905622095,
+      "rss_end_bytes": 705298432,
+      "available_end_bytes": 3574628352,
+      "mps_active_bytes": 328130816,
+      "mps_driver_bytes": 1103839232
+    },
+    {
+      "stage": "linear_loss_0",
+      "seconds": 0.013705958030186594,
+      "rss_end_bytes": 705970176,
+      "available_end_bytes": 3574628352,
+      "mps_active_bytes": 388543232,
+      "mps_driver_bytes": 1103855616
+    },
+    {
+      "stage": "linear_backward_0",
+      "seconds": 0.10087445797398686,
+      "rss_end_bytes": 732217344,
+      "available_end_bytes": 3574628352,
+      "mps_active_bytes": 66907392,
+      "mps_driver_bytes": 1141620736
+    },
+    {
+      "stage": "mlp_forward_0",
+      "seconds": 0.17468974995426834,
+      "rss_end_bytes": 749813760,
+      "available_end_bytes": 2903392256,
+      "mps_active_bytes": 358401536,
+      "mps_driver_bytes": 1145815040
+    },
+    {
+      "stage": "mlp_loss_0",
+      "seconds": 0.0036712499568238854,
+      "rss_end_bytes": 749813760,
+      "available_end_bytes": 2903392256,
+      "mps_active_bytes": 388608000,
+      "mps_driver_bytes": 1143717888
+    },
+    {
+      "stage": "mlp_backward_0",
+      "seconds": 0.050949875032529235,
+      "rss_end_bytes": 754761728,
+      "available_end_bytes": 2903392256,
+      "mps_active_bytes": 66972416,
+      "mps_driver_bytes": 1141620736
+    }
+  ],
+  "loss_definition": "mean((response / 255 - binary_mask) ** 2)",
+  "note": "Resource and integration probe; not model quality evaluation or a full training epoch."
+}

@@ -1,0 +1,13 @@
+{
+  "package_path": "/Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-install-final/mtlearn/__init__.py",
+  "native_path": "/Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-install-final/mtlearn/_mtlearn.cpython-312-darwin.so",
+  "native_sha256": "eb0a7481e41b85dc92bb5a9d27b451a33cd52cb8701c35aba4a9f61129e629f9",
+  "version": "1.1.0.post5",
+  "python": "3.12.3 | packaged by Anaconda, Inc. | (main, May  6 2024, 14:46:42) [Clang 14.0.6 ]",
+  "torch": "2.10.0",
+  "mps_available": true,
+  "cuda_available": false,
+  "release_smoke": "passed",
+  "checkpoint_pytest_exit": 0,
+  "source_package_used": false
+}

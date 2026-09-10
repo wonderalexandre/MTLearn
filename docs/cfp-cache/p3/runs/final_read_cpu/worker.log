@@ -1,0 +1,20 @@
+{"stage": "statistics_from_summaries", "seconds": 0.005725208087824285, "rss_end_bytes": 243367936, "available_end_bytes": 4013817856}
+{"stage": "read_image_0", "seconds": 0.06244629202410579, "rss_end_bytes": 306970624, "available_end_bytes": 3993108480}
+{"stage": "load_prepared_0", "seconds": 0.3571306250523776, "rss_end_bytes": 314392576, "available_end_bytes": 3967729664}
+{"stage": "linear_forward_0", "seconds": 0.22938116698060185, "rss_end_bytes": 987398144, "available_end_bytes": 3967729664}
+{"stage": "linear_backward_0", "seconds": 0.08593012497294694, "rss_end_bytes": 1011400704, "available_end_bytes": 3967729664}
+{"stage": "mlp_forward_0", "seconds": 0.21249962493311614, "rss_end_bytes": 1247363072, "available_end_bytes": 3967729664}
+{"stage": "mlp_backward_0", "seconds": 0.07299583405256271, "rss_end_bytes": 1100611584, "available_end_bytes": 3967729664}
+{"stage": "read_image_1000", "seconds": 0.05913787498138845, "rss_end_bytes": 853377024, "available_end_bytes": 3940220928}
+{"stage": "load_prepared_1000", "seconds": 0.32350929197855294, "rss_end_bytes": 743587840, "available_end_bytes": 3934208000}
+{"stage": "linear_forward_1000", "seconds": 0.1852896249620244, "rss_end_bytes": 1150353408, "available_end_bytes": 3934208000}
+{"stage": "linear_backward_1000", "seconds": 0.057949084090068936, "rss_end_bytes": 1025916928, "available_end_bytes": 3934208000}
+{"stage": "mlp_forward_1000", "seconds": 0.1776895000366494, "rss_end_bytes": 1207959552, "available_end_bytes": 3934208000}
+{"stage": "mlp_backward_1000", "seconds": 0.06656308402307332, "rss_end_bytes": 1050099712, "available_end_bytes": 3934208000}
+{"stage": "read_image_2040", "seconds": 0.05559404205996543, "rss_end_bytes": 813940736, "available_end_bytes": 3934208000}
+{"stage": "load_prepared_2040", "seconds": 0.327232624986209, "rss_end_bytes": 712228864, "available_end_bytes": 3767222272}
+{"stage": "linear_forward_2040", "seconds": 0.17536504205781966, "rss_end_bytes": 1047707648, "available_end_bytes": 3757146112}
+{"stage": "linear_backward_2040", "seconds": 0.06427558290306479, "rss_end_bytes": 962314240, "available_end_bytes": 3757146112}
+{"stage": "mlp_forward_2040", "seconds": 0.17934370890725404, "rss_end_bytes": 1216839680, "available_end_bytes": 3757146112}
+{"stage": "mlp_backward_2040", "seconds": 0.0750023340806365, "rss_end_bytes": 1101529088, "available_end_bytes": 3757146112}
+P3_SSD_PASS
