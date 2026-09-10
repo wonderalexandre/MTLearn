@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <list>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -106,13 +107,13 @@ public:
         torch::Tensor tPreOrder = torch::zeros({numNodes}, opts_i64);
         torch::Tensor tPostOrder = torch::zeros({numNodes}, opts_i64);
         torch::Tensor tParent = torch::zeros({numNodes}, opts_i64);
-        torch::Tensor tNodeOfPixel = torch::zeros({numPixels}, opts_i64);
+        torch::Tensor tNodeOfPixel = torch::zeros({numPixels}, torch::TensorOptions().dtype(torch::kUInt32).requires_grad(false));
 
         float* residuesPtr = tResiduos.data_ptr<float>();
         int64_t* preOrderPtr = tPreOrder.data_ptr<int64_t>();
         int64_t* postOrderPtr = tPostOrder.data_ptr<int64_t>();
         int64_t* parentPtr = tParent.data_ptr<int64_t>();
-        int64_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<int64_t>();
+        uint32_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<uint32_t>();
 
         // Node-local metadata is independent per node, so the backend tree can
         // be scanned in parallel. Values for inactive slots keep their zero
@@ -130,7 +131,11 @@ public:
         // nodeOfPixel is the final gather map used to reconstruct image pixels
         // from node-level filtered residues.
         for (int pixel = 0; pixel < numPixels; ++pixel) {
-            nodeOfPixelPtr[pixel] = static_cast<int64_t>(tree.smallestNode(pixel));
+            const auto node = tree.smallestNode(pixel);
+            if (node < 0 || static_cast<uint64_t>(node) > std::numeric_limits<uint32_t>::max()) {
+                throw std::overflow_error("node_of_pixel cannot be represented as uint32.");
+            }
+            nodeOfPixelPtr[pixel] = static_cast<uint32_t>(node);
         }
 
         std::list<torch::Tensor> result;

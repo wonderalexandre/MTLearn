@@ -336,6 +336,8 @@ def test_connected_filter_preprocessing_tree_tensors_have_consistent_shapes():
     assert len(info) == 5
     assert all(item.shape == residues.shape for item in info[:4])
     assert info[4].shape == (img.size,)
+    assert info[4].dtype == torch.uint32
+    assert info[4].untyped_storage().nbytes() == 4 * img.size
     assert not hasattr(mtlearn.ConnectedFilterPreprocessingTreeTensors, "get_jacobian_dense")
     assert not hasattr(mtlearn.ConnectedFilterPreprocessingTreeTensors, "get_acumulated_gradient")
 

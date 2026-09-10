@@ -24,7 +24,8 @@ def reconstruct_from_info(
     delta.index_add_(0, tpre, node_signal)
     delta.index_add_(0, tpost, -node_signal)
     y_cumsum = torch.cumsum(delta, dim=0)
-    return y_cumsum[tpre[node_of_pixel]]
+    # Keep the saved pixel map compact; signed indices exist only for this operation.
+    return y_cumsum[tpre[node_of_pixel.to(torch.int64)]]
 
 
 def propagate_pixels_to_nodes(
@@ -40,7 +41,7 @@ def propagate_pixels_to_nodes(
     g_pix = grad_output.reshape(-1)
     num_nodes = tpre.numel()
     base = torch.zeros(num_nodes, dtype=g_pix.dtype, device=g_pix.device)
-    base.index_add_(0, node_of_pixel.reshape(-1), g_pix)
+    base.index_add_(0, node_of_pixel.reshape(-1).to(torch.int64), g_pix)
 
     if order_pre is None:
         order_pre = torch.argsort(tpre)
