@@ -68,7 +68,7 @@ def group_name(group: Iterable[Any]) -> str:
     """Return a stable display/key name for an attribute group.
 
     Enum-like attributes use their ``.name`` when available, producing names
-    such as ``"AREA+GRAY_HEIGHT"``.
+    such as ``"AREA+GRAY_LEVEL_HEIGHT"``.
     """
     return "+".join([getattr(t, "name", str(t)) for t in group])
 
@@ -86,10 +86,7 @@ def _is_tree_of_shapes(tree_type: Optional[str]) -> bool:
 def _expand_attribute_spec_entry(attr_type: Any, tree_type: Optional[str] = None) -> Tuple[Any, ...]:
     """Expand backend attribute groups into scalar attributes for CFP layers."""
     if isinstance(attr_type, morphology.AttributeGroup):
-        expanded = tuple(morphology.expand_attribute_group(attr_type))
-        if _is_tree_of_shapes(tree_type) and _attribute_name(attr_type) in {"SHAPE", "ALL"}:
-            return tuple(attr for attr in expanded if _attribute_name(attr) != "MAX_DIST")
-        return expanded
+        return tuple(morphology.expand_attribute_group(attr_type))
     return (attr_type,)
 
 
@@ -101,9 +98,7 @@ def normalize_attributes_spec(
 
     ``attributes_spec`` groups control learnable CFP projections. A public
     ``morphology.AttributeGroup`` is therefore expanded in place to the scalar
-    attributes it represents before caching and weight construction. For
-    tree-of-shapes, group-provided ``MAX_DIST`` is omitted from ``SHAPE`` and
-    ``ALL`` because that scalar attribute is undefined on ToS.
+    attributes it represents before caching and weight construction.
     """
     group_defs = []
     all_attr_types_set = set()
@@ -170,37 +165,9 @@ def build_tree(
     )
 
 
-def validate_attributes_for_tree_type(attributes: Iterable[Any], tree_type: str) -> None:
-    """Reject attribute requests that the selected tree type cannot compute."""
-    if morphology.normalize_tree_type(tree_type) != "tree-of-shapes":
-        return
-
-    unsupported = []
-    for attr_type in attributes:
-        name = _attribute_name(attr_type)
-        expanded = _expand_attribute_spec_entry(attr_type, tree_type)
-        unsupported_members = [
-            _attribute_name(scalar_attr)
-            for scalar_attr in expanded
-            if _attribute_name(scalar_attr) == "MAX_DIST"
-        ]
-        if unsupported_members and len(expanded) == 1:
-            unsupported.append(name)
-        elif unsupported_members:
-            unsupported.append(f"{name} contains {', '.join(sorted(set(unsupported_members)))}")
-
-    if unsupported:
-        names = ", ".join(sorted(set(unsupported)))
-        raise ValueError(
-            "tree-of-shapes CFP does not support attributes that are undefined "
-            f"for tree-of-shapes: {names}"
-        )
-
-
 __all__ = [
     "group_name",
     "normalize_attributes_spec",
     "to_numpy_u8",
     "build_tree",
-    "validate_attributes_for_tree_type",
 ]

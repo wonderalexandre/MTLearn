@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <list>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -83,7 +84,8 @@ public:
     }
 
     // Return the compact tensor set used by the implicit-Jacobian CFP path:
-    // residues, preorder time, postorder time, parent id, and node-of-pixel.
+    // residues, compact preorder index, exclusive subtree end, parent id,
+    // and node-of-pixel. The backend retains its separate DFS event indices.
     // This avoids building a potentially large explicit sparse matrix during
     // training and allows the Python autograd function to traverse the tree.
     static std::list<torch::Tensor> getInfoForJacobian(morphology::WeightedTreePtr weightedTree)
@@ -106,31 +108,37 @@ public:
         torch::Tensor tPreOrder = torch::zeros({numNodes}, opts_i64);
         torch::Tensor tPostOrder = torch::zeros({numNodes}, opts_i64);
         torch::Tensor tParent = torch::zeros({numNodes}, opts_i64);
-        torch::Tensor tNodeOfPixel = torch::zeros({numPixels}, opts_i64);
+        torch::Tensor tNodeOfPixel = torch::zeros({numPixels}, torch::TensorOptions().dtype(torch::kUInt32).requires_grad(false));
 
         float* residuesPtr = tResiduos.data_ptr<float>();
         int64_t* preOrderPtr = tPreOrder.data_ptr<int64_t>();
         int64_t* postOrderPtr = tPostOrder.data_ptr<int64_t>();
         int64_t* parentPtr = tParent.data_ptr<int64_t>();
-        int64_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<int64_t>();
+        uint32_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<uint32_t>();
 
-        // Node-local metadata is independent per node, so the backend tree can
-        // be scanned in parallel. Values for inactive slots keep their zero
-        // defaults and are ignored by the traversal orders.
-        #pragma omp parallel for
-        for (morphology::NodeId nodeId = 0; nodeId < numNodes; ++nodeId) {
-            if (tree.isAlive(nodeId)) {
+        // Count entries only: each subtree occupies [pre, post) in preorder.
+        // Export CFP-specific indices in one O(T) traversal, leaving the
+        // backend's interleaved DFS event cache and node ids unchanged.
+        // Inactive slots retain the empty interval [0, 0) and zero residue.
+        int64_t nextPreorder = 0;
+        morphology::detail::traversePostOrder(
+            tree, tree.root(),
+            [&](morphology::NodeId nodeId) {
+                preOrderPtr[nodeId] = nextPreorder++;
                 residuesPtr[nodeId] = morphology::residue(*weightedTree, nodeId);
-                preOrderPtr[nodeId] = static_cast<int64_t>(tree.dfsEntryIndex(nodeId));
-                postOrderPtr[nodeId] = static_cast<int64_t>(tree.dfsExitIndex(nodeId));
                 parentPtr[nodeId] = static_cast<int64_t>(tree.parent(nodeId));
-            }
-        }
+            },
+            [](morphology::NodeId, morphology::NodeId) {},
+            [&](morphology::NodeId nodeId) { postOrderPtr[nodeId] = nextPreorder; });
 
         // nodeOfPixel is the final gather map used to reconstruct image pixels
         // from node-level filtered residues.
         for (int pixel = 0; pixel < numPixels; ++pixel) {
-            nodeOfPixelPtr[pixel] = static_cast<int64_t>(tree.smallestNode(pixel));
+            const auto node = tree.smallestNode(pixel);
+            if (node < 0 || static_cast<uint64_t>(node) > std::numeric_limits<uint32_t>::max()) {
+                throw std::overflow_error("node_of_pixel cannot be represented as uint32.");
+            }
+            nodeOfPixelPtr[pixel] = static_cast<uint32_t>(node);
         }
 
         std::list<torch::Tensor> result;

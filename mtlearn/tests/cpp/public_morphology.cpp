@@ -24,14 +24,14 @@ int main()
 
     // Attribute requests are variant-based so callers can pass either a single
     // attribute or a backend-expanded attribute group through one API.
-    morphology::AttributeOrGroup attribute = morphology::Attribute::AREA;
+    morphology::AttributeOrGroup attribute = morphology::Attribute::Area;
     assert(std::holds_alternative<morphology::Attribute>(attribute));
 
-    attribute = morphology::AttributeGroup::SHAPE;
+    attribute = morphology::AttributeGroup::Shape;
     assert(std::holds_alternative<morphology::AttributeGroup>(attribute));
 
-    const auto outputSpace = morphology::NodeIdSpace::MORPHOLOGICAL_TREE;
-    assert(outputSpace == morphology::NodeIdSpace::MORPHOLOGICAL_TREE);
+    const auto outputSpace = morphology::NodeIdSpace::MorphologicalTree;
+    assert(outputSpace == morphology::NodeIdSpace::MorphologicalTree);
 
     const auto interpolation = morphology::TreeOfShapesInterpolation::SelfDual;
     assert(interpolation == morphology::TreeOfShapesInterpolation::SelfDual);

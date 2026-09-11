@@ -24,8 +24,8 @@ image = np.array(
 
 tree = morphology.create_max_tree(image)
 
-print(tree.numRows, tree.numCols)
-print(tree.numNodes, tree.numInternalNodeSlots)
+print(tree.num_rows, tree.num_columns)
+print(tree.num_nodes, tree.num_internal_node_slots)
 ```
 
 Use a max-tree for bright connected components, a min-tree for dark connected
@@ -41,11 +41,11 @@ tos = morphology.create_tree_of_shapes(image, interpolation="self-dual")
 
 Node arrays returned by mtlearn are usually indexed by backend node slot. The
 slot count can be larger than the number of live nodes after edits, so allocate
-criteria and scores with `numInternalNodeSlots`.
+criteria and scores with `num_internal_node_slots`.
 
 ```python
 root = tree.root
-children = tree.children_of(root)
+children = tree.children(root)
 alive_nodes = tree.alive_node_ids
 
 print("root:", root)
@@ -57,8 +57,8 @@ For a pixel-level lookup, use the flattened pixel id:
 
 ```python
 row, col = 1, 2
-pixel_id = row * tree.numCols + col
-owner = tree.proper_part_owner_of(pixel_id)
+pixel_id = row * tree.num_columns + col
+owner = tree.smallest_node(pixel_id)
 print("pixel owner:", owner)
 ```
 
@@ -70,7 +70,7 @@ attribute names to columns. The value matrix has one row per node slot.
 ```python
 attrs = [
     morphology.AttributeType.AREA,
-    morphology.AttributeType.GRAY_HEIGHT,
+    morphology.AttributeType.GRAY_LEVEL_HEIGHT,
     morphology.AttributeType.COMPACTNESS,
 ]
 
@@ -99,7 +99,7 @@ one value per node slot and return a reconstructed image.
 filters = morphology.create_attribute_filter(tree)
 area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA)
 
-filtered = filters.filteringMin(area, threshold=4.0)
+filtered = filters.filtering_by_pruning_min(area, threshold=4.0)
 print(filtered.dtype, filtered.shape)
 ```
 
@@ -107,7 +107,7 @@ Boolean criteria must also have one entry per node slot:
 
 ```python
 criterion = area >= 4.0
-filtered = filters.filteringDirectRule(criterion.tolist())
+filtered = filters.apply_direct_attribute_filter(criterion.tolist())
 ```
 
 ## Next Steps

@@ -5,6 +5,8 @@ from __future__ import annotations
 import torch
 
 from ..._helpers import to_numpy_u8
+from ..preparation import PreparedBatch
+from .forward_executor import ForwardExecutor
 
 
 class TrainingSampleInspector:
@@ -20,6 +22,10 @@ class TrainingSampleInspector:
         build_if_missing: bool = True,
     ):
         """Return cached or direct attributes, altitude increments, and parameters per spec."""
+        if isinstance(img, PreparedBatch):
+            if idx is not None or img.shape[0] != 1:
+                raise ValueError("Use inspect_prepared_sample with a batch index for prepared batches.")
+            return self.inspect_prepared(layer, img, channel=channel)
         if img.dim() == 2:
             img_chw = img.unsqueeze(0)
         elif img.dim() == 3:
@@ -51,6 +57,20 @@ class TrainingSampleInspector:
                     update_stats=False,
                 )
 
+        return self._describe(layer, payloads)
+
+    def inspect_prepared(self, layer, batch, *, batch_index=0, channel=0):
+        if not isinstance(batch, PreparedBatch):
+            raise TypeError("inspect_prepared_sample expects a PreparedBatch.")
+        ForwardExecutor._input(layer, batch)
+        if not 0 <= batch_index < batch.shape[0] or not 0 <= channel < batch.shape[1]:
+            raise IndexError("Prepared sample or channel index out of range.")
+        payloads = {key: layer._tree_payload_provider.consume_prepared(
+            batch.samples[batch_index][channel][key]) for key in layer._tree_spec_by_key}
+        return self._describe(layer, payloads)
+
+    @staticmethod
+    def _describe(layer, payloads):
         specs = {}
         for spec in layer.filter_specs:
             payload = payloads[spec.tree_key]

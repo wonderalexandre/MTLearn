@@ -57,8 +57,8 @@ enum class TreeOfShapesInterpolation {
 /// morphological-tree node ids or by the Higra-compatible hierarchy exported by
 /// the backend.
 enum class NodeIdSpace {
-    MORPHOLOGICAL_TREE, ///< Rows are indexed by morphology-tree node ids.
-    HIGRA,              ///< Rows are indexed by exported Higra hierarchy ids.
+    MorphologicalTree, ///< Rows are indexed by morphology-tree node ids.
+    Higra,              ///< Rows are indexed by exported Higra hierarchy ids.
 };
 
 /// Public attribute identifiers supported by the current morphology backend.
@@ -67,69 +67,138 @@ enum class NodeIdSpace {
 /// `bindings/morphology/BindingSupport.hpp` and the Python exposure in
 /// `bindings/morphology/AttributeBinding.hpp`.
 enum class Attribute {
-    AREA,                         ///< Component area.
-    VOLUME,                       ///< Component volume.
-    RELATIVE_VOLUME,              ///< Volume relative to its parent context.
-    GRAY_HEIGHT,                  ///< Gray-level height.
-    MEAN_LEVEL,                   ///< Mean gray-level value.
-    VARIANCE_LEVEL,               ///< Gray-level variance.
-    BOX_WIDTH,                    ///< Bounding-box width.
-    BOX_HEIGHT,                   ///< Bounding-box height.
-    DIAGONAL_LENGTH,              ///< Bounding-box diagonal length.
-    RECTANGULARITY,               ///< Component rectangularity.
-    RATIO_WH,                     ///< Width-to-height ratio.
-    BOX_COL_MIN,                  ///< Minimum bounding-box column.
-    BOX_COL_MAX,                  ///< Maximum bounding-box column.
-    BOX_ROW_MIN,                  ///< Minimum bounding-box row.
-    BOX_ROW_MAX,                  ///< Maximum bounding-box row.
-    CENTRAL_MOMENT_20,            ///< Central moment mu20.
-    CENTRAL_MOMENT_02,            ///< Central moment mu02.
-    CENTRAL_MOMENT_11,            ///< Central moment mu11.
-    CENTRAL_MOMENT_30,            ///< Central moment mu30.
-    CENTRAL_MOMENT_03,            ///< Central moment mu03.
-    CENTRAL_MOMENT_21,            ///< Central moment mu21.
-    CENTRAL_MOMENT_12,            ///< Central moment mu12.
-    HU_MOMENT_1,                  ///< First Hu invariant moment.
-    HU_MOMENT_2,                  ///< Second Hu invariant moment.
-    HU_MOMENT_3,                  ///< Third Hu invariant moment.
-    HU_MOMENT_4,                  ///< Fourth Hu invariant moment.
-    HU_MOMENT_5,                  ///< Fifth Hu invariant moment.
-    HU_MOMENT_6,                  ///< Sixth Hu invariant moment.
-    HU_MOMENT_7,                  ///< Seventh Hu invariant moment.
-    INERTIA,                      ///< Moment-based inertia.
-    COMPACTNESS,                  ///< Shape compactness.
-    ECCENTRICITY,                 ///< Moment-based eccentricity.
-    LENGTH_MAJOR_AXIS,            ///< Major-axis length.
-    LENGTH_MINOR_AXIS,            ///< Minor-axis length.
-    AXIS_ORIENTATION,             ///< Principal-axis orientation.
-    CIRCULARITY,                  ///< Shape circularity.
-    BITQUADS_AREA,                ///< Bitquad area estimate.
-    BITQUADS_NUMBER_EULER,        ///< Bitquad Euler number.
-    BITQUADS_NUMBER_HOLES,        ///< Bitquad hole count.
-    BITQUADS_PERIMETER,           ///< Bitquad perimeter estimate.
-    BITQUADS_PERIMETER_CONTINUOUS, ///< Continuous bitquad perimeter estimate.
-    BITQUADS_CIRCULARITY,         ///< Bitquad circularity.
-    BITQUADS_PERIMETER_AVERAGE,   ///< Average bitquad perimeter.
-    BITQUADS_LENGTH_AVERAGE,      ///< Average bitquad length.
-    BITQUADS_WIDTH_AVERAGE,       ///< Average bitquad width.
-    HEIGHT_NODE,                  ///< Node height in the tree.
-    DEPTH_NODE,                   ///< Node depth in the tree.
-    IS_LEAF_NODE,                 ///< Nonzero when the node is a leaf.
-    IS_ROOT_NODE,                 ///< Nonzero when the node is the root.
-    NUM_CHILDREN_NODE,            ///< Number of direct children.
-    NUM_SIBLINGS_NODE,            ///< Number of siblings.
-    NUM_DESCENDANTS_NODE,         ///< Number of descendants.
-    NUM_LEAF_DESCENDANTS_NODE,    ///< Number of leaf descendants.
-    LEAF_RATIO_NODE,              ///< Leaf-descendant ratio.
-    BALANCE_NODE,                 ///< Tree-balance descriptor.
-    MAX_DIST,                     ///< Maximum distance descriptor.
-    AVG_CHILD_HEIGHT_NODE,        ///< Average child height.
-    CONTOUR_PIXELS,               ///< Number of contour pixels.
-    CONTOUR_PERIMETER,            ///< Contour perimeter.
-    CONTOUR_SIDE_NORTH,           ///< North-side contour contribution.
-    CONTOUR_SIDE_WEST,            ///< West-side contour contribution.
-    CONTOUR_SIDE_EAST,            ///< East-side contour contribution.
-    CONTOUR_SIDE_SOUTH,           ///< South-side contour contribution.
+    Area,                         ///< Component area.
+    Volume,                       ///< Component volume.
+    RelativeVolume,              ///< Recursive contrast volume over the node subtree.
+    GrayLevelHeight,                  ///< Gray-level height.
+    MeanGrayLevel,                   ///< Mean gray-level value.
+    GrayLevelVariance,               ///< Gray-level variance.
+    BoxWidth,                    ///< Bounding-box width.
+    BoundingBoxHeight,                   ///< Bounding-box height.
+    DiagonalLength,              ///< Bounding-box diagonal length.
+    Rectangularity,               ///< Component rectangularity.
+    RatioWh,                     ///< Ratio of the longer to the shorter bounding-box side.
+    BoxColumnMin,                  ///< Minimum bounding-box column.
+    BoxColumnMax,                  ///< Maximum bounding-box column.
+    BoxRowMin,                  ///< Minimum bounding-box row.
+    BoxRowMax,                  ///< Maximum bounding-box row.
+    CentralMoment20,            ///< Central moment mu20.
+    CentralMoment02,            ///< Central moment mu02.
+    CentralMoment11,            ///< Central moment mu11.
+    CentralMoment30,            ///< Central moment mu30.
+    CentralMoment03,            ///< Central moment mu03.
+    CentralMoment21,            ///< Central moment mu21.
+    CentralMoment12,            ///< Central moment mu12.
+    HuMoment1,                  ///< First Hu invariant moment.
+    HuMoment2,                  ///< Second Hu invariant moment.
+    HuMoment3,                  ///< Third Hu invariant moment.
+    HuMoment4,                  ///< Fourth Hu invariant moment.
+    HuMoment5,                  ///< Fifth Hu invariant moment.
+    HuMoment6,                  ///< Sixth Hu invariant moment.
+    HuMoment7,                  ///< Seventh Hu invariant moment.
+    Inertia,                      ///< Moment-based inertia.
+    Compactness,                  ///< Shape compactness.
+    Eccentricity,                 ///< Moment-based eccentricity.
+    LengthMajorAxis,            ///< Major-axis length.
+    LengthMinorAxis,            ///< Minor-axis length.
+    AxisOrientation,             ///< Principal-axis orientation.
+    Circularity,                  ///< Shape circularity.
+    BitquadArea,                ///< Bitquad area estimate.
+    BitquadNumberEuler,        ///< Bitquad Euler number.
+    BitquadNumberHoles,        ///< Bitquad hole count.
+    BitquadPerimeter,           ///< Bitquad perimeter estimate.
+    BitquadPerimeterContinuous, ///< Continuous bitquad perimeter estimate.
+    BitquadCircularity,         ///< Bitquad circularity.
+    BitquadPerimeterAverage,   ///< Average bitquad perimeter.
+    BitquadLengthAverage,      ///< Average bitquad length.
+    BitquadWidthAverage,       ///< Average bitquad width.
+    SubtreeHeight,                  ///< Node height in the tree.
+    DepthNode,                   ///< Node depth in the tree.
+    IsLeafNode,                 ///< Nonzero when the node is a leaf.
+    IsRootNode,                 ///< Nonzero when the node is the root.
+    NumChildrenNode,            ///< Number of direct children.
+    NumSiblingsNode,            ///< Number of siblings.
+    NumDescendantsNode,         ///< Number of descendants.
+    NumLeafDescendantsNode,    ///< Number of leaf descendants.
+    LeafRatioNode,              ///< Leaf-descendant ratio.
+    BalanceNode,                 ///< Tree-balance descriptor.
+    MaxDist,                     ///< Maximum distance descriptor.
+    AvgChildHeightNode,        ///< Average child height.
+    ContourPixels,               ///< Number of contour pixels.
+    ContourPerimeter,            ///< Contour perimeter.
+    ContourSideNorth,           ///< North-side contour contribution.
+    ContourSideWest,            ///< West-side contour contribution.
+    ContourSideEast,            ///< East-side contour contribution.
+    ContourSideSouth,           ///< South-side contour contribution.
+    MaxDistExact,
+    DistSquaredSumExact,
+    DistSquaredMeanExact,
+    DistRmsExact,
+    DistSquaredVarianceExact,
+    DistSquaredSum,
+    DistSquaredMean,
+    DistRms,
+    DistSquaredVariance,
+    MaxDistCenterRowExact,
+    MaxDistCenterColumnExact,
+    MaxDistCenterRow,
+    MaxDistCenterColumn,
+    MaxDistPlateauAreaExact,
+    MaxDistPlateauCentroidRowExact,
+    MaxDistPlateauCentroidColumnExact,
+    MaxDistPlateauArea,
+    MaxDistPlateauCentroidRow,
+    MaxDistPlateauCentroidColumn,
+    DistSum,
+    DistMean,
+    DistVariance,
+    DistMedian,
+    DistMode,
+    DistQ25,
+    DistQ75,
+    DistQ90,
+    DistEntropy,
+    DistPositiveArea,
+    DistLevelCount,
+    DistWeightedCentroidRow,
+    DistWeightedCentroidColumn,
+    DistWeightedCentralMoment20,
+    DistWeightedCentralMoment02,
+    DistWeightedCentralMoment11,
+    DistWeightedAxisOrientation,
+    DistWeightedEccentricity,
+    DistSumExact,
+    DistMeanExact,
+    DistVarianceExact,
+    DistMedianExact,
+    DistModeExact,
+    DistQ25Exact,
+    DistQ75Exact,
+    DistQ90Exact,
+    DistEntropyExact,
+    DistPositiveAreaExact,
+    DistLevelCountExact,
+    DistWeightedCentroidRowExact,
+    DistWeightedCentroidColumnExact,
+    DistWeightedCentralMoment20Exact,
+    DistWeightedCentralMoment02Exact,
+    DistWeightedCentralMoment11Exact,
+    DistWeightedAxisOrientationExact,
+    DistWeightedEccentricityExact,
+    MaxSquaredDist,
+    MaxSquaredDistExact,
+    FilledArea,
+    FilledCentroidRow,
+    FilledCentroidColumn,
+    FilledLengthMajorAxis,
+    FilledLengthMinorAxis,
+    FilledAxisOrientation,
+    FilledEccentricity,
+    FilledInertia,
+    HoleAreaFraction,
+    FilledCentroidDisplacementNormalized,
+    FilledCompactness,
+    FilledCircularity,
 };
 
 /// Attribute groups expanded by the backend attribute computer.
@@ -137,12 +206,15 @@ enum class Attribute {
 /// Groups are part of the facade because Python notebooks and future C++
 /// consumers should not depend on backend attribute-group types directly.
 enum class AttributeGroup {
-    ALL,           ///< All public scalar attributes supported by the backend.
-    GRAY_LEVEL,    ///< Gray-level attributes.
-    SHAPE,         ///< Shape attributes.
-    MOMENTS,       ///< Moment-based attributes.
-    BOUNDARY,      ///< Boundary and contour attributes.
-    TREE_TOPOLOGY, ///< Tree-topology attributes.
+    All,           ///< All public scalar attributes supported by the backend.
+    GrayLevel,    ///< Gray-level attributes.
+    Shape,         ///< Shape attributes.
+    Moments,       ///< Moment-based attributes.
+    Boundary,      ///< Boundary and contour attributes.
+    TreeTopology, ///< Tree-topology attributes.
+    DistTransf,
+    DistTransfExact,
+    FilledShape,
 };
 
 /// Attribute request accepted by APIs that can consume a scalar attribute or a group.

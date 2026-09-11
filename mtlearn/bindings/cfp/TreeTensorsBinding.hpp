@@ -47,8 +47,12 @@ These helpers expose residues, sparse Jacobians, and traversal metadata for a
             py::call_guard<py::gil_scoped_release>(),
             R"pbdoc(Return residues and implicit-Jacobian helper tensors.
 
-The returned list contains residues, preorder times, postorder times, parent
-ids, and the node owner of each flattened pixel.
+The returned list contains residues, compact preorder indices, exclusive
+subtree ends, parent ids, and the node owner of each flattened pixel.
+For each live node, its subtree occupies [pre, post) and post - pre is its
+subtree node count. The root ends at the number of live nodes. Tensor rows
+retain backend node-slot ids; inactive slots have zero residues and [0, 0).
+These CFP indices differ from the backend's interleaved DFS entry/exit events.
 )pbdoc");
 }
 

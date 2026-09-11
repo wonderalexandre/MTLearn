@@ -154,7 +154,7 @@ def facade_assertion_cell(label: str) -> nbformat.NotebookNode:
         "    tree,\n"
         "    [morphology.AttributeType.AREA, morphology.AttributeGroup.TREE_TOPOLOGY],\n"
         ")[1]\n"
-        "single = morphology.Attribute.computeSingleAttribute(\n"
+        "single = morphology.Attribute.compute_single_attribute(\n"
         "    tree,\n"
         "    morphology.AttributeType.AREA,\n"
         "    morphology.NodeIdSpace.MORPHOLOGICAL_TREE,\n"

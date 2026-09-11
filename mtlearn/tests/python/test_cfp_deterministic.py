@@ -47,7 +47,7 @@ def _small_batch_tensor():
     )
 
 
-def _single_area_layer(*, in_channels=1, tree_type="max-tree", tos_interpolation=None):
+def _single_area_layer(*, in_channels=1, tree_type="max-tree", tos_interpolation=None, device="cpu"):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=in_channels,
         filter_specs=[
@@ -57,7 +57,7 @@ def _single_area_layer(*, in_channels=1, tree_type="max-tree", tos_interpolation
                 "tos_interpolation": tos_interpolation,
             }
         ],
-        device="cpu",
+        device=device,
         scale_mode="none",
         score_sharpness=1.0,
         clamp=None,
@@ -81,7 +81,7 @@ def _two_group_layer(*, tree_type="max-tree", tos_interpolation=None):
             },
             {
                 "tree_type": tree_type,
-                "attributes": (morphology.AttributeType.GRAY_HEIGHT,),
+                "attributes": (morphology.AttributeType.GRAY_LEVEL_HEIGHT,),
                 "tos_interpolation": tos_interpolation,
             },
         ],
@@ -106,16 +106,119 @@ def test_implicit_metadata_reconstructs_like_explicit_jacobian():
     )
     filtered_residues = residues * torch.linspace(0.1, 0.9, residues.numel())
 
-    explicit = (jacobian.T @ filtered_residues).reshape(tree.numRows, tree.numCols)
+    explicit = (jacobian.T @ filtered_residues).reshape(tree.num_rows, tree.num_columns)
     implicit = ConnectedFilterPreprocessingImplicitJacobianFunction.forward_from_info(
         filtered_residues,
         tpre,
         tpost,
         node_of_pixel,
-        parent,
-    ).reshape(tree.numRows, tree.numCols)
+    ).reshape(tree.num_rows, tree.num_columns)
 
     assert torch.allclose(implicit, explicit)
+
+
+@pytest.mark.parametrize(
+    "tree_type",
+    [
+        pytest.param(morphology.TreeType.MAX_TREE, id="max-tree"),
+        pytest.param(morphology.TreeType.MIN_TREE, id="min-tree"),
+    ],
+)
+def test_implicit_unfiltered_residues_reconstruct_input(tree_type):
+    image = _small_image_np()
+    tree = morphology.build_tree(image, tree_type)
+    residues, tpre, tpost, parent, node_of_pixel = (
+        mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+    )
+
+    reconstructed = ConnectedFilterPreprocessingImplicitJacobianFunction.forward_from_info(
+        residues,
+        tpre,
+        tpost,
+        node_of_pixel,
+    ).reshape(tree.num_rows, tree.num_columns)
+
+    assert torch.equal(reconstructed, torch.as_tensor(image, dtype=residues.dtype))
+
+
+@pytest.mark.parametrize(
+    "tree_type",
+    [
+        pytest.param(morphology.TreeType.MAX_TREE, id="max-tree"),
+        pytest.param(morphology.TreeType.MIN_TREE, id="min-tree"),
+    ],
+)
+def test_implicit_forward_and_parameter_gradients_match_explicit_jacobian(tree_type):
+    image = _small_image_np()
+    tree = morphology.build_tree(image, tree_type)
+    jacobian = mtlearn.ConnectedFilterPreprocessingTreeTensors.get_jacobian(tree).to_dense().double()
+    residues, tpre, tpost, parent, node_of_pixel = (
+        mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+    )
+    residues = residues.double()
+    attributes = morphology.compute_attributes(tree, [morphology.AttributeType.AREA])[1]
+    attributes = torch.as_tensor(attributes, dtype=torch.float64).reshape(-1, 1)
+    score_sharpness = 1.7
+
+    explicit_weight = torch.tensor([0.25], dtype=torch.float64, requires_grad=True)
+    explicit_bias = torch.tensor([-0.1], dtype=torch.float64, requires_grad=True)
+    explicit_scores = torch.sigmoid(score_sharpness * (attributes @ explicit_weight + explicit_bias))
+    explicit_output = (jacobian.T @ (residues * explicit_scores)).reshape(tree.num_rows, tree.num_columns)
+
+    implicit_weight = explicit_weight.detach().clone().requires_grad_(True)
+    implicit_bias = explicit_bias.detach().clone().requires_grad_(True)
+    implicit_output = ConnectedFilterPreprocessingImplicitJacobianFunction.apply(
+        implicit_weight,
+        implicit_bias,
+        residues,
+        tpre,
+        tpost,
+        node_of_pixel,
+        attributes,
+        tree.num_rows,
+        tree.num_columns,
+        score_sharpness,
+    )
+
+    probe = torch.linspace(-0.5, 0.75, image.size, dtype=torch.float64).reshape(image.shape)
+    explicit_grads = torch.autograd.grad((explicit_output * probe).sum(), (explicit_weight, explicit_bias))
+    implicit_grads = torch.autograd.grad((implicit_output * probe).sum(), (implicit_weight, implicit_bias))
+
+    assert torch.allclose(implicit_output, explicit_output, rtol=1e-8, atol=1e-10)
+    assert torch.allclose(implicit_grads[0], explicit_grads[0], rtol=1e-8, atol=1e-10)
+    assert torch.allclose(implicit_grads[1], explicit_grads[1], rtol=1e-8, atol=1e-10)
+
+
+@pytest.mark.parametrize("tree_type", ["max-tree", "min-tree"])
+def test_mps_forward_and_parameter_gradients_match_cpu(tree_type):
+    if not getattr(torch.backends, "mps", None) or not torch.backends.mps.is_available():
+        pytest.skip("MPS is not available")
+
+    x_cpu = torch.as_tensor(_small_image_np(), dtype=torch.float32).reshape(1, 1, 3, 3)
+    probe_cpu = torch.linspace(-0.5, 0.75, x_cpu.numel(), dtype=torch.float32).reshape_as(x_cpu)
+    cpu_layer = _single_area_layer(tree_type=tree_type, device="cpu")
+    mps_layer = _single_area_layer(tree_type=tree_type, device="mps")
+
+    cpu_output = cpu_layer(x_cpu)
+    (cpu_output * probe_cpu).sum().backward()
+    mps_output = mps_layer(x_cpu.to("mps"))
+    (mps_output * probe_cpu.to("mps")).sum().backward()
+
+    assert mps_output.device.type == "mps"
+    assert torch.allclose(mps_output.cpu(), cpu_output, rtol=1e-4, atol=1e-5)
+    cpu_parameters = dict(cpu_layer.named_parameters())
+    mps_parameters = dict(mps_layer.named_parameters())
+    assert cpu_parameters.keys() == mps_parameters.keys()
+    for name, cpu_parameter in cpu_parameters.items():
+        assert cpu_parameter.grad is not None
+        assert mps_parameters[name].grad is not None
+        assert torch.isfinite(mps_parameters[name].grad).all()
+        assert torch.allclose(
+            mps_parameters[name].grad.cpu(),
+            cpu_parameter.grad,
+            rtol=1e-4,
+            atol=1e-5,
+        )
 
 
 def test_predict_preserves_training_mode_parameters_and_shape_for_batch_channels():
@@ -168,7 +271,7 @@ def test_predict_matches_forward_for_tree_of_shapes_multiple_groups():
     x = torch.as_tensor(_small_image_np(), dtype=torch.float32).reshape(1, 1, 3, 3)
     layer = _two_group_layer(
         tree_type="tree-of-shapes",
-        tos_interpolation=morphology.ToSInterpolation.Min8cMax4c,
+        tos_interpolation=morphology.ToSInterpolation.MIN8_MAX4,
     )
     indexed_x = (x, torch.tensor([0]))
 

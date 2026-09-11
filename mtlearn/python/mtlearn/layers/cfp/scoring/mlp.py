@@ -10,6 +10,14 @@ import torch
 from .base import ScoringModel
 
 
+class _Linear(torch.nn.Linear):
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        if features.device.type == "mps" and self.bias is not None:
+            output = torch.nn.functional.linear(features, self.weight)
+            return output + self.bias.to(dtype=output.dtype)
+        return super().forward(features)
+
+
 class MLPScorer(ScoringModel):
     """Score tree nodes with a small MLP over normalized CFP attributes."""
 
@@ -50,10 +58,10 @@ class MLPScorer(ScoringModel):
         in_features = self.num_features
         activation_cls = self._ACTIVATIONS[self.activation]
         for hidden in self.hidden_units:
-            layers.append(torch.nn.Linear(in_features, hidden, device=device, dtype=dtype))
+            layers.append(_Linear(in_features, hidden, device=device, dtype=dtype))
             layers.append(activation_cls())
             in_features = hidden
-        layers.append(torch.nn.Linear(in_features, 1, device=device, dtype=dtype))
+        layers.append(_Linear(in_features, 1, device=device, dtype=dtype))
         self.network = torch.nn.Sequential(*layers)
 
     def init_identity(

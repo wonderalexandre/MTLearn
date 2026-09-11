@@ -8,10 +8,7 @@ import re
 from typing import Any, Mapping
 
 from .... import morphology
-from ..._helpers import (
-    normalize_attributes_spec,
-    validate_attributes_for_tree_type,
-)
+from ..._helpers import normalize_attributes_spec
 from ..component_registries import (
     normalize_constraint_configs,
     normalize_regularizer_configs,
@@ -115,7 +112,6 @@ def normalize_filter_specs(
             raise ValueError("Each filter spec must contain at least one attribute.")
 
         attributes = normalize_attributes_spec([raw_group], tree_type)[0][0]
-        validate_attributes_for_tree_type(attributes, tree_type)
         scoring_model = normalize_scoring_model(raw_spec.get("scoring", None), len(attributes))
         score_sharpness = normalize_positive_scalar(
             raw_spec.get("score_sharpness", default_score_sharpness),

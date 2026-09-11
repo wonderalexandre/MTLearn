@@ -385,7 +385,7 @@ def test_checkpoint_helpers_load_no_arg_factory(tmp_path):
 
 def test_checkpoint_helpers_roundtrip_multiple_cfps(tmp_path):
     first = _named_primary_layer("area_filter", morphology.AttributeType.AREA)
-    second = _named_primary_layer("gray_filter", morphology.AttributeType.GRAY_HEIGHT)
+    second = _named_primary_layer("gray_filter", morphology.AttributeType.GRAY_LEVEL_HEIGHT)
     first.build_dataloader_cached(_tiny_dataset_loader())
     second.build_dataloader_cached(_tiny_dataset_loader())
     source_model = _TwoCfpBackbone(first, second)
@@ -403,13 +403,13 @@ def test_checkpoint_helpers_roundtrip_multiple_cfps(tmp_path):
     def model_factory():
         return _TwoCfpBackbone(
             _named_primary_layer("area_filter", morphology.AttributeType.AREA),
-            _named_primary_layer("gray_filter", morphology.AttributeType.GRAY_HEIGHT),
+            _named_primary_layer("gray_filter", morphology.AttributeType.GRAY_LEVEL_HEIGHT),
         )
 
     loaded_model, _ = load_checkpoint(checkpoint_path, model_factory, device="cpu")
 
     first_stat_key = first._stat_key(first.filter_specs[0].tree_key, morphology.AttributeType.AREA)
-    second_stat_key = second._stat_key(second.filter_specs[0].tree_key, morphology.AttributeType.GRAY_HEIGHT)
+    second_stat_key = second._stat_key(second.filter_specs[0].tree_key, morphology.AttributeType.GRAY_LEVEL_HEIGHT)
     assert torch.equal(loaded_model.pre._weights["area_filter"], source_model.pre._weights["area_filter"])
     assert torch.equal(loaded_model.branch.cfp._weights["gray_filter"], source_model.branch.cfp._weights["gray_filter"])
     assert torch.equal(loaded_model.pre._ds_stats[first_stat_key]["amin"], source_model.pre._ds_stats[first_stat_key]["amin"])
