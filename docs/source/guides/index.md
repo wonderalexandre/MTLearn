@@ -11,7 +11,6 @@ morphology
 connected-filter-preprocessing
 custom-attributes-filter-specs
 pytorch-integration
-cpp-api
 ```
 
 ## Reading Order
@@ -19,5 +18,4 @@ cpp-api
 Start with {doc}`getting-started` if you only need to build a tree and compute
 attributes. Move to {doc}`connected-filter-preprocessing` when using mtlearn as
 a learnable preprocessing block. Use {doc}`custom-attributes-filter-specs` and
-{doc}`pytorch-integration` when building experiments. Use {doc}`cpp-api` when
-embedding the public C++ facade in another target.
+{doc}`pytorch-integration` when building experiments.

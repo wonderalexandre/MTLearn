@@ -234,6 +234,15 @@ for (x, idx), target in cached_loader:
     y = layer((x, idx))
 ```
 
+Each sample index must remain associated with the same image while its
+morphology is cached. Random crops or other random image transformations must
+not produce different images for the same cached index.
+
+For validation and test data, use `build_dataloader_cached_fixed_stats` after
+fitting or loading the training statistics. It builds the cache while keeping
+those statistics fixed. Set `index_offset` so that training, validation, and
+test data use disjoint sample-index ranges when sharing the same layer cache.
+
 For quick experiments without a statistics pass, use `scale_mode="none"`.
 This passes raw attribute values to the scoring model.
 
