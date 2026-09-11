@@ -6,8 +6,7 @@ based on morphological trees.
 This site combines:
 
 - Python API reference generated from docstrings.
-- C++ source-level notes for the installed public facade.
-- User guides for building experiments with the public Python and C++ APIs.
+- User guides for building experiments with the public Python API.
 
 ```{toctree}
 :maxdepth: 2
@@ -29,5 +28,4 @@ guides/index
 :caption: API Reference
 
 api/python/index
-api/cpp/index
 ```

@@ -219,7 +219,10 @@ attribute_index, shape_values = morphology.compute_attributes(
 ```
 
 Groups are useful for exploration, but explicit scalar lists are easier to
-track in experiments and checkpoints.
+track in experiments and checkpoints. Groups such as `ALL` can gain attributes
+between library versions, changing the number of input features and potentially
+the shapes of CFP parameters. Use explicit scalar lists when an experiment or
+checkpoint requires a fixed attribute set.
 
 ```python
 attrs_for_experiment = [
