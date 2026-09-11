@@ -1,0 +1,97 @@
+{
+  "status": "cancelled",
+  "phase": "first",
+  "device": "cpu",
+  "counts": {
+    "prepare": 1,
+    "summaries": 1,
+    "model_statistics_updates": 0
+  },
+  "cache_dir": "/Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p3-validated",
+  "before": {
+    "max_bytes": 0,
+    "retained_bytes": 0,
+    "entries": 0,
+    "hits": 0,
+    "misses": 0,
+    "evictions": 0,
+    "oversized_entries": 0,
+    "active_entries": 0,
+    "active_bytes": 0,
+    "active_not_retained_bytes": 0,
+    "live_bytes": 0,
+    "ram_hits": 0,
+    "disk_hits": 0,
+    "writes": 0,
+    "invalid_entries": 0,
+    "disk_entries": 0,
+    "entry_states": {},
+    "disk_bytes": 0,
+    "manifest_bytes": 86336,
+    "max_disk_bytes": 1073741824,
+    "readonly": false
+  },
+  "after": {
+    "max_bytes": 0,
+    "retained_bytes": 0,
+    "entries": 0,
+    "hits": 0,
+    "misses": 1,
+    "evictions": 0,
+    "oversized_entries": 1,
+    "active_entries": 0,
+    "active_bytes": 0,
+    "active_not_retained_bytes": 0,
+    "live_bytes": 0,
+    "ram_hits": 0,
+    "disk_hits": 0,
+    "writes": 1,
+    "invalid_entries": 0,
+    "disk_entries": 1,
+    "entry_states": {
+      "valid": 1
+    },
+    "disk_bytes": 267551633,
+    "manifest_bytes": 144016,
+    "max_disk_bytes": 1073741824,
+    "readonly": false
+  },
+  "images": [
+    {
+      "image_id": 0,
+      "raw_bytes": 267520272,
+      "nodes": 699690
+    }
+  ],
+  "contributions": 1,
+  "statistics_match_p1": false,
+  "sample_count": null,
+  "statistics_bytes": 0,
+  "timings": [
+    {
+      "stage": "read_image_0",
+      "seconds": 0.059475041925907135,
+      "rss_end_bytes": 303759360,
+      "available_end_bytes": 3840655360
+    },
+    {
+      "stage": "prepare_0",
+      "seconds": 20.06318204093259,
+      "rss_end_bytes": 739721216,
+      "available_end_bytes": 3273097216
+    },
+    {
+      "stage": "summarize_0",
+      "seconds": 0.06616620800923556,
+      "rss_end_bytes": 859799552,
+      "available_end_bytes": 3320971264
+    },
+    {
+      "stage": "first_pass",
+      "seconds": 21.138609750079922,
+      "rss_end_bytes": 880214016,
+      "available_end_bytes": 3320971264
+    }
+  ],
+  "note": "Integration/resource probe with MSE, not a full epoch or model-quality evaluation."
+}

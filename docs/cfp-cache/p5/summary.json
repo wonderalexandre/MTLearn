@@ -1,0 +1,66 @@
+{
+  "recorded_at": "2026-09-09T19:26:55.820888-03:00",
+  "run": "runs/original_mps",
+  "device": "mps",
+  "epochs_per_scorer": 1,
+  "samples": 3,
+  "size": [
+    2748,
+    2748
+  ],
+  "train_ids": [
+    "1068",
+    "1316"
+  ],
+  "test_ids": [
+    "1000"
+  ],
+  "elapsed_seconds": 96.07318983296864,
+  "rss_peak_bytes": 1787215872,
+  "available_min_bytes": 2159558656,
+  "phases": [
+    {
+      "phase": "shared_preparation",
+      "seconds": 62.48531295801513,
+      "rss_peak_bytes": 1787215872,
+      "available_min_bytes": 3325820928
+    },
+    {
+      "phase": "initial_evaluation_and_preview",
+      "seconds": 12.211199874989688,
+      "rss_peak_bytes": 1143750656,
+      "available_min_bytes": 2159558656
+    },
+    {
+      "phase": "one_epoch_and_evaluation",
+      "seconds": 13.250822542002425,
+      "rss_peak_bytes": 1290321920,
+      "available_min_bytes": 2309816320
+    },
+    {
+      "phase": "results",
+      "seconds": 0.09350108297076076,
+      "rss_peak_bytes": 658243584,
+      "available_min_bytes": 3334455296
+    }
+  ],
+  "disk_bytes": 739351347,
+  "training_retained_bytes": 0,
+  "training_active_bytes_at_end": 0,
+  "training_disk_reads": 18,
+  "training_disk_writes": 0,
+  "forbidden_calls": {
+    "morphology": 0,
+    "stats_update": 0,
+    "stats_merge": 0,
+    "stats_summary": 0
+  },
+  "gradient_norms_before_clip": [
+    0.001836265902966261,
+    0.08705109357833862,
+    0.0002651444519869983,
+    0.0004018379549961537
+  ],
+  "figures": 4,
+  "note": "Integration test only. Aggregate RSS does not include all MPS driver allocations; this is not a unified-memory peak."
+}

@@ -48,11 +48,12 @@ class SmallModel(torch.nn.Module):
 The CFP output channel count is `in_channels * len(filter_specs)`. Use
 `self.cfp.out_channels` when wiring the next layer.
 
-## Cache Dataset Statistics
+## Fit Dataset Statistics
 
-For statistical modes (`"dataset_clipped_zscore01"`, `"dataset_minmax01"`, and `"dataset_zscore"`), build a
-cached DataLoader before training. The wrapped loader yields `((x, idx), y)` so
-the CFP layer can reuse tree payloads by stable dataset index.
+For the default `scale_mode="dataset_clipped_zscore01"`, fit statistics on the
+training set before training. `fit_stats` leaves the DataLoader unchanged;
+ordinary batches contain `(x, target)`. Reuse the fitted training statistics
+for validation and test data.
 
 ```python
 from torch.utils.data import DataLoader
@@ -60,25 +61,27 @@ from torch.utils.data import DataLoader
 model = SmallModel()
 
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False)
-train_loader_cached = model.cfp.build_dataloader_cached(train_loader)
+model.cfp.fit_stats(train_loader)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 loss_fn = torch.nn.CrossEntropyLoss()
 
 for epoch in range(10):
     model.train()
-    for (x, idx), target in train_loader_cached:
+    for x, target in train_loader:
         optimizer.zero_grad(set_to_none=True)
-        logits = model((x, idx))
+        logits = model(x)
         loss = loss_fn(logits, target)
         loss.backward()
         optimizer.step()
 ```
 
-For smoke tests that intentionally avoid cached statistics, pass ordinary
-tensors to a model constructed with `scale_mode="none"`. In that mode CFP uses
-raw attribute scale, so it is a diagnostic shortcut rather than the recommended
-training path.
+To cache per-image morphology as well, use
+`model.cfp.build_dataloader_cached(train_loader)` in place of `fit_stats`.
+Iterate over its `((x, idx), target)` batches and call `model((x, idx))`.
+
+For quick checks without fitting statistics, use `scale_mode="none"`.
+Forward passes do not update dataset statistics.
 
 ```python
 debug_model = SmallModel(cfp_scale_mode="none")
@@ -91,28 +94,26 @@ The layer stores trainable parameters and CFP tensors on its `device`.
 Morphology-tree construction runs in the native CPU backend, so image tensors
 are copied to CPU and converted to uint8 before tree construction.
 
+For full models, pass the same device into the CFP constructor and then move
+the surrounding model as usual. Fit or restore statistics before using the
+newly constructed model:
+
 ```python
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-layer = ConnectedFilterPreprocessingLayer(
-    in_channels=1,
-    filter_specs=filter_specs,
-    device=device,
-)
-```
-
-For full models, pass the same device into the CFP constructor and then move
-the surrounding model as usual.
-
-```python
 model = SmallModel(cfp_device=device).to(device)
+model.cfp.fit_stats(train_loader)
 ```
 
-Keep inputs in the image range expected by the conversion helper:
+Keep inputs finite and non-negative. Use `torch.uint8` images, normalized
+floating-point images in `[0, 1]`, or direct gray levels in `[0, 255]`:
 
-- tensors with max value `<= 1.5` are treated as normalized images in `[0, 1]`
-  and scaled to uint8;
-- other tensors are cast directly to uint8.
+- `torch.uint8` values are preserved;
+- other tensors with max value `<= 1.5` are treated as normalized images and
+  scaled by 255 before conversion to `uint8`;
+- other tensors are cast directly to `uint8`.
+
+Use `torch.uint8` for dark images whose values already represent direct gray
+levels, so they are not mistaken for normalized images.
 
 ## Checkpoints
 
@@ -136,19 +137,19 @@ def model_factory(cfp_configs):
     return model
 
 
-loaded_model, checkpoint = load_checkpoint("model.pt", model_factory)
+loaded_model, checkpoint = load_checkpoint("model.pt", model_factory, device=device)
 ```
 
 You can also pass an already constructed model:
 
 ```python
-loaded_model, checkpoint = load_checkpoint("model.pt", SmallModel())
+loaded_model, checkpoint = load_checkpoint("model.pt", SmallModel(), device=device)
 ```
 
 ## Inference
 
-Use `predict` on the CFP layer when you want hard-gate-like behavior during
-evaluation.
+Use `predict` on the CFP layer when you want scores closer to binary
+preservation decisions during evaluation.
 
 ```python
 model.eval()
@@ -157,8 +158,8 @@ with torch.no_grad():
     logits = model.head(features)
 ```
 
-If the model was trained with cached dataset normalization statistics, load
-stats or restore a checkpoint before inference.
+For statistical normalization, load the fitted training statistics or restore
+a checkpoint containing them before inference.
 
 ```python
 model.cfp.save_stats("cfp-stats.pt")
@@ -177,13 +178,15 @@ for name, spec_report in report["specs"].items():
     print(name)
     print("raw:", spec_report["base_attrs"].shape)
     print("norm:", spec_report["norm_attrs"].shape)
-    print("weight:", spec_report["weight"].detach())
-    print("bias:", spec_report["bias"].detach())
+    print("scoring model:", spec_report["scoring_model"])
+    if "weight" in spec_report:
+        print("weight:", spec_report["weight"].detach())
+        print("bias:", spec_report["bias"].detach())
 ```
 
 Common issues:
 
-- Statistical `scale_mode` values without cached or loaded stats raise at forward time.
+- Statistical normalization without fitted or loaded statistics raises at forward time.
 - Reordered unnamed specs can make old checkpoints incompatible.
 - Inputs outside `[0, 1]` may be cast to uint8 directly.
 - Tree construction is CPU-side preprocessing, so very large batches can spend

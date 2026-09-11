@@ -1,0 +1,130 @@
+{
+  "images": 39,
+  "scalar_channels": 67,
+  "cases": 268,
+  "image_grouping": "sum channel and max/min-tree median times, then compare per image with equal image weights",
+  "benchmark_sha256": "175e5b6f6a8dc169b3d8bdd7c74fe2d93ebe55fa4225a7199daa88934532c87e",
+  "runtime_sha256": "d0253d42c43fcdeb28c99b7cda9a1a18c1feb19b54202e6af15a9981dbb1c885",
+  "metrics": {
+    "cpu_forward": {
+      "original_cached_median_image_ms": 0.2941038692370057,
+      "events_scan_median_image_ms": 0.2904165303334594,
+      "compact_scan_median_image_ms": 0.28122897492721677,
+      "events_speedup_vs_original": {
+        "median": 1.002571783345865,
+        "min": 0.9534447575395409,
+        "max": 1.1415183550675223,
+        "faster_images": 25
+      },
+      "compact_speedup_vs_original": {
+        "median": 1.056649625384364,
+        "min": 0.9831467981110809,
+        "max": 1.1277176518836376,
+        "faster_images": 37
+      },
+      "compact_speedup_vs_events": {
+        "median": 1.0524767778311104,
+        "min": 0.922767034754,
+        "max": 1.1000493476079558,
+        "faster_images": 34
+      }
+    },
+    "cpu_backward": {
+      "original_cached_median_image_ms": 0.4378750454634428,
+      "events_scan_median_image_ms": 0.36285456735640764,
+      "compact_scan_median_image_ms": 0.34860451705753803,
+      "events_speedup_vs_original": {
+        "median": 1.193597804526137,
+        "min": 0.8871317195056467,
+        "max": 1.3093996779924557,
+        "faster_images": 38
+      },
+      "compact_speedup_vs_original": {
+        "median": 1.2370838809109024,
+        "min": 0.8880216753184315,
+        "max": 1.3501311047343891,
+        "faster_images": 38
+      },
+      "compact_speedup_vs_events": {
+        "median": 1.042919446915777,
+        "min": 0.9844170895387585,
+        "max": 1.0868949303554194,
+        "faster_images": 37
+      }
+    },
+    "mps_forward": {
+      "original_cached_median_image_ms": 0.823999522253871,
+      "events_scan_median_image_ms": 0.842416484374553,
+      "compact_scan_median_image_ms": 0.8339169435203075,
+      "events_speedup_vs_original": {
+        "median": 0.997131392506645,
+        "min": 0.6346086846370372,
+        "max": 1.1346491319225516,
+        "faster_images": 19
+      },
+      "compact_speedup_vs_original": {
+        "median": 0.997668786700813,
+        "min": 0.9100704516097494,
+        "max": 1.1567415221338144,
+        "faster_images": 16
+      },
+      "compact_speedup_vs_events": {
+        "median": 0.9993612043876297,
+        "min": 0.9446973889349006,
+        "max": 1.5586581014767982,
+        "faster_images": 18
+      }
+    },
+    "mps_backward": {
+      "original_cached_median_image_ms": 1.9312500371597707,
+      "events_scan_median_image_ms": 0.8871460449881852,
+      "compact_scan_median_image_ms": 0.8623540052212775,
+      "events_speedup_vs_original": {
+        "median": 2.4002355743028843,
+        "min": 1.6851842889098692,
+        "max": 2.66246774429032,
+        "faster_images": 39
+      },
+      "compact_speedup_vs_original": {
+        "median": 2.394398129484315,
+        "min": 1.6736090739412008,
+        "max": 2.623746524816337,
+        "faster_images": 39
+      },
+      "compact_speedup_vs_events": {
+        "median": 0.9936061235740796,
+        "min": 0.9542613379103596,
+        "max": 1.0739454798932753,
+        "faster_images": 17
+      }
+    }
+  },
+  "order_preparation_cpu": {
+    "original_argsort": {
+      "median_image_ms": 0.6631469004787505,
+      "median_speedup_vs_original": 1.0
+    },
+    "events_linear": {
+      "median_image_ms": 0.23647950729355216,
+      "median_speedup_vs_original": 2.547319501050173
+    },
+    "compact_linear": {
+      "median_image_ms": 0.05587446503341198,
+      "median_speedup_vs_original": 10.910006222992504
+    }
+  },
+  "errors_vs_float64": {
+    "original_cached": {
+      "forward_max_abs": 0.00012195110321044922,
+      "backward_max_abs": 2.026382310560404e-08
+    },
+    "events_scan": {
+      "forward_max_abs": 0.00012195110321044922,
+      "backward_max_abs": 2.4920435978681432e-08
+    },
+    "compact_scan": {
+      "forward_max_abs": 0.00011317431926727295,
+      "backward_max_abs": 2.026382310560404e-08
+    }
+  }
+}

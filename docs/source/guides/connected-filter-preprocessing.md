@@ -2,7 +2,7 @@
 
 `ConnectedFilterPreprocessingLayer` turns morphology-tree attribute filtering
 into a trainable PyTorch module. It builds a tree for each sample/channel,
-computes node attributes outside autograd, learns node-wise sigmoid gates, and
+computes node attributes outside autograd, learns node-wise sigmoid scores, and
 reconstructs one output image per input channel and filter spec.
 
 ## Minimal Layer
@@ -12,8 +12,6 @@ examples below use the default reconstructed signal.
 
 ```python
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-
 from mtlearn import morphology
 from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
@@ -25,20 +23,15 @@ layer = ConnectedFilterPreprocessingLayer(
             "tree_type": morphology.TreeType.MAX_TREE,
             "attributes": [
                 morphology.AttributeType.AREA,
-                morphology.AttributeType.GRAY_HEIGHT,
+                morphology.AttributeType.GRAY_LEVEL_HEIGHT,
             ],
         },
     ],
+    scale_mode="none",
 )
 
 x = torch.rand(4, 1, 32, 32)
-dataset = TensorDataset(x, torch.zeros(len(x)))
-loader = DataLoader(dataset, batch_size=4, shuffle=False)
-cached_loader = layer.build_dataloader_cached(loader)
-
-for batch_inputs, _ in cached_loader:
-    y = layer(batch_inputs)
-
+y = layer(x)
 assert y.shape == (4, 1, 32, 32)
 ```
 
@@ -53,7 +46,11 @@ A spec has these user-facing fields:
 | --- | --- | --- |
 | `name` | No | Stable key for weights, biases, exported params, and checkpoints. |
 | `tree_type` | Yes | `"max-tree"`, `"min-tree"`, `"tree-of-shapes"`, or `TreeType`. |
-| `attributes` | Yes | One scalar attribute, one group, or a list/tuple of scalar attributes. |
+| `attributes` | Yes | One scalar attribute, one group, or a list/tuple of scalar attributes and groups. |
+| `scoring` | No | Scoring model or configuration; defaults to `linear_sigmoid`. |
+| `score_sharpness` | No | Positive sigmoid sharpness for this spec; defaults to the layer setting. |
+| `constraints` | No | Score constraints applied before reconstruction. |
+| `regularizers` | No | Penalties added explicitly to the training loss. |
 | `tos_interpolation` | No | Per-spec tree-of-shapes interpolation override. |
 | `tos_infinity_seed_row` | No | Per-spec tree-of-shapes infinity seed row. |
 | `tos_infinity_seed_col` | No | Per-spec tree-of-shapes infinity seed column. |
@@ -79,7 +76,7 @@ filter_specs = [
 ## Scoring Models
 
 Each spec has a scoring model that maps normalized node attributes to one score
-per tree node. The default is the layer-owned linear sigmoid gate:
+per tree node. The default is a linear sigmoid model:
 
 ```python
 linear_spec = {
@@ -90,9 +87,9 @@ linear_spec = {
 }
 ```
 
-The linear default keeps trainable parameters under `_weights.<spec_name>` and
-`_biases.<spec_name>`, which makes simple linear filters easy to inspect and
-export.
+The linear default keeps trainable parameters under the historical
+`_weights.<spec_name>` and `_biases.<spec_name>` names for checkpoint
+compatibility.
 
 Use an MLP scorer when the keep/discard criterion should combine attributes
 nonlinearly:
@@ -116,10 +113,10 @@ mlp_spec = {
 MLP parameters are owned by the scorer module and appear in
 `get_parameter_contract()["scoring_models"]`.
 
-## Altitude Signal
+## Reconstructed Signal
 
-Scoring decides which nodes contribute to the reconstructed altitude-residue
-signal:
+Scoring determines each node's contribution to the reconstructed image.
+CFP reconstructs the filtered altitude signal from node residues and scores:
 
 ```python
 altitude_spec = {
@@ -128,10 +125,6 @@ altitude_spec = {
     "attributes": [morphology.AttributeType.AREA],
 }
 ```
-
-CFP does not expose alternative signal projections as a Python extension point.
-The forward signal is fixed to morphology-tree altitude residues.
-
 
 ## Constraints and Regularizers
 
@@ -148,8 +141,8 @@ constrained_spec = {
 ```
 
 Regularizers add training penalties. They are not included in the inference
-contract, so changing a training regularizer does not change forward
-semantics.
+contract, so changing a training regularizer does not invalidate checkpoint
+weight compatibility.
 
 ```python
 regularized_spec = {
@@ -162,16 +155,11 @@ regularized_spec = {
 layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
     filter_specs=[regularized_spec],
+    scale_mode="none",
 )
 
-# Use the same batch_inputs object yielded by build_dataloader_cached(...).
-loss = task_loss + layer.regularization_penalty(batch_inputs)
+loss = task_loss + layer.regularization_penalty(x)
 ```
-
-Other registered morphological regularizers include
-`attribute_order_score_monotonicity`, which penalizes score inversions after sorting
-nodes by one normalized attribute, and `path_score_monotonicity`, which penalizes
-descendants that score higher than their ancestors.
 
 ## Extension Registries
 
@@ -190,8 +178,8 @@ registry-backed scoring models, constraints, and regularizers with
 ## Configs and Contracts
 
 `get_config()` stores the architecture needed by `from_config()`. It includes
-tree type, attributes, scoring, constraints, normalization, and training-only
-regularizer settings.
+tree type, attributes, scoring, constraints, normalization, and
+training-only regularizer settings.
 
 ```python
 config = layer.get_config()
@@ -209,29 +197,45 @@ training = contracts["training_contract"]
 
 ## Normalization and Caching
 
-The default `scale_mode` is `"dataset_clipped_zscore01"`. It uses dataset-level z-score
-statistics, clips values to `[-clipped_zscore_radius, clipped_zscore_radius]`, and rescales them into a
-positive interval controlled by `clipped_zscore_floor`.
+The default `scale_mode` is `"dataset_clipped_zscore01"`. It uses dataset-level
+z-score statistics, clips values to `[-clipped_zscore_radius,
+clipped_zscore_radius]`, and rescales them into
+`[clipped_zscore_floor, 1]`. The other statistical modes are
+`"dataset_minmax01"` and `"dataset_zscore"`.
 
-For statistical modes (`"dataset_clipped_zscore01"`, `"dataset_minmax01"`, and `"dataset_zscore"`), fit or
-load normalization statistics before normal forward passes. Use
-`build_dataloader_cached` on the training split to estimate statistics and
-precompute tree payloads.
+All three modes require training-set statistics before normal forward passes.
+Use `fit_stats` to compute them without retaining per-image morphology, or
+`load_stats` to restore a previous fit. Reuse the training statistics for
+validation and test data.
 
 ```python
 from torch.utils.data import DataLoader
 
-loader = DataLoader(dataset, batch_size=16, shuffle=False)
-cached_loader = layer.build_dataloader_cached(loader)
+layer = ConnectedFilterPreprocessingLayer(
+    in_channels=1,
+    filter_specs=filter_specs,
+    scale_mode="dataset_clipped_zscore01",
+)
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=False)
+layer.fit_stats(train_loader)
+
+for x, target in train_loader:
+    y = layer(x)
+```
+
+If you also want to cache per-image morphology, use `build_dataloader_cached`
+in place of `fit_stats`. It computes statistics and returns a loader with
+sample indices for reuse:
+
+```python
+cached_loader = layer.build_dataloader_cached(train_loader)
 
 for (x, idx), target in cached_loader:
     y = layer((x, idx))
 ```
 
-For smoke tests or diagnostics that intentionally avoid a stats prepass, use
-`scale_mode="none"` explicitly. In this mode, the scorer receives raw
-attributes and the caller is responsible for their scale. Do not use this as
-the default training setup for attribute-comparable experiments.
+For quick experiments without a statistics pass, use `scale_mode="none"`.
+This passes raw attribute values to the scoring model.
 
 ```python
 debug_layer = ConnectedFilterPreprocessingLayer(
@@ -243,8 +247,8 @@ debug_layer = ConnectedFilterPreprocessingLayer(
 
 ## Initialization
 
-Initialize scoring models close to identity when CFP should start by preserving
-the input image.
+Use `init_identity` to initialize the built-in scoring models with node scores
+close to one.
 
 ```python
 layer.init_identity(p0=0.995)
@@ -257,8 +261,8 @@ block is meant to discover strong filtering behavior from scratch.
 ## Inference
 
 `predict` temporarily switches to evaluation mode, runs without gradients, and
-uses a caller-provided score sharpness. A large `score_sharpness` makes gates
-closer to hard decisions.
+uses the requested `score_sharpness`. A large value makes sigmoid scores
+closer to binary preservation decisions.
 
 ```python
 with torch.no_grad():
@@ -277,8 +281,10 @@ report = layer.inspect_training_sample(x[0], channel=0, idx=0)
 for name, spec_report in report["specs"].items():
     print(name)
     print(spec_report["attributes"])
-    print(spec_report["weight"])
-    print(spec_report["bias"])
+    print(spec_report["scoring_model"])
+    if "weight" in spec_report:
+        print(spec_report["weight"])
+        print(spec_report["bias"])
 ```
 
 ## Save Stats and Params

@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-09-09T15:32:58.554653-03:00",
+  "passed": 242,
+  "expected_failures": 3,
+  "failures": 0,
+  "errors": 0,
+  "expected_failure_cases": [
+    "test_legacy_mps_statistics_deserialization[load_checkpoint]",
+    "test_legacy_mps_statistics_deserialization[load_state_dict]",
+    "test_legacy_mps_statistics_deserialization[load_stats]"
+  ],
+  "baseline_passed": 61,
+  "existing_gradchecks_passed": 19,
+  "library_sources_unchanged": true
+}

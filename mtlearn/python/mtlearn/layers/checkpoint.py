@@ -88,12 +88,17 @@ def load_checkpoint(
 ) -> tuple[torch.nn.Module, dict[str, Any]]:
     """Load a checkpoint saved by ``save_checkpoint``.
 
+    The returned checkpoint dictionary stays on CPU, including float64 dataset
+    moments. Model parameters are copied to the requested device.
+
     ``model_or_factory`` can be either an already constructed module or a
     callable that returns a module. Factories may accept no arguments when the
     model constructor already hard-codes its CFP layers, or one positional
     ``cfp_configs`` argument when they need the saved CFP configs.
     """
-    checkpoint = _load_torch_checkpoint(path, device=device, weights_only=weights_only)
+    # Deserialize statistical moments on CPU; float64 is not supported on MPS.
+    # load_state_dict copies trainable tensors to the model device below.
+    checkpoint = _load_torch_checkpoint(path, device="cpu", weights_only=weights_only)
     cfp_configs = checkpoint.get("cfp_configs", {})
 
     if isinstance(model_or_factory, torch.nn.Module):
@@ -105,6 +110,17 @@ def load_checkpoint(
 
     if device is not None:
         model.to(device)
+        # CFP also keeps an execution device outside registered parameters.
+        # Factories may build on CPU even when the checkpoint targets MPS/CUDA.
+        for module in model.modules():
+            if isinstance(module, ConnectedFilterPreprocessingLayer):
+                parameter = next(module.parameters(), None)
+                target_device = parameter.device if parameter is not None else torch.device(device)
+                if module.device != target_device:
+                    module._tree_payload_cache.clear()
+                    module.device = target_device
+                    module._tree_payload_provider.device = target_device
+                    module._attribute_normalizer.invalidate_constants()
     model.load_state_dict(checkpoint["model_state_dict"], strict=strict)
     return model, checkpoint
 

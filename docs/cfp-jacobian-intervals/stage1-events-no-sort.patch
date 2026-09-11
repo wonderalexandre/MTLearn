@@ -1,0 +1,96 @@
+diff --git a/mtlearn/python/mtlearn/layers/cfp/preparation/cfp_preprocessor.py b/mtlearn/python/mtlearn/layers/cfp/preparation/cfp_preprocessor.py
+index e9d42f8..7a582bd 100644
+--- a/mtlearn/python/mtlearn/layers/cfp/preparation/cfp_preprocessor.py
++++ b/mtlearn/python/mtlearn/layers/cfp/preparation/cfp_preprocessor.py
+@@ -132,13 +132,19 @@ class CFPPreprocessor:
+         residues, tpre, tpost, parent, node_of_pixel = (
+             mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
+         )
++        num_times = int(tpost.max().item()) + 1
++        # DFS event times are already ordered. Recover the node order by a
++        # linear scatter/gather, rather than sorting the entries twice.
++        node_at_time = torch.full((num_times,), -1, dtype=torch.int64)
++        node_at_time[tpre] = torch.arange(tpre.numel(), dtype=torch.int64)
++        order = node_at_time[node_at_time >= 0]
+         return {
+             "residues": residues, "tpre": tpre, "tpost": tpost,
+             "parent": parent, "node_of_pixel": node_of_pixel,
+             "num_rows": tree.numRows, "num_cols": tree.numCols,
+-            "num_times": int(tpost.max().item()) + 1, "tree_type": spec.tree_type,
+-            "order_forward": torch.argsort(tpre, descending=False),
+-            "order_backward": torch.argsort(tpre),
++            "num_times": num_times, "tree_type": spec.tree_type,
++            "order_forward": order,
++            "order_backward": order,
+         }
+ 
+     @torch.no_grad()
+diff --git a/mtlearn/python/mtlearn/layers/cfp/preparation/prepared_morphology.py b/mtlearn/python/mtlearn/layers/cfp/preparation/prepared_morphology.py
+index 040e53d..0aea39c 100644
+--- a/mtlearn/python/mtlearn/layers/cfp/preparation/prepared_morphology.py
++++ b/mtlearn/python/mtlearn/layers/cfp/preparation/prepared_morphology.py
+@@ -115,11 +115,11 @@ class PreparedMorphology:
+             raise ValueError("parent references an invalid node.")
+         if bool(((pre < 0) | (post < pre)).any()) or int(post.max()) + 1 != self.info["num_times"]:
+             raise ValueError("Invalid preorder/postorder time bounds.")
+-        expected_order = torch.argsort(pre)
+-        if any(not torch.equal(self.info[key], expected_order) for key in ("order_forward", "order_backward")):
+-            raise ValueError("Traversal orders do not match preorder times.")
+-        if torch.unique(pre).numel() != n:
+-            raise ValueError("Preorder times must identify distinct nodes.")
++        order = self.info["order_forward"]
++        ordered_pre = pre[order]
++        if (not torch.equal(order, self.info["order_backward"])
++                or bool((ordered_pre[1:] <= ordered_pre[:-1]).any())):
++            raise ValueError("Traversal orders must identify distinct nodes in preorder.")
+         roots = (parent == -1) | (parent == torch.arange(n))
+         if int(roots.sum()) != 1:
+             raise ValueError("Prepared morphology must have one root.")
+diff --git a/mtlearn/python/mtlearn/layers/cfp/runtime/tree_reconstructor.py b/mtlearn/python/mtlearn/layers/cfp/runtime/tree_reconstructor.py
+index 6c544d1..ac2291d 100644
+--- a/mtlearn/python/mtlearn/layers/cfp/runtime/tree_reconstructor.py
++++ b/mtlearn/python/mtlearn/layers/cfp/runtime/tree_reconstructor.py
+@@ -37,29 +37,21 @@ def propagate_pixels_to_nodes(
+     order_pre=None,
+     num_times=None,
+ ):
+-    """Propagate pixel gradients back to tree nodes without a dense matrix."""
++    """Sum pixel gradients over DFS subtree intervals in linear time.
++
++    Entry/exit events and compact preorder intervals are both supported. The
++    optional traversal order is retained for compatibility; no sorting or
++    conversion to preorder ranks is needed.
++    """
+     g_pix = grad_output.reshape(-1)
+-    num_nodes = tpre.numel()
+-    base = torch.zeros(num_nodes, dtype=g_pix.dtype, device=g_pix.device)
+-    base.index_add_(0, node_of_pixel.reshape(-1).to(torch.int64), g_pix)
+-
+-    if order_pre is None:
+-        order_pre = torch.argsort(tpre)
+-    pre_rank = torch.empty_like(order_pre)
+-    pre_rank[order_pre] = torch.arange(num_nodes, device=order_pre.device)
+-
+-    base_sorted = base[order_pre]
+-    pref = torch.cumsum(base_sorted, dim=0)
+-    pref0 = torch.cat([pref.new_zeros(1), pref], dim=0)
+-
+-    max_time = int(num_times) if num_times is not None else int(torch.max(tpost).item()) + 1
+-    counts = torch.bincount(tpre, minlength=max_time)
+-    cum = torch.cumsum(counts, dim=0)
+-    time_to_rank = torch.cat([cum.new_zeros(1), cum[:-1]], dim=0)
+-
+-    left = pre_rank
+-    right = time_to_rank[tpost]
+-    return pref0[right] - pref0[left]
++    max_time = int(num_times) if num_times is not None else int(tpost.max().item()) + 1
++    # The last time is only an exclusive endpoint, never a node entry.
++    events = torch.zeros(max_time - 1, dtype=g_pix.dtype, device=g_pix.device)
++    pixel_pre = tpre[node_of_pixel.reshape(-1).to(torch.int64)]
++    events.index_add_(0, pixel_pre, g_pix)
++    prefix = torch.cat([events.new_zeros(1), torch.cumsum(events, dim=0)])
++    return prefix[tpost] - prefix[tpre]
++
+ 
+ 
+ class TreeReconstructionFunction(torch.autograd.Function):

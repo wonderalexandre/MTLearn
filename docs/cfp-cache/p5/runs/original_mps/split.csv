@@ -1,0 +1,4 @@
+id,input,target,split
+1000,1000.png,1000.png,test
+1068,1068.png,1068.png,train
+1316,1316.png,1316.png,train

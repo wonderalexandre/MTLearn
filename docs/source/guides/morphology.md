@@ -38,7 +38,7 @@ area = morphology.compute_single_attribute(
 )
 
 filters = morphology.create_attribute_filter(tree)
-filtered = filters.filteringMin(area, threshold=4.0)
+filtered = filters.filtering_by_pruning_min(area, threshold=4.0)
 
 print(filtered.shape, filtered.dtype)
 ```
@@ -97,7 +97,7 @@ tree = morphology.build_tree(image, morphology.TreeType.MIN_TREE)
 tree = morphology.build_tree(
     image,
     "tree-of-shapes",
-    tos_interpolation=morphology.ToSInterpolation.SelfDual,
+    tos_interpolation=morphology.ToSInterpolation.SELF_DUAL,
 )
 ```
 
@@ -110,25 +110,25 @@ The tree object exposes image dimensions, live node counts, internal node slot
 counts, and common topology queries.
 
 ```python
-print("image:", tree.numRows, "x", tree.numCols)
-print("live nodes:", tree.numNodes)
-print("node slots:", tree.numInternalNodeSlots)
+print("image:", tree.num_rows, "x", tree.num_columns)
+print("live nodes:", tree.num_nodes)
+print("node slots:", tree.num_internal_node_slots)
 print("root:", tree.root)
-print("leaves:", len(tree.leaf_node_ids))
+print("leaves:", len(tree.leaves))
 ```
 
 The backend distinguishes live topology nodes from internal node slots:
 
-- `numNodes` counts currently live topology nodes.
-- `numInternalNodeSlots` is the size expected by attribute vectors, boolean
+- `num_nodes` counts currently live topology nodes.
+- `num_internal_node_slots` is the size expected by attribute vectors, boolean
   criteria, score vectors, and CFP tree tensors.
 
 Use the slot count when allocating node-indexed arrays.
 
 ```python
-criterion = [False] * tree.numInternalNodeSlots
+criterion = [False] * tree.num_internal_node_slots
 for node in tree.alive_node_ids:
-    criterion[node] = tree.isLeaf(node)
+    criterion[node] = tree.is_leaf(node)
 ```
 
 This convention matters after pruning or merging, because inactive node slots
@@ -136,30 +136,30 @@ may remain allocated even when the live topology changes.
 
 ## Navigate Topology
 
-Common topology methods have legacy camelCase names and Python-friendly
-snake_case aliases. Prefer the snake_case aliases in new Python code.
+Topology queries use the same relation names as mmcfilters: `children`,
+`parent`, `ancestors`, `descendants`, and `subtree_nodes`.
 
 ```python
 root = tree.root
-children = tree.children_of(root)
-descendants = tree.descendants_of(root)
-leaves = tree.leaf_node_ids
+children = tree.children(root)
+descendants = tree.descendants(root)
+leaves = tree.leaves
 
 leaf = leaves[0]
-parent = tree.parent_of(leaf)
-path_to_root = tree.getPathToRootNodes(leaf)
-leaf_subtree = tree.node_subtree_of(leaf)
+parent = tree.parent(leaf)
+path_to_root = tree.ancestors(leaf)
+leaf_subtree = tree.subtree_nodes(leaf)
 ```
 
-Pixel ownership is exposed through proper parts. For ordinary 2D images, a
-proper part can be read as a flattened pixel id.
+The proper part of a node contains the pixels assigned directly to it.
+`smallest_node` maps a flattened pixel id to the node that owns it.
 
 ```python
 row, col = 1, 2
-pixel_id = row * tree.numCols + col
+pixel_id = row * tree.num_columns + col
 
-owner = tree.proper_part_owner_of(pixel_id)
-component_mask = tree.reconstructNode(owner)
+owner = tree.smallest_node(pixel_id)
+component_mask = tree.reconstruct_node(owner)
 ```
 
 `component_mask` is a uint8 image mask for the component represented by the
@@ -175,9 +175,9 @@ area = morphology.compute_single_attribute(
     morphology.AttributeType.AREA,
 )
 
-gray_height = morphology.compute_single_attribute(
+gray_level_height = morphology.compute_single_attribute(
     tree,
-    morphology.AttributeType.GRAY_HEIGHT,
+    morphology.AttributeType.GRAY_LEVEL_HEIGHT,
 )
 ```
 
@@ -188,7 +188,7 @@ attribute_index, values = morphology.compute_attributes(
     tree,
     [
         morphology.AttributeType.AREA,
-        morphology.AttributeType.GRAY_HEIGHT,
+        morphology.AttributeType.GRAY_LEVEL_HEIGHT,
         morphology.AttributeType.COMPACTNESS,
     ],
 )
@@ -224,7 +224,7 @@ track in experiments and checkpoints.
 ```python
 attrs_for_experiment = [
     morphology.AttributeType.AREA,
-    morphology.AttributeType.GRAY_HEIGHT,
+    morphology.AttributeType.GRAY_LEVEL_HEIGHT,
     morphology.AttributeType.COMPACTNESS,
 ]
 ```
@@ -239,9 +239,8 @@ for name, description in morphology.describe_all_attributes().items():
 For a grouped list of public attributes and their intended use, see
 {doc}`../concepts/attributes`.
 
-Tree-of-shapes filters cannot compute every scalar attribute currently exposed
-by the backend. In particular, attributes that depend on one-sided component
-tree geometry may be unavailable for trees of shapes.
+Attribute availability follows the input contracts in the attribute catalog.
+Distance-transform attributes support trees of shapes.
 
 ## Find Nodes by Attribute
 
@@ -257,7 +256,7 @@ largest_live_node = alive[np.argmax(area[alive])]
 print("largest node:", largest_live_node)
 print("area:", area[largest_live_node])
 
-mask = tree.reconstructNode(int(largest_live_node))
+mask = tree.reconstruct_node(int(largest_live_node))
 ```
 
 The same pattern works for shape attributes, topology attributes, and
@@ -272,7 +271,7 @@ consume node-slot-sized arrays and return reconstructed images.
 filters = morphology.create_attribute_filter(tree)
 area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA)
 
-area_opening = filters.filteringMin(area, threshold=16.0)
+area_opening = filters.filtering_by_pruning_min(area, threshold=16.0)
 ```
 
 For boolean-rule filters, build one boolean value per node slot.
@@ -280,22 +279,22 @@ For boolean-rule filters, build one boolean value per node slot.
 ```python
 criterion = (area >= 16.0).tolist()
 
-direct = filters.filteringDirectRule(criterion)
-subtractive = filters.filteringSubtractiveRule(criterion)
+direct = filters.apply_direct_attribute_filter(criterion)
+subtractive = filters.apply_subtractive_attribute_filter(criterion)
 ```
 
 Keep this assertion in prototypes; it catches most criterion/attribute shape
 mistakes.
 
 ```python
-assert len(criterion) == tree.numInternalNodeSlots
+assert len(criterion) == tree.num_internal_node_slots
 ```
 
-Score-based subtractive filtering expects one float score per node slot.
+Soft subtractive filtering expects one finite score in `[0, 1]` per node slot.
 
 ```python
-scores = area.astype(np.float32)
-score_image = filters.filteringSubtractiveScoreRule(scores.tolist())
+scores = (area / area.max()).astype(np.float32)
+score_image = filters.apply_soft_subtractive_attribute_filter(scores.tolist())
 ```
 
 ## Common Filtering Recipes
@@ -309,7 +308,7 @@ tree = morphology.create_max_tree(image)
 area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA)
 filters = morphology.create_attribute_filter(tree)
 
-opened = filters.filteringMin(area, threshold=25.0)
+opened = filters.filtering_by_pruning_min(area, threshold=25.0)
 ```
 
 ### Remove Small Dark Components
@@ -321,7 +320,7 @@ tree = morphology.create_min_tree(image)
 area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA)
 filters = morphology.create_attribute_filter(tree)
 
-closed_like = filters.filteringMin(area, threshold=25.0)
+closed_like = filters.filtering_by_pruning_min(area, threshold=25.0)
 ```
 
 ### Inspect Self-Dual Shapes
@@ -331,7 +330,7 @@ Use a tree of shapes when you do not want to choose bright or dark polarity.
 ```python
 tree = morphology.create_tree_of_shapes(
     image,
-    interpolation=morphology.ToSInterpolation.SelfDual,
+    interpolation=morphology.ToSInterpolation.SELF_DUAL,
 )
 
 attrs = [
@@ -343,14 +342,14 @@ attribute_index, values = morphology.compute_attributes(tree, attrs)
 
 ## Mutating Trees
 
-`pruneNode` and `mergeNodeIntoParent` mutate the tree in place. Query
+`prune_node` and `merge_node_into_parent` mutate the tree in place. Query
 topology-dependent values again after a mutation.
 
 ```python
-node = int(tree.leaf_node_ids[0])
-tree.pruneNode(node)
+node = int(tree.leaves[0])
+tree.prune_node(node)
 
-reconstructed = tree.reconstructionImage()
+reconstructed = tree.reconstruct_from_node_altitudes()
 alive_after_prune = tree.alive_node_ids
 ```
 
@@ -360,7 +359,7 @@ Rebuild the tree if you need to preserve the original topology.
 original = morphology.create_max_tree(image)
 working = morphology.create_max_tree(image)
 
-working.pruneNode(int(working.leaf_node_ids[0]))
+working.prune_node(int(working.leaves[0]))
 ```
 
 Use mutating operations for inspection, deterministic prototypes, and backend
@@ -372,7 +371,7 @@ attribute computation outside autograd and learns only node-wise gates.
 
 - Passing RGB or batched arrays to tree constructors. Build one tree from one
   2D grayscale image.
-- Allocating criteria with `numNodes` instead of `numInternalNodeSlots`.
+- Allocating criteria with `num_nodes` instead of `num_internal_node_slots`.
 - Treating attribute arrays as images. Attributes are indexed by node slot.
 - Reusing topology-dependent node ids after pruning or merging without
   querying the tree again.

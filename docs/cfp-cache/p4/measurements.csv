@@ -1,0 +1,3 @@
+run,num_workers,max_in_flight,cold_seconds,warm_seconds,rss_peak_bytes,available_min_bytes,worker_rss_max_bytes,disk_bytes,retained_bytes,writes,contributions,statistics_match_p1,all_raw_tensors_match_p3
+one_worker,1,1,59.542333749937825,0.7821364999981597,1820409856,3864608768,1377255424,752419571,0,3,3,True,True
+two_workers,2,2,43.17662912502419,0.7909395419992507,2533343232,3608592384,1310982144,752419571,0,3,3,True,True

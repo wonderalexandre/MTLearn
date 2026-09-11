@@ -222,18 +222,18 @@ def test_constructor_rejects_unknown_keyword_parameter():
         [(morphology.AttributeGroup.SHAPE, morphology.AttributeType.MAX_DIST)],
     ],
 )
-def test_tree_of_shapes_constructor_rejects_explicit_unsupported_attributes(attributes_spec):
-    with pytest.raises(ValueError, match="tree-of-shapes CFP does not support"):
-        ConnectedFilterPreprocessingLayer(
-            in_channels=1,
-            filter_specs=[
-                {
-                    "tree_type": morphology.TreeType.TREE_OF_SHAPES,
-                    "attributes": attributes_spec[0],
-                }
-            ],
-            device="cpu",
-        )
+def test_tree_of_shapes_constructor_accepts_explicit_max_dist(attributes_spec):
+    layer = ConnectedFilterPreprocessingLayer(
+        in_channels=1,
+        filter_specs=[
+            {
+                "tree_type": morphology.TreeType.TREE_OF_SHAPES,
+                "attributes": attributes_spec[0],
+            }
+        ],
+        device="cpu",
+    )
+    assert morphology.AttributeType.MAX_DIST in layer.filter_specs[0].attributes
 
 
 @pytest.mark.parametrize(
@@ -243,7 +243,7 @@ def test_tree_of_shapes_constructor_rejects_explicit_unsupported_attributes(attr
         morphology.AttributeGroup.ALL,
     ],
 )
-def test_tree_of_shapes_constructor_omits_max_dist_from_supported_groups(group):
+def test_tree_of_shapes_constructor_keeps_max_dist_in_supported_groups(group):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -255,15 +255,11 @@ def test_tree_of_shapes_constructor_omits_max_dist_from_supported_groups(group):
         device="cpu",
         scale_mode="none",
     )
-    expected_group = tuple(
-        attr
-        for attr in morphology.expand_attribute_group(group)
-        if attr != morphology.AttributeType.MAX_DIST
-    )
+    expected_group = tuple(morphology.expand_attribute_group(group))
 
     assert layer.filter_specs[0].tree_type == "tree-of-shapes"
     assert layer.filter_specs[0].attributes == expected_group
-    assert morphology.AttributeType.MAX_DIST not in layer.filter_specs[0].attributes
+    assert morphology.AttributeType.MAX_DIST in layer.filter_specs[0].attributes
 
 
 def test_tree_of_shapes_constructor_accepts_boundary_group():
@@ -292,7 +288,7 @@ def test_tree_of_shapes_constructor_accepts_boundary_group():
         morphology.AttributeGroup.ALL,
     ],
 )
-def test_tree_of_shapes_forward_accepts_filtered_attribute_groups(group):
+def test_tree_of_shapes_forward_accepts_complete_attribute_groups(group):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -320,7 +316,7 @@ def test_tree_of_shapes_forward_accepts_boundary_attributes():
         filter_specs=[
             {
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
-                "attributes": (morphology.AttributeType.BITQUADS_AREA,),
+                "attributes": (morphology.AttributeType.BITQUAD_AREA,),
             },
             {
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
@@ -1012,7 +1008,7 @@ def test_export_params_includes_filter_specs_metadata(tmp_path):
                 "name": "tos_boundary",
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
                 "attributes": (morphology.AttributeGroup.BOUNDARY,),
-                "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
+                "tos_interpolation": morphology.ToSInterpolation.MIN8_MAX4,
                 "constraints": [{"kind": "preserve_root"}],
             },
             {
@@ -1062,7 +1058,7 @@ def test_export_params_includes_filter_specs_metadata(tmp_path):
     assert "preserve_root" not in payload["filter_specs"][1]
     assert "monotonicity_weight" not in payload["filter_specs"][1]
     assert payload["filter_specs"][1]["constraints"] == [{"kind": "preserve_root"}]
-    assert payload["filter_specs"][1]["tos_interpolation"] == "Min8cMax4c"
+    assert payload["filter_specs"][1]["tos_interpolation"] == "MIN8_MAX4"
     assert payload["filter_specs"][2]["key"] == "spec_002"
     assert payload["filter_specs"][2]["name"] == "spec_002"
     assert "valuation" not in payload["filter_specs"][2]
@@ -1074,7 +1070,7 @@ def test_export_params_includes_filter_specs_metadata(tmp_path):
         {"kind": "edge_score_monotonicity", "weight": 0.25}
     ]
     assert payload["config"]["filter_specs"][1]["constraints"] == [{"kind": "preserve_root"}]
-    assert payload["config"]["filter_specs"][1]["tos_interpolation"] == "Min8cMax4c"
+    assert payload["config"]["filter_specs"][1]["tos_interpolation"] == "MIN8_MAX4"
 
 def test_get_config_and_from_config_reconstruct_layer_contract():
     layer = ConnectedFilterPreprocessingLayer(
@@ -1092,7 +1088,7 @@ def test_get_config_and_from_config_reconstruct_layer_contract():
                 "name": "tos_boundary",
                 "tree_type": morphology.TreeType.TREE_OF_SHAPES,
                 "attributes": (morphology.AttributeGroup.BOUNDARY,),
-                "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
+                "tos_interpolation": morphology.ToSInterpolation.MIN8_MAX4,
                 "tos_infinity_seed_row": 1,
                 "tos_infinity_seed_col": 2,
             },

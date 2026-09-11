@@ -95,6 +95,8 @@ MTLEARN_ENABLE_EMBED = "OFF"
 MTLEARN_ENABLE_ASSERTS = "OFF"
 MTLEARN_WITH_TORCH = "ON"
 MMCFILTERS_BUILD_PYTHON = "OFF"
+# Source distributions omit the backend documentation inputs.
+MMCFILTERS_ENABLE_DOC_TARGETS = "OFF"
 
 [tool.scikit-build.metadata]
 version = { provider = "scikit_build_core.metadata.setuptools_scm" }
@@ -115,6 +117,8 @@ include = [
   "/mtlearn/tests/cmake/*.cmake",
   "/mtlearn/tests/cpp/*.cpp",
   "/mtlearn/tests/python/*.py",
+  "/mtlearn/tests/python/fixtures/cfp_cache_p0/**",
+  "/mtlearn/tests/python/fixtures/cfp_cache_p0_mmcfilters_v5_2_0/**",
   "/scripts/*.py",
   "/docs/installation.md",
   "/docs/development.md",
@@ -131,7 +135,7 @@ exclude = [
   ".gitignore",
   ".gitmodules",
   "dat/**",
-  "notebooks/**",
+  "**/notebooks/**",
   "build/**",
   "docs/source-layout-refactoring-plan.md",
   "external/mmcfilters/.git",

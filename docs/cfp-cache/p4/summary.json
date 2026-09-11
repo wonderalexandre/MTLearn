@@ -1,0 +1,45 @@
+{
+  "recorded_at": "2026-09-09T18:46:25.146567-03:00",
+  "runs": [
+    {
+      "run": "one_worker",
+      "num_workers": 1,
+      "max_in_flight": 1,
+      "cold_seconds": 59.542333749937825,
+      "warm_seconds": 0.7821364999981597,
+      "rss_peak_bytes": 1820409856,
+      "available_min_bytes": 3864608768,
+      "worker_rss_max_bytes": 1377255424,
+      "disk_bytes": 752419571,
+      "retained_bytes": 0,
+      "writes": 3,
+      "contributions": 3,
+      "statistics_match_p1": true,
+      "all_raw_tensors_match_p3": true
+    },
+    {
+      "run": "two_workers",
+      "num_workers": 2,
+      "max_in_flight": 2,
+      "cold_seconds": 43.17662912502419,
+      "warm_seconds": 0.7909395419992507,
+      "rss_peak_bytes": 2533343232,
+      "available_min_bytes": 3608592384,
+      "worker_rss_max_bytes": 1310982144,
+      "disk_bytes": 752419571,
+      "retained_bytes": 0,
+      "writes": 3,
+      "contributions": 3,
+      "statistics_match_p1": true,
+      "all_raw_tensors_match_p3": true
+    }
+  ],
+  "speedup_2_vs_1": 1.3790408134346097,
+  "time_reduction_fraction": 0.2748582998719079,
+  "native_extension_sha256": "c84f7e6cb8b9a6677324de94fd9a8372eedb16e3980ed931379b2caaf5a2ff6c",
+  "source_hashes_match_delivered_library": true,
+  "four_worker_peak_projection_bytes": 5509021696,
+  "four_workers_run": false,
+  "four_workers_reason": "Four times the observed per-worker RSS peak already exceeds the 4 GiB aggregate cap before adding the coordinator.",
+  "scope": "Three original 2748x2748 images; one run per worker count, not a full dataset or training epoch."
+}

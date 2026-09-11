@@ -1,0 +1,343 @@
+{
+  "status": "passed",
+  "device": "cpu",
+  "cache_max_bytes": 268435456,
+  "statistics_source": "docs/cfp-cache/p1/runs/fit_cpu_3_validated/result.json",
+  "statistics_source_sha256": "1465ced63686a646c255640ca30681d1d415355431c63a8267d436f4918afbbd",
+  "counts": {
+    "prepare": 3,
+    "statistics_updates": 0
+  },
+  "images": [
+    {
+      "image_id": 0,
+      "nodes": 699690,
+      "raw_bytes": 267520272,
+      "attributes": 63,
+      "shape": [
+        2748,
+        2748
+      ],
+      "store_before_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 267520272,
+        "entries": 1,
+        "hits": 1,
+        "misses": 1,
+        "evictions": 0,
+        "oversized_entries": 0,
+        "active_entries": 1,
+        "active_bytes": 267520272,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 267520272
+      },
+      "models": {
+        "linear": {
+          "loss": 0.1373121291399002,
+          "gradient_l2": 0.3164759135380524
+        },
+        "mlp": {
+          "loss": 0.06801307201385498,
+          "gradient_l2": 0.1635282729513635
+        }
+      },
+      "store_after_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 267520272,
+        "entries": 1,
+        "hits": 1,
+        "misses": 1,
+        "evictions": 0,
+        "oversized_entries": 0,
+        "active_entries": 0,
+        "active_bytes": 0,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 267520272
+      }
+    },
+    {
+      "image_id": 1000,
+      "nodes": 627731,
+      "raw_bytes": 246220408,
+      "attributes": 63,
+      "shape": [
+        2748,
+        2748
+      ],
+      "store_before_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 246220408,
+        "entries": 1,
+        "hits": 2,
+        "misses": 2,
+        "evictions": 1,
+        "oversized_entries": 0,
+        "active_entries": 1,
+        "active_bytes": 246220408,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 246220408
+      },
+      "models": {
+        "linear": {
+          "loss": 0.14031781256198883,
+          "gradient_l2": 0.30416854616507394
+        },
+        "mlp": {
+          "loss": 0.06740743666887283,
+          "gradient_l2": 0.1612232281501988
+        }
+      },
+      "store_after_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 246220408,
+        "entries": 1,
+        "hits": 2,
+        "misses": 2,
+        "evictions": 1,
+        "oversized_entries": 0,
+        "active_entries": 0,
+        "active_bytes": 0,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 246220408
+      }
+    },
+    {
+      "image_id": 2040,
+      "nodes": 601906,
+      "raw_bytes": 238576208,
+      "attributes": 63,
+      "shape": [
+        2748,
+        2748
+      ],
+      "store_before_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 238576208,
+        "entries": 1,
+        "hits": 3,
+        "misses": 3,
+        "evictions": 2,
+        "oversized_entries": 0,
+        "active_entries": 1,
+        "active_bytes": 238576208,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 238576208
+      },
+      "models": {
+        "linear": {
+          "loss": 0.1427142322063446,
+          "gradient_l2": 0.30072002012147014
+        },
+        "mlp": {
+          "loss": 0.06920935213565826,
+          "gradient_l2": 0.16709419182961913
+        }
+      },
+      "store_evicted_before_backward": {
+        "max_bytes": 268435456,
+        "retained_bytes": 0,
+        "entries": 0,
+        "hits": 3,
+        "misses": 3,
+        "evictions": 2,
+        "oversized_entries": 0,
+        "active_entries": 1,
+        "active_bytes": 238576208,
+        "active_not_retained_bytes": 238576208,
+        "live_bytes": 238576208
+      },
+      "store_after_training": {
+        "max_bytes": 268435456,
+        "retained_bytes": 0,
+        "entries": 0,
+        "hits": 3,
+        "misses": 3,
+        "evictions": 2,
+        "oversized_entries": 0,
+        "active_entries": 0,
+        "active_bytes": 0,
+        "active_not_retained_bytes": 0,
+        "live_bytes": 0
+      }
+    }
+  ],
+  "final_store": {
+    "max_bytes": 268435456,
+    "retained_bytes": 0,
+    "entries": 0,
+    "hits": 3,
+    "misses": 3,
+    "evictions": 2,
+    "oversized_entries": 0,
+    "active_entries": 0,
+    "active_bytes": 0,
+    "active_not_retained_bytes": 0,
+    "live_bytes": 0
+  },
+  "timings": [
+    {
+      "stage": "read_image_0",
+      "seconds": 0.07516854209825397,
+      "rss_end_bytes": 311934976,
+      "available_end_bytes": 3591192576
+    },
+    {
+      "stage": "prepare_cold_0",
+      "seconds": 20.21339758299291,
+      "rss_end_bytes": 890978304,
+      "available_end_bytes": 3736109056
+    },
+    {
+      "stage": "prepare_hit_0",
+      "seconds": 0.004438749980181456,
+      "rss_end_bytes": 892796928,
+      "available_end_bytes": 3736109056
+    },
+    {
+      "stage": "linear_forward_0",
+      "seconds": 0.22086891694925725,
+      "rss_end_bytes": 1233829888,
+      "available_end_bytes": 3559440384
+    },
+    {
+      "stage": "linear_loss_0",
+      "seconds": 0.020144250011071563,
+      "rss_end_bytes": 1264664576,
+      "available_end_bytes": 3550248960
+    },
+    {
+      "stage": "linear_backward_0",
+      "seconds": 0.0648408749839291,
+      "rss_end_bytes": 1153515520,
+      "available_end_bytes": 3610984448
+    },
+    {
+      "stage": "mlp_forward_0",
+      "seconds": 0.20741224999073893,
+      "rss_end_bytes": 1365704704,
+      "available_end_bytes": 3496460288
+    },
+    {
+      "stage": "mlp_loss_0",
+      "seconds": 0.008212791988626122,
+      "rss_end_bytes": 1365737472,
+      "available_end_bytes": 3496460288
+    },
+    {
+      "stage": "mlp_backward_0",
+      "seconds": 0.0676568339113146,
+      "rss_end_bytes": 1164836864,
+      "available_end_bytes": 3496460288
+    },
+    {
+      "stage": "read_image_1000",
+      "seconds": 0.06002408405765891,
+      "rss_end_bytes": 1173356544,
+      "available_end_bytes": 3496460288
+    },
+    {
+      "stage": "prepare_cold_1000",
+      "seconds": 21.070044499938376,
+      "rss_end_bytes": 567164928,
+      "available_end_bytes": 3372630016
+    },
+    {
+      "stage": "prepare_hit_1000",
+      "seconds": 0.005226959008723497,
+      "rss_end_bytes": 578797568,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "linear_forward_1000",
+      "seconds": 0.17634983302559704,
+      "rss_end_bytes": 1136328704,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "linear_loss_1000",
+      "seconds": 0.011506207985803485,
+      "rss_end_bytes": 1196326912,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "linear_backward_1000",
+      "seconds": 0.05724633298814297,
+      "rss_end_bytes": 1065320448,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "mlp_forward_1000",
+      "seconds": 0.16619074996560812,
+      "rss_end_bytes": 1286914048,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "mlp_loss_1000",
+      "seconds": 0.008052291930653155,
+      "rss_end_bytes": 1286946816,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "mlp_backward_1000",
+      "seconds": 0.07109654205851257,
+      "rss_end_bytes": 1158152192,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "read_image_2040",
+      "seconds": 0.062095124972984195,
+      "rss_end_bytes": 1159086080,
+      "available_end_bytes": 3402448896
+    },
+    {
+      "stage": "prepare_cold_2040",
+      "seconds": 21.235318999970332,
+      "rss_end_bytes": 599801856,
+      "available_end_bytes": 3544104960
+    },
+    {
+      "stage": "prepare_hit_2040",
+      "seconds": 0.005263791070319712,
+      "rss_end_bytes": 611713024,
+      "available_end_bytes": 3546120192
+    },
+    {
+      "stage": "linear_forward_2040",
+      "seconds": 0.18034695798996836,
+      "rss_end_bytes": 1166409728,
+      "available_end_bytes": 3558604800
+    },
+    {
+      "stage": "linear_loss_2040",
+      "seconds": 0.016022542025893927,
+      "rss_end_bytes": 1226997760,
+      "available_end_bytes": 3558604800
+    },
+    {
+      "stage": "linear_backward_2040",
+      "seconds": 0.050532667082734406,
+      "rss_end_bytes": 1087537152,
+      "available_end_bytes": 3558604800
+    },
+    {
+      "stage": "mlp_forward_2040",
+      "seconds": 0.1529574589803815,
+      "rss_end_bytes": 1277165568,
+      "available_end_bytes": 3558604800
+    },
+    {
+      "stage": "mlp_loss_2040",
+      "seconds": 0.007882249890826643,
+      "rss_end_bytes": 1277165568,
+      "available_end_bytes": 3558604800
+    },
+    {
+      "stage": "mlp_backward_2040",
+      "seconds": 0.08240487508010119,
+      "rss_end_bytes": 1144815616,
+      "available_end_bytes": 3558604800
+    }
+  ],
+  "loss_definition": "mean((response / 255 - binary_mask) ** 2)",
+  "note": "Resource and integration probe; not model quality evaluation or a full training epoch."
+}

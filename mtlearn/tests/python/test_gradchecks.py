@@ -70,7 +70,7 @@ def _small_layer_input(dtype=torch.float64):
 
 def _tos_spec_kwargs(tree_type):
     if tree_type == morphology.TreeType.TREE_OF_SHAPES:
-        return {"tos_interpolation": morphology.ToSInterpolation.Min8cMax4c}
+        return {"tos_interpolation": morphology.ToSInterpolation.MIN8_MAX4}
     return {}
 
 
@@ -89,11 +89,10 @@ def test_implicit_jacobian_function_gradcheck():
             residues,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             attributes,
-            tree.numRows,
-            tree.numCols,
+            tree.num_rows,
+            tree.num_columns,
             2.0,
         ).mean()
 
@@ -106,22 +105,15 @@ def test_tree_reconstruction_function_gradcheck():
         mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
     )
     node_signal = residues.to(dtype=torch.float64).detach().requires_grad_(True)
-    order_forward = torch.argsort(tpre, descending=False)
-    order_backward = torch.argsort(tpre)
-    num_times = int(tpost.max().item()) + 1
 
     def reconstructed_mean(signal):
         return TreeReconstructionFunction.apply(
             signal,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
-            tree.numRows,
-            tree.numCols,
-            order_forward,
-            order_backward,
-            num_times,
+            tree.num_rows,
+            tree.num_columns,
         ).mean()
 
     assert gradcheck(reconstructed_mean, (node_signal,), eps=1e-6, atol=1e-4)
@@ -151,11 +143,10 @@ def test_implicit_jacobian_function_gradcheck_with_clamp_bounds(clamp_min, clamp
             residues,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             attributes,
-            tree.numRows,
-            tree.numCols,
+            tree.num_rows,
+            tree.num_columns,
             3.0,
             clamp_min,
             clamp_max,
@@ -180,11 +171,10 @@ def test_implicit_jacobian_function_clamp_saturates_backward():
         residues,
         tpre,
         tpost,
-        parent,
         node_of_pixel,
         attributes,
-        tree.numRows,
-        tree.numCols,
+        tree.num_rows,
+        tree.num_columns,
         1.0,
         -1.0,
         1.0,
@@ -214,11 +204,10 @@ def test_implicit_jacobian_function_gradcheck_tree_of_shapes():
             residues,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
             attributes,
-            tree.numRows,
-            tree.numCols,
+            tree.num_rows,
+            tree.num_columns,
             1.0,
         ).mean()
 

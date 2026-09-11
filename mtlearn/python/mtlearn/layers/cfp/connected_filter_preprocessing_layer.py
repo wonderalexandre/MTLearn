@@ -22,6 +22,8 @@ from .._helpers import (
     to_numpy_u8,
 )
 from .normalization import AttributeNormalizer, DEFAULT_SCALE_MODE, StatsSerializer
+from .normalization.statistics_snapshot import StatisticsSnapshot
+from .preparation._statistics_fitter import fit_statistics
 from .runtime import (
     BatchInputNormalizer,
     CachedDataLoaderBuilder,
@@ -140,7 +142,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                 rescaling; ``"dataset_minmax01"`` and ``"dataset_zscore"`` use
                 other dataset-statistic normalizers; ``"none"`` passes raw
                 attributes through unchanged. All statistical modes require statistics from
-                ``build_dataloader_cached(...)`` or ``load_stats(...)`` before
+                ``fit_stats(...)``, ``build_dataloader_cached(...)`` or ``load_stats(...)`` before
                 regular forward passes.
             eps: Numerical floor used by normalization.
             score_sharpness: Default score sharpness used by specs that do not
@@ -241,6 +243,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         self._linear_parameter_initializer = LayerOwnedLinearParameterInitializer()
         self._persistent_state_manager = PersistentStateManager()
         self._active_context = None
+        self._stats_sample_count = None
         self._score_sharpness_override = None
 
         self._weights, self._biases = self._linear_parameter_initializer.create_parameter_dicts(
@@ -283,6 +286,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
     @_ds_stats.setter
     def _ds_stats(self, value):
         self._attribute_normalizer.ds_stats = value
+        self._stats_sample_count = None
 
     @property
     def _stats_epoch(self) -> int:
@@ -299,6 +303,8 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
     @_stats_frozen.setter
     def _stats_frozen(self, value: bool) -> None:
         self._attribute_normalizer.stats_frozen = bool(value)
+        if not value:
+            self._stats_sample_count = None
 
     @property
     def _norm_epoch_by_key(self):
@@ -510,13 +516,9 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
             filtered_increments,
             info["tpre"],
             info["tpost"],
-            info["parent"],
             info["node_of_pixel"],
             info["num_rows"],
             info["num_cols"],
-            info["order_forward"],
-            info["order_backward"],
-            info["num_times"],
         )
 
         return y_ch
@@ -529,18 +531,36 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
 
         Args:
             x: Input tensor shaped ``(B, C, H, W)`` or the cached-loader form
-                ``(x, idx)`` produced by ``build_dataloader_cached``.
+                ``(x, idx)`` produced by ``build_dataloader_cached``, or a
+                ``PreparedBatch`` prepared independently of the model.
 
         Returns:
             Tensor with one output channel per input channel and filter spec.
         """
         return self._forward_executor.forward(self, x)
 
+    def forward_prepared(self, batch) -> torch.Tensor:
+        """Apply shared CPU morphology using this layer's frozen stats and weights.
+
+        Only the active batch is transferred/normalized. Neither the preparation
+        nor this layer retains normalized payloads after their autograd use.
+        """
+        from .preparation import PreparedBatch
+        if not isinstance(batch, PreparedBatch):
+            raise TypeError("forward_prepared expects a PreparedBatch.")
+        return self._forward_executor.forward(self, batch)
+
+    def inspect_prepared_sample(self, batch, batch_index=0, channel=0):
+        """Inspect one sample/channel without constructing another tree."""
+        return self._training_sample_inspector.inspect_prepared(
+            self, batch, batch_index=batch_index, channel=channel)
+
     def regularization_penalty(self, x: torch.Tensor) -> torch.Tensor:
         """Return the per-spec training regularization penalty.
 
         Specs without effective regularizers are skipped. Callers must add this
-        scalar to their training objective explicitly.
+        scalar to their training objective explicitly. Accepts ``PreparedBatch``
+        to reuse morphology from forward without constructing trees again.
         """
         return self._forward_executor.regularization_penalty(self, x)
 
@@ -571,7 +591,9 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         """Return cached or direct attributes, altitude increments, and parameters per spec.
 
         Args:
-            img: Image tensor shaped ``(H, W)`` or ``(C, H, W)``.
+            img: Image tensor shaped ``(H, W)`` or ``(C, H, W)``, or a
+                single-sample ``PreparedBatch``. For a larger prepared batch use
+                ``inspect_prepared_sample`` with an explicit batch index.
             channel: Channel to inspect when ``img`` has multiple channels.
             idx: Optional stable dataset index used to look up cached payloads.
             build_if_missing: Build a temporary tree payload when no cache entry
@@ -592,7 +614,9 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
 
     def freeze_ds_stats(self):
         """Stop updating dataset-level normalization statistics."""
-        self._stats_frozen = True
+        self._attribute_normalizer.freeze()
+        dtype = torch.float64 if self.attribute_dtype == np.dtype(np.float64) else torch.float32
+        self._attribute_normalizer.prepare_constants(device=self.device, dtype=dtype)
 
     def unfreeze_ds_stats(self):
         """Resume updating dataset-level normalization statistics."""
@@ -600,6 +624,10 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
 
     def refresh_cached_normalization(self):
         """Recompute normalized attributes for all cached samples."""
+        self._attribute_normalizer.invalidate_constants()
+        if self._stats_frozen:
+            dtype = torch.float64 if self.attribute_dtype == np.dtype(np.float64) else torch.float32
+            self._attribute_normalizer.prepare_constants(device=self.device, dtype=dtype)
         for base_key in list(self._tree_payload_cache.sample_keys()):
             self._tree_payload_cache.invalidate_sample_normalization(base_key)
             self._maybe_refresh_norm_for_key(base_key)
@@ -710,7 +738,7 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
         return self._stats_serializer.serialize(self._ds_stats)
 
     def _deserialize_ds_stats(self, serialized: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
-        return self._stats_serializer.deserialize(serialized, device=self.device)
+        return self._stats_serializer.deserialize(serialized, device="cpu")
 
     @staticmethod
     def _serialize_filter_spec_config(spec: _NormalizedFilterSpec, *, include_training: bool = True) -> dict[str, Any]:
@@ -750,6 +778,65 @@ class ConnectedFilterPreprocessingLayer(torch.nn.Module):
                     ) from exc
                 skipped.append(spec.key)
         return tuple(skipped)
+
+    def _statistics_contract(self):
+        return {
+            "scale_mode": self.scale_mode, "eps": self.eps,
+            "clipped_zscore_radius": self.clipped_zscore_radius,
+            "clipped_zscore_floor": self.clipped_zscore_floor,
+            "attribute_dtype": self.attribute_dtype.name,
+            "stat_keys": tuple(sorted(self._stat_key(key, attr)
+                                      for key, attrs in self._scoring_attrs_by_tree_key.items()
+                                      for attr in attrs)),
+        }
+
+    def get_statistics_contract(self):
+        """Return the scalar normalization contract for independent preparation.
+
+        No fitting, parameters or cache configuration are included.
+        """
+        return self._statistics_contract()
+
+    def fit_stats(self, dataloader) -> StatisticsSnapshot:
+        """Fit/freeze training statistics in one finite pass without populating a cache.
+
+        Uses exactly the samples emitted by dataloader, including sampler order,
+        multiplicity and drop_last. Each call replaces the previous fit. Failure
+        or an empty stream preserves previous statistics. Only the active input
+        batch and one raw image/tree payload are needed. Existing legacy caches
+        remain in place; their normalization is invalidated and refreshed lazily.
+        """
+        return fit_statistics(self, dataloader)
+
+    def get_stats(self) -> StatisticsSnapshot:
+        """Export a defensive snapshot independent of scoring parameters/device."""
+        self._require_fixed_dataset_stats()
+        return StatisticsSnapshot(self._statistics_contract(), self._ds_stats,
+                                  sample_count=self._stats_sample_count)
+
+    def set_stats(self, snapshot: StatisticsSnapshot) -> None:
+        """Install compatible CPU statistics and freeze their derived constants.
+
+        Tree/attribute dtype and normalization contracts must agree; scorer
+        names/parameters need not agree. No per-image morphology is copied.
+        """
+        if not isinstance(snapshot, StatisticsSnapshot):
+            raise TypeError("set_stats requires a StatisticsSnapshot.")
+        if snapshot.contract != self._statistics_contract():
+            raise ValueError("Statistics snapshot is incompatible with this layer.")
+        # Validate/prepare off to the side so device or numerical errors cannot
+        # replace the layer's previous fit with a partially installed snapshot.
+        candidate = AttributeNormalizer(self.scale_mode, self.eps,
+                                        clipped_zscore_radius=self.clipped_zscore_radius,
+                                        clipped_zscore_floor=self.clipped_zscore_floor)
+        candidate.ds_stats = snapshot.statistics
+        candidate.freeze()
+        dtype = torch.float64 if self.attribute_dtype == np.dtype(np.float64) else torch.float32
+        candidate.stats_epoch = self._stats_epoch + 1
+        candidate.prepare_constants(device=self.device, dtype=dtype)
+        self._attribute_normalizer = candidate
+        self._tree_payload_provider.normalizer = candidate
+        self._stats_sample_count = snapshot.sample_count
 
     def build_dataloader_cached(self, dataloader):
         """Wrap a DataLoader and precompute CFP caches/statistics.

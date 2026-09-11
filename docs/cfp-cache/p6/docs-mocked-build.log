@@ -1,0 +1,89 @@
+[01mRunning Sphinx v9.1.0[39;49;00m
+[01mloading translations [en]... [39;49;00mdone
+[01mmaking output directory... [39;49;00mdone
+[01mmyst v5.1.0:[39;49;00m MdParserConfig(commonmark_only=False, gfm_only=False, enable_extensions=set(), disable_syntax=[], all_links_external=False, links_external_new_tab=False, url_schemes=('http', 'https', 'mailto', 'ftp'), ref_domains=None, fence_as_directive=set(), number_code_blocks=[], title_to_header=False, heading_anchors=0, heading_slug_func=None, html_meta={}, footnote_sort=True, footnote_transition=True, words_per_minute=200, substitutions={}, linkify_fuzzy_links=True, dmath_allow_labels=True, dmath_allow_space=True, dmath_allow_digits=True, dmath_double_inline=False, update_mathjax=True, mathjax_classes='tex2jax_process|mathjax_process|math|output_area', enable_checkboxes=False, strikethrough_single_tilde=False, colon_fence_exact_match=False, suppress_warnings=[], highlight_code_blocks=True)
+[autosummary] generating autosummary for: api/cpp/index.rst, api/cpp/morphology.rst, api/python/cfp_preparation.rst, api/python/data.rst, api/python/datasets.rst, api/python/index.rst, api/python/layers.rst, api/python/morphology.rst, api/python/native.rst, concepts/attributes.md, concepts/morphology.md, guides/cfp-cache-migration.md, guides/connected-filter-preprocessing.md, guides/cpp-api.md, guides/custom-attributes-filter-specs.md, guides/getting-started.md, guides/index.md, guides/morphology.md, guides/pytorch-integration.md, index.md
+[01mbuilding [mo]: [39;49;00mall of 0 po files
+[01mwriting output... [39;49;00m
+[01mbuilding [html]: [39;49;00mall source files
+[01mupdating environment: [39;49;00m[new config] 20 added, 0 changed, 0 removed
+[01mreading sources... [39;49;00m[  5%] [35mapi/cpp/index[39;49;00m
+[01mreading sources... [39;49;00m[ 10%] [35mapi/cpp/morphology[39;49;00m
+[01mreading sources... [39;49;00m[ 15%] [35mapi/python/cfp_preparation[39;49;00m
+[01mreading sources... [39;49;00m[ 20%] [35mapi/python/data[39;49;00m
+[01mreading sources... [39;49;00m[ 25%] [35mapi/python/datasets[39;49;00m
+[01mreading sources... [39;49;00m[ 30%] [35mapi/python/index[39;49;00m
+[01mreading sources... [39;49;00m[ 35%] [35mapi/python/layers[39;49;00m
+[01mreading sources... [39;49;00m[ 40%] [35mapi/python/morphology[39;49;00m
+[01mreading sources... [39;49;00m[ 45%] [35mapi/python/native[39;49;00m
+[01mreading sources... [39;49;00m[ 50%] [35mconcepts/attributes[39;49;00m
+[01mreading sources... [39;49;00m[ 55%] [35mconcepts/morphology[39;49;00m
+[01mreading sources... [39;49;00m[ 60%] [35mguides/cfp-cache-migration[39;49;00m
+[01mreading sources... [39;49;00m[ 65%] [35mguides/connected-filter-preprocessing[39;49;00m
+[01mreading sources... [39;49;00m[ 70%] [35mguides/cpp-api[39;49;00m
+[01mreading sources... [39;49;00m[ 75%] [35mguides/custom-attributes-filter-specs[39;49;00m
+[01mreading sources... [39;49;00m[ 80%] [35mguides/getting-started[39;49;00m
+[01mreading sources... [39;49;00m[ 85%] [35mguides/index[39;49;00m
+[01mreading sources... [39;49;00m[ 90%] [35mguides/morphology[39;49;00m
+[01mreading sources... [39;49;00m[ 95%] [35mguides/pytorch-integration[39;49;00m
+[01mreading sources... [39;49;00m[100%] [35mindex[39;49;00m
+
+[01mlooking for now-outdated files... [39;49;00mnone found
+[01mpickling environment... [39;49;00mdone
+[01mchecking consistency... [39;49;00mdone
+[01mpreparing documents... [39;49;00mdone
+[01mcopying assets... [39;49;00m
+[01mcopying static files... [39;49;00m
+Writing evaluated template result to /Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-docs-mocked/html/_static/basic.css
+Writing evaluated template result to /Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-docs-mocked/html/_static/language_data.js
+Writing evaluated template result to /Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-docs-mocked/html/_static/documentation_options.js
+Writing evaluated template result to /Volumes/SSD/GitHub/mtlearn/build/cfp-cache-p6-docs-mocked/html/_static/alabaster.css
+[01mcopying static files: [39;49;00mdone
+[01mcopying extra files... [39;49;00m
+[01mcopying extra files: [39;49;00mdone
+[01mcopying assets: [39;49;00mdone
+[01mwriting output... [39;49;00m[  5%] [32mapi/cpp/index[39;49;00m
+[01mwriting output... [39;49;00m[ 10%] [32mapi/cpp/morphology[39;49;00m
+[01mwriting output... [39;49;00m[ 15%] [32mapi/python/cfp_preparation[39;49;00m
+[01mwriting output... [39;49;00m[ 20%] [32mapi/python/data[39;49;00m
+[01mwriting output... [39;49;00m[ 25%] [32mapi/python/datasets[39;49;00m
+[01mwriting output... [39;49;00m[ 30%] [32mapi/python/index[39;49;00m
+[01mwriting output... [39;49;00m[ 35%] [32mapi/python/layers[39;49;00m
+[01mwriting output... [39;49;00m[ 40%] [32mapi/python/morphology[39;49;00m
+[01mwriting output... [39;49;00m[ 45%] [32mapi/python/native[39;49;00m
+[01mwriting output... [39;49;00m[ 50%] [32mconcepts/attributes[39;49;00m
+[01mwriting output... [39;49;00m[ 55%] [32mconcepts/morphology[39;49;00m
+[01mwriting output... [39;49;00m[ 60%] [32mguides/cfp-cache-migration[39;49;00m
+[01mwriting output... [39;49;00m[ 65%] [32mguides/connected-filter-preprocessing[39;49;00m
+[01mwriting output... [39;49;00m[ 70%] [32mguides/cpp-api[39;49;00m
+[01mwriting output... [39;49;00m[ 75%] [32mguides/custom-attributes-filter-specs[39;49;00m
+[01mwriting output... [39;49;00m[ 80%] [32mguides/getting-started[39;49;00m
+[01mwriting output... [39;49;00m[ 85%] [32mguides/index[39;49;00m
+[01mwriting output... [39;49;00m[ 90%] [32mguides/morphology[39;49;00m
+[01mwriting output... [39;49;00m[ 95%] [32mguides/pytorch-integration[39;49;00m
+[01mwriting output... [39;49;00m[100%] [32mindex[39;49;00m
+
+[01mgenerating indices... [39;49;00mgenindex py-modindex done
+[01mhighlighting module code... [39;49;00m[  6%] [94m_mtlearn[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 12%] [94mmtlearn._datasets._generated_target[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 19%] [94mmtlearn._datasets._paired_image[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 25%] [94mmtlearn.data[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 31%] [94mmtlearn.layers.cfp.connected_filter_preprocessing_layer[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 38%] [94mmtlearn.layers.cfp.normalization.statistics_snapshot[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 44%] [94mmtlearn.layers.cfp.preparation.cfp_preprocessor[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 50%] [94mmtlearn.layers.cfp.preparation.preparation_result[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 56%] [94mmtlearn.layers.cfp.preparation.prepared_batch[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 62%] [94mmtlearn.layers.cfp.preparation.prepared_dataset[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 69%] [94mmtlearn.layers.cfp.preparation.prepared_morphology[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 75%] [94mmtlearn.layers.cfp.storage.disk_store[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 81%] [94mmtlearn.layers.cfp.storage.memory_store[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 88%] [94mmtlearn.layers.cfp.storage.null_store[39;49;00m
+[01mhighlighting module code... [39;49;00m[ 94%] [94mmtlearn.layers.checkpoint[39;49;00m
+[01mhighlighting module code... [39;49;00m[100%] [94mmtlearn.morphology[39;49;00m
+
+[01mwriting additional pages... [39;49;00msearch done
+[01mdumping search index in English (code: en)... [39;49;00mdone
+[01mdumping object inventory... [39;49;00mdone
+[01mbuild succeeded.[39;49;00m
+
+The HTML pages are in build/cfp-cache-p6-docs-mocked/html.

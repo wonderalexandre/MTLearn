@@ -1,0 +1,70 @@
+{
+  "status": "complete",
+  "num_workers": 2,
+  "max_in_flight": 2,
+  "max_sample_bytes": 8388608,
+  "worker_threads": 1,
+  "sample_ids": [
+    0,
+    1000,
+    2040
+  ],
+  "statistics_match_p1": true,
+  "all_raw_tensors_match_p3": true,
+  "statistics_bytes": 1512,
+  "statistics_id": "e85e6a25eac8d5bee42df60527063e8c07936629dcc37ef612f7d81435270154",
+  "contributions": 3,
+  "publication_order": [
+    "0",
+    "1000",
+    "2040"
+  ],
+  "source_reads": [
+    0,
+    1000,
+    2040,
+    0,
+    1000,
+    2040
+  ],
+  "cache": {
+    "max_bytes": 0,
+    "retained_bytes": 0,
+    "entries": 0,
+    "hits": 3,
+    "misses": 3,
+    "evictions": 0,
+    "oversized_entries": 3,
+    "active_entries": 0,
+    "active_bytes": 0,
+    "active_not_retained_bytes": 0,
+    "live_bytes": 0,
+    "ram_hits": 0,
+    "disk_hits": 3,
+    "writes": 3,
+    "invalid_entries": 0,
+    "disk_entries": 3,
+    "entry_states": {
+      "valid": 3
+    },
+    "disk_bytes": 752419571,
+    "manifest_bytes": 242896,
+    "max_disk_bytes": 1073741824,
+    "readonly": false
+  },
+  "timings": [
+    {
+      "stage": "cold_prepare",
+      "seconds": 43.17662912502419,
+      "rss_end_bytes": 213827584,
+      "available_end_bytes": 4856184832
+    },
+    {
+      "stage": "warm_resume",
+      "seconds": 0.7909395419992507,
+      "rss_end_bytes": 252854272,
+      "available_end_bytes": 4850827264
+    }
+  ],
+  "note": "Three original images, preparation and warm resume only; not a training epoch."
+}

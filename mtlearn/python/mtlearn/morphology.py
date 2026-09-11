@@ -132,7 +132,7 @@ def normalize_tree_type(tree_type: str | TreeType) -> str:
 def normalize_tos_interpolation(interpolation=None):
     """Return the native tree-of-shapes interpolation enum value.
 
-    ``None`` maps to ``ToSInterpolation.SelfDual``.
+    ``None`` maps to ``ToSInterpolation.SELF_DUAL``.
     """
     return _backend.normalize_tos_interpolation(interpolation)
 

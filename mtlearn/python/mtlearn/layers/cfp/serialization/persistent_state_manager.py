@@ -21,7 +21,7 @@ class PersistentStateManager:
 
     def load_stats(self, layer, path: str, *, refresh_cache: bool = True) -> None:
         """Load dataset-level normalization statistics into ``layer``."""
-        payload = torch.load(path, map_location=layer.device, weights_only=True)
+        payload = torch.load(path, map_location="cpu", weights_only=True)
         layer._ds_stats = layer._deserialize_ds_stats(payload.get("ds_stats", {}))
         layer._stats_epoch += 1
         if refresh_cache:

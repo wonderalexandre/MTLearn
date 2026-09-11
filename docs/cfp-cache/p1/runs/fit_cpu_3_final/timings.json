@@ -1,0 +1,2312 @@
+[
+  {
+    "stage": "read_image_0",
+    "seconds": 0.08308512507937849,
+    "rss_end_bytes": 331186176,
+    "available_end_bytes": 3170992128
+  },
+  {
+    "stage": "prepare_image_0",
+    "seconds": 19.110896290978417,
+    "rss_end_bytes": 912769024,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001334166037850082,
+    "rss_end_bytes": 917618688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00024800002574920654,
+    "rss_end_bytes": 918323200,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010385829955339432,
+    "rss_end_bytes": 921468928,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.437491487711668e-05,
+    "rss_end_bytes": 921468928,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012659999774768949,
+    "rss_end_bytes": 924286976,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.850001566112041e-05,
+    "rss_end_bytes": 924286976,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006245409604161978,
+    "rss_end_bytes": 927088640,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.800005212426186e-05,
+    "rss_end_bytes": 927088640,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000708000035956502,
+    "rss_end_bytes": 929529856,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00012554205022752285,
+    "rss_end_bytes": 929546240,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0016814590198919177,
+    "rss_end_bytes": 932364288,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00013129203580319881,
+    "rss_end_bytes": 932380672,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012566660298034549,
+    "rss_end_bytes": 937967616,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001611249754205346,
+    "rss_end_bytes": 937967616,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011165420291945338,
+    "rss_end_bytes": 940769280,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.77920538187027e-05,
+    "rss_end_bytes": 940769280,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010559590300545096,
+    "rss_end_bytes": 943570944,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.216698188334703e-05,
+    "rss_end_bytes": 943570944,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012778750387951732,
+    "rss_end_bytes": 946372608,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.104101289063692e-05,
+    "rss_end_bytes": 946388992,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010735419346019626,
+    "rss_end_bytes": 949190656,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.445900700986385e-05,
+    "rss_end_bytes": 949190656,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011811250587925315,
+    "rss_end_bytes": 951992320,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.933300755918026e-05,
+    "rss_end_bytes": 951992320,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011487919837236404,
+    "rss_end_bytes": 954810368,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.270901162177324e-05,
+    "rss_end_bytes": 956071936,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012943330220878124,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.920906111598015e-05,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000934166950173676,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.837506175041199e-05,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008404169930145144,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.987499702721834e-05,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007739999564364552,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.974996697157621e-05,
+    "rss_end_bytes": 958873600,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007948329439386725,
+    "rss_end_bytes": 958889984,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.929202936589718e-05,
+    "rss_end_bytes": 958889984,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007593330228701234,
+    "rss_end_bytes": 958889984,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.333292160183191e-05,
+    "rss_end_bytes": 958889984,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011522910790517926,
+    "rss_end_bytes": 961691648,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.02079851180315e-05,
+    "rss_end_bytes": 961691648,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011565410532057285,
+    "rss_end_bytes": 964493312,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.874999962747097e-05,
+    "rss_end_bytes": 964493312,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007789579685777426,
+    "rss_end_bytes": 964493312,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.12500186637044e-05,
+    "rss_end_bytes": 964493312,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010627919109538198,
+    "rss_end_bytes": 967294976,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.691704038530588e-05,
+    "rss_end_bytes": 967294976,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001127875060774386,
+    "rss_end_bytes": 970096640,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.995804142206907e-05,
+    "rss_end_bytes": 970113024,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0014786249957978725,
+    "rss_end_bytes": 972914688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.320905569940805e-05,
+    "rss_end_bytes": 972914688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007393750129267573,
+    "rss_end_bytes": 972914688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.741696365177631e-05,
+    "rss_end_bytes": 972914688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005785409593954682,
+    "rss_end_bytes": 972914688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001489589922130108,
+    "rss_end_bytes": 972914688,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000779291964136064,
+    "rss_end_bytes": 975716352,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.079200051724911e-05,
+    "rss_end_bytes": 975716352,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007633750792592764,
+    "rss_end_bytes": 978518016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.37080117687583e-05,
+    "rss_end_bytes": 978518016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007170420140028,
+    "rss_end_bytes": 981336064,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00013437506277114153,
+    "rss_end_bytes": 981336064,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003250830341130495,
+    "rss_end_bytes": 981336064,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.741692777723074e-05,
+    "rss_end_bytes": 981336064,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007262500002980232,
+    "rss_end_bytes": 984137728,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.604206282645464e-05,
+    "rss_end_bytes": 984137728,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007590829627588391,
+    "rss_end_bytes": 986939392,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.76250783726573e-05,
+    "rss_end_bytes": 986939392,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007149589946493506,
+    "rss_end_bytes": 989741056,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.504100747406483e-05,
+    "rss_end_bytes": 989741056,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00032962497789412737,
+    "rss_end_bytes": 989757440,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.408302579075098e-05,
+    "rss_end_bytes": 989757440,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007332080276682973,
+    "rss_end_bytes": 992493568,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.975000724196434e-05,
+    "rss_end_bytes": 992493568,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0004367079818621278,
+    "rss_end_bytes": 992493568,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.145805284380913e-05,
+    "rss_end_bytes": 992493568,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005485840374603868,
+    "rss_end_bytes": 992526336,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.512505933642387e-05,
+    "rss_end_bytes": 992526336,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00034620892256498337,
+    "rss_end_bytes": 992526336,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.879105396568775e-05,
+    "rss_end_bytes": 992542720,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00031812500674277544,
+    "rss_end_bytes": 992542720,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00021854194346815348,
+    "rss_end_bytes": 992542720,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008120000129565597,
+    "rss_end_bytes": 995344384,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.866695523262024e-05,
+    "rss_end_bytes": 995344384,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003875410184264183,
+    "rss_end_bytes": 995360768,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.041601929813623e-05,
+    "rss_end_bytes": 995360768,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003216249169781804,
+    "rss_end_bytes": 995360768,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.666698027402163e-05,
+    "rss_end_bytes": 995360768,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003211249131709337,
+    "rss_end_bytes": 995377152,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.200008258223534e-05,
+    "rss_end_bytes": 995377152,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000732957967557013,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.695797830820084e-05,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00032595801167190075,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.87920255586505e-05,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00032891600858420134,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.216706242412329e-05,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000328624970279634,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.649992428719997e-05,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003195420140400529,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.362504791468382e-05,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000321374973282218,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.658292841166258e-05,
+    "rss_end_bytes": 998178816,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007275840034708381,
+    "rss_end_bytes": 1001013248,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.787502206861973e-05,
+    "rss_end_bytes": 1001013248,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006603329675272107,
+    "rss_end_bytes": 1001029632,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.329205982387066e-05,
+    "rss_end_bytes": 1001029632,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00037604093085974455,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00013254093937575817,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00033887499012053013,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.458302959799767e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011589579517021775,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.995900861918926e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007982919923961163,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.03329749032855e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007306659827008843,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.54169886931777e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007125829579308629,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.90000194683671e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008313329890370369,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.916699931025505e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007709589553996921,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.574997678399086e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000858957995660603,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.175005834549665e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008410830050706863,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.77080824971199e-05,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001440166961401701,
+    "rss_end_bytes": 1001046016,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.029203698039055e-05,
+    "rss_end_bytes": 1001062400,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "read_image_1000",
+    "seconds": 0.06722479197196662,
+    "rss_end_bytes": 982663168,
+    "available_end_bytes": 2855239680
+  },
+  {
+    "stage": "prepare_image_1000",
+    "seconds": 19.315313541912474,
+    "rss_end_bytes": 786481152,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001277957926504314,
+    "rss_end_bytes": 786563072,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00022250006441026926,
+    "rss_end_bytes": 786661376,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005083330906927586,
+    "rss_end_bytes": 786825216,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.195797611027956e-05,
+    "rss_end_bytes": 786825216,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006880419095978141,
+    "rss_end_bytes": 786857984,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.237501606345177e-05,
+    "rss_end_bytes": 786857984,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005907920422032475,
+    "rss_end_bytes": 789381120,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.462489884346724e-05,
+    "rss_end_bytes": 789381120,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010407910449430346,
+    "rss_end_bytes": 789643264,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00016775005497038364,
+    "rss_end_bytes": 789643264,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012102080509066582,
+    "rss_end_bytes": 789643264,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001045420067384839,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008222500327974558,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.29590717330575e-05,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007014170987531543,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.216593414545059e-05,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008529169717803597,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.795899339020252e-05,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008077499223873019,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.725006435066462e-05,
+    "rss_end_bytes": 789659648,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008763329824432731,
+    "rss_end_bytes": 792182784,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.745805826038122e-05,
+    "rss_end_bytes": 792182784,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0013170000165700912,
+    "rss_end_bytes": 792182784,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.533301297575235e-05,
+    "rss_end_bytes": 792182784,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007662499556317925,
+    "rss_end_bytes": 792543232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.108303882181644e-05,
+    "rss_end_bytes": 792543232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005629160441458225,
+    "rss_end_bytes": 792543232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.095901623368263e-05,
+    "rss_end_bytes": 792543232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00051837507635355,
+    "rss_end_bytes": 792543232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.116693399846554e-05,
+    "rss_end_bytes": 792543232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005844580009579659,
+    "rss_end_bytes": 793673728,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.466704118996859e-05,
+    "rss_end_bytes": 793690112,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00048320810310542583,
+    "rss_end_bytes": 793722880,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.175002247095108e-05,
+    "rss_end_bytes": 793722880,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005421250825747848,
+    "rss_end_bytes": 794558464,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.008400280028582e-05,
+    "rss_end_bytes": 794558464,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007644580909982324,
+    "rss_end_bytes": 797081600,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.095898035913706e-05,
+    "rss_end_bytes": 797081600,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006809999467805028,
+    "rss_end_bytes": 799588352,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.204199209809303e-05,
+    "rss_end_bytes": 799588352,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006032909732311964,
+    "rss_end_bytes": 802111488,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.849993951618671e-05,
+    "rss_end_bytes": 802111488,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006455000257119536,
+    "rss_end_bytes": 804618240,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.995800115168095e-05,
+    "rss_end_bytes": 804618240,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000693832989782095,
+    "rss_end_bytes": 807141376,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.908395491540432e-05,
+    "rss_end_bytes": 807141376,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00038475007750093937,
+    "rss_end_bytes": 807337984,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.812504190951586e-05,
+    "rss_end_bytes": 807337984,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00118208397179842,
+    "rss_end_bytes": 809025536,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001259170239791274,
+    "rss_end_bytes": 809025536,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007831670809537172,
+    "rss_end_bytes": 809304064,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.720792200416327e-05,
+    "rss_end_bytes": 809304064,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008877919754013419,
+    "rss_end_bytes": 811827200,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.52090709283948e-05,
+    "rss_end_bytes": 811827200,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001144082983955741,
+    "rss_end_bytes": 814366720,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.712503429502249e-05,
+    "rss_end_bytes": 814366720,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001098083914257586,
+    "rss_end_bytes": 816889856,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.166701834648848e-05,
+    "rss_end_bytes": 816906240,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001078583998605609,
+    "rss_end_bytes": 819445760,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.350001346319914e-05,
+    "rss_end_bytes": 819445760,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011126670287922025,
+    "rss_end_bytes": 821198848,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.43749551475048e-05,
+    "rss_end_bytes": 821198848,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0013881250051781535,
+    "rss_end_bytes": 823738368,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.920789696276188e-05,
+    "rss_end_bytes": 823738368,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007966249249875546,
+    "rss_end_bytes": 826261504,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.354200351983309e-05,
+    "rss_end_bytes": 826261504,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006871660007163882,
+    "rss_end_bytes": 828784640,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.829209789633751e-05,
+    "rss_end_bytes": 828784640,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006175419548526406,
+    "rss_end_bytes": 831291392,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.045804522931576e-05,
+    "rss_end_bytes": 831291392,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006365840090438724,
+    "rss_end_bytes": 833798144,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.412501145154238e-05,
+    "rss_end_bytes": 833798144,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006843329174444079,
+    "rss_end_bytes": 836321280,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.070798892527819e-05,
+    "rss_end_bytes": 836321280,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0004277080297470093,
+    "rss_end_bytes": 837058560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.816699169576168e-05,
+    "rss_end_bytes": 837058560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0004587919684126973,
+    "rss_end_bytes": 837058560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.724998820573092e-05,
+    "rss_end_bytes": 837058560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009036660194396973,
+    "rss_end_bytes": 838631424,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.079106919467449e-05,
+    "rss_end_bytes": 838631424,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003248340217396617,
+    "rss_end_bytes": 838647808,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.891600787639618e-05,
+    "rss_end_bytes": 838647808,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0003933750558644533,
+    "rss_end_bytes": 838664192,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00016112509183585644,
+    "rss_end_bytes": 838664192,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010598329827189445,
+    "rss_end_bytes": 838746112,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.645801037549973e-05,
+    "rss_end_bytes": 838746112,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010976670309901237,
+    "rss_end_bytes": 841269248,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.966692257672548e-05,
+    "rss_end_bytes": 841269248,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011805000249296427,
+    "rss_end_bytes": 843792384,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.42920271679759e-05,
+    "rss_end_bytes": 843808768,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011261249892413616,
+    "rss_end_bytes": 846020608,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.949990686029196e-05,
+    "rss_end_bytes": 846020608,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012648330302909017,
+    "rss_end_bytes": 848543744,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.937499321997166e-05,
+    "rss_end_bytes": 848543744,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012016670079901814,
+    "rss_end_bytes": 849838080,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.31669894978404e-05,
+    "rss_end_bytes": 849887232,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012428340269252658,
+    "rss_end_bytes": 851394560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00014062505215406418,
+    "rss_end_bytes": 851394560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007542499806731939,
+    "rss_end_bytes": 851394560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.116697426885366e-05,
+    "rss_end_bytes": 851394560,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009328329470008612,
+    "rss_end_bytes": 852639744,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.354103192687035e-05,
+    "rss_end_bytes": 852639744,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009976249421015382,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.850001566112041e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008236250141635537,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.299993351101875e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007250419585034251,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.941701915115118e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000961333978921175,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.712503429502249e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007367919897660613,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.441596921533346e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000814083032310009,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.958407513797283e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009989169193431735,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.995904888957739e-05,
+    "rss_end_bytes": 853377024,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006902909372001886,
+    "rss_end_bytes": 853393408,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.029203698039055e-05,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007508340058848262,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.704109884798527e-05,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007995408959686756,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.825007196515799e-05,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008327499963343143,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.279201574623585e-05,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007019999902695417,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.679204620420933e-05,
+    "rss_end_bytes": 853409792,
+    "available_end_bytes": 2818949120
+  },
+  {
+    "stage": "read_image_2040",
+    "seconds": 0.0631689999718219,
+    "rss_end_bytes": 853753856,
+    "available_end_bytes": 2973548544
+  },
+  {
+    "stage": "prepare_image_2040",
+    "seconds": 19.664746333961375,
+    "rss_end_bytes": 799866880,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009325420251116157,
+    "rss_end_bytes": 800473088,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00014462496619671583,
+    "rss_end_bytes": 800505856,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011734169675037265,
+    "rss_end_bytes": 800522240,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.624997619539499e-05,
+    "rss_end_bytes": 800522240,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009156670421361923,
+    "rss_end_bytes": 800587776,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00016675004735589027,
+    "rss_end_bytes": 800587776,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011878750519827008,
+    "rss_end_bytes": 802668544,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.737493772059679e-05,
+    "rss_end_bytes": 802668544,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007015829905867577,
+    "rss_end_bytes": 802668544,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.999998681247234e-05,
+    "rss_end_bytes": 802668544,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008157080737873912,
+    "rss_end_bytes": 803028992,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.287501987069845e-05,
+    "rss_end_bytes": 803028992,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008226250065490603,
+    "rss_end_bytes": 803831808,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.612502668052912e-05,
+    "rss_end_bytes": 803831808,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006997089367359877,
+    "rss_end_bytes": 803864576,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.449998520314693e-05,
+    "rss_end_bytes": 803864576,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010482920333743095,
+    "rss_end_bytes": 803864576,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.695898577570915e-05,
+    "rss_end_bytes": 803864576,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006874159444123507,
+    "rss_end_bytes": 804405248,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00013420800678431988,
+    "rss_end_bytes": 804405248,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008283749921247363,
+    "rss_end_bytes": 804749312,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.270901162177324e-05,
+    "rss_end_bytes": 804749312,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007732500089332461,
+    "rss_end_bytes": 805535744,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.679099846631289e-05,
+    "rss_end_bytes": 805535744,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006691670278087258,
+    "rss_end_bytes": 805552128,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.545796688646078e-05,
+    "rss_end_bytes": 805552128,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006770000327378511,
+    "rss_end_bytes": 805847040,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.770908996462822e-05,
+    "rss_end_bytes": 805847040,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007007080130279064,
+    "rss_end_bytes": 805863424,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.60830007493496e-05,
+    "rss_end_bytes": 805863424,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007642080308869481,
+    "rss_end_bytes": 805879808,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.787494152784348e-05,
+    "rss_end_bytes": 805879808,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005784999812021852,
+    "rss_end_bytes": 805879808,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.287506014108658e-05,
+    "rss_end_bytes": 805879808,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012491249945014715,
+    "rss_end_bytes": 805896192,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001622500130906701,
+    "rss_end_bytes": 805896192,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008360829669982195,
+    "rss_end_bytes": 805928960,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.874991908669472e-05,
+    "rss_end_bytes": 805928960,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000738375005312264,
+    "rss_end_bytes": 805928960,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.462497498840094e-05,
+    "rss_end_bytes": 805945344,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008501659613102674,
+    "rss_end_bytes": 805961728,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.525000885128975e-05,
+    "rss_end_bytes": 805961728,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008898329688236117,
+    "rss_end_bytes": 806666240,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.916602771729231e-05,
+    "rss_end_bytes": 806666240,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0013937919866293669,
+    "rss_end_bytes": 808534016,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.029094897210598e-05,
+    "rss_end_bytes": 808534016,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.00110354193020612,
+    "rss_end_bytes": 809385984,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00011483300477266312,
+    "rss_end_bytes": 809385984,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005788339767605066,
+    "rss_end_bytes": 809582592,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.487507537007332e-05,
+    "rss_end_bytes": 809582592,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007712499937042594,
+    "rss_end_bytes": 810188800,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.874995935708284e-05,
+    "rss_end_bytes": 810188800,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007919169729575515,
+    "rss_end_bytes": 810221568,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.895799353718758e-05,
+    "rss_end_bytes": 810237952,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006633331067860126,
+    "rss_end_bytes": 810270720,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.075009100139141e-05,
+    "rss_end_bytes": 810287104,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009398750262334943,
+    "rss_end_bytes": 812449792,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.450006134808064e-05,
+    "rss_end_bytes": 812449792,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006611659191548824,
+    "rss_end_bytes": 812466176,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.704203017055988e-05,
+    "rss_end_bytes": 812466176,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011329170083627105,
+    "rss_end_bytes": 814022656,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001248749904334545,
+    "rss_end_bytes": 814022656,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007704580202698708,
+    "rss_end_bytes": 814268416,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.875007577240467e-05,
+    "rss_end_bytes": 814268416,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007096249610185623,
+    "rss_end_bytes": 814268416,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.745798211544752e-05,
+    "rss_end_bytes": 814268416,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000990708009339869,
+    "rss_end_bytes": 816676864,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.491698488593102e-05,
+    "rss_end_bytes": 816676864,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000914291013032198,
+    "rss_end_bytes": 819085312,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.387495134025812e-05,
+    "rss_end_bytes": 819085312,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0011377910850569606,
+    "rss_end_bytes": 819707904,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.283299393951893e-05,
+    "rss_end_bytes": 819724288,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000878416933119297,
+    "rss_end_bytes": 820871168,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00013924995437264442,
+    "rss_end_bytes": 820871168,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008279170142486691,
+    "rss_end_bytes": 821985280,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.50829528644681e-05,
+    "rss_end_bytes": 821985280,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006782499840483069,
+    "rss_end_bytes": 822001664,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.054100908339024e-05,
+    "rss_end_bytes": 822001664,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006801249692216516,
+    "rss_end_bytes": 822034432,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.908399518579245e-05,
+    "rss_end_bytes": 822034432,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009298340883105993,
+    "rss_end_bytes": 824426496,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.474992889910936e-05,
+    "rss_end_bytes": 824426496,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006285419221967459,
+    "rss_end_bytes": 824426496,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.970805745571852e-05,
+    "rss_end_bytes": 824426496,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0005863329861313105,
+    "rss_end_bytes": 824442880,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.30419997125864e-05,
+    "rss_end_bytes": 824442880,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0014427501009777188,
+    "rss_end_bytes": 826851328,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00014454207848757505,
+    "rss_end_bytes": 826851328,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007846250664442778,
+    "rss_end_bytes": 826884096,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.970790077000856e-05,
+    "rss_end_bytes": 826884096,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000683416030369699,
+    "rss_end_bytes": 826884096,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.38329254090786e-05,
+    "rss_end_bytes": 826884096,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.001010957988910377,
+    "rss_end_bytes": 829292544,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.858395110815763e-05,
+    "rss_end_bytes": 829292544,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010358330328017473,
+    "rss_end_bytes": 832143360,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.0001692919759079814,
+    "rss_end_bytes": 832143360,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007609580643475056,
+    "rss_end_bytes": 832143360,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.991698268800974e-05,
+    "rss_end_bytes": 832143360,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010177500080317259,
+    "rss_end_bytes": 832159744,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.041698649525642e-05,
+    "rss_end_bytes": 832176128,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.000757250003516674,
+    "rss_end_bytes": 832176128,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.620803080499172e-05,
+    "rss_end_bytes": 832176128,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006339160026982427,
+    "rss_end_bytes": 832192512,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.429101970046759e-05,
+    "rss_end_bytes": 832192512,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006581250345334411,
+    "rss_end_bytes": 832192512,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 6.850005593150854e-05,
+    "rss_end_bytes": 832192512,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006068330258131027,
+    "rss_end_bytes": 832225280,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.483398076146841e-05,
+    "rss_end_bytes": 832225280,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0009235830511897802,
+    "rss_end_bytes": 832225280,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 9.058299474418163e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0006538749439641833,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00012070802040398121,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012037919368594885,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.537492249161005e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007807499496266246,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.291599806398153e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007958749774843454,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 7.954204920679331e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0007902079960331321,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.208293002098799e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0012917080894112587,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.425000123679638e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0010606669820845127,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 0.00013445899821817875,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "summarize_attribute",
+    "seconds": 0.0008536250097677112,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "merge_summary",
+    "seconds": 8.695805445313454e-05,
+    "rss_end_bytes": 832258048,
+    "available_end_bytes": 2968911872
+  },
+  {
+    "stage": "fit_stats_total",
+    "seconds": 58.808596416027285,
+    "rss_end_bytes": 800669696,
+    "available_end_bytes": 2968911872
+  }
+]

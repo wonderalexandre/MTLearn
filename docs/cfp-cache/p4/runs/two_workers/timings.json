@@ -1,0 +1,14 @@
+[
+  {
+    "stage": "cold_prepare",
+    "seconds": 43.17662912502419,
+    "rss_end_bytes": 213827584,
+    "available_end_bytes": 4856184832
+  },
+  {
+    "stage": "warm_resume",
+    "seconds": 0.7909395419992507,
+    "rss_end_bytes": 252854272,
+    "available_end_bytes": 4850827264
+  }
+]

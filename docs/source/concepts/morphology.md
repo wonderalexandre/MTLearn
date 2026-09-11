@@ -32,29 +32,29 @@ as `"self-dual"`, `"min4c-max8c"`, and `"min8c-max4c"`.
 `NodeId` values identify nodes in the morphology backend. Some arrays are
 indexed by live tree nodes, while attribute and CFP arrays usually use the
 backend node-slot domain. When allocating a node-indexed criterion, attribute
-vector, or CFP tensor, use `numInternalNodeSlots` rather than `numNodes`.
+vector, or CFP tensor, use `num_internal_node_slots` rather than `num_nodes`.
 
 The distinction matters after pruning or merging: a tree can have inactive
 slots even when the live node count changes.
 
 ## Proper Parts
 
-Proper parts are pixel-level ownership elements used by the backend topology.
-For ordinary 2D image use, they can be understood as flattened image pixels
-owned by tree nodes. Methods such as `proper_part_owner_of(pixel_id)` expose
-this mapping for inspection and debugging.
+The proper part of a node is the set of pixels in its support that do not
+belong to the support of any child. Each pixel belongs to one proper part.
+`smallest_node(pixel_id)` returns the node whose proper part contains that
+pixel.
 
 ## Scalar Attributes and Groups
 
 A scalar attribute is one node-level measurement such as `AREA`,
-`GRAY_HEIGHT`, `COMPACTNESS`, or `CONTOUR_PERIMETER`.
+`GRAY_LEVEL_HEIGHT`, `COMPACTNESS`, or `CONTOUR_PERIMETER`.
 
 An attribute group is a named bundle of scalar attributes, such as
 `AttributeGroup.SHAPE` or `AttributeGroup.TREE_TOPOLOGY`. Groups are expanded
 before attribute computation or CFP parameter construction.
 
-For tree-of-shapes CFP filters, the current backend omits unsupported scalar
-members such as explicit `MAX_DIST` when expanding broad groups.
+Distance-transform attributes, including `MAX_DIST`, support trees of shapes.
+Groups expand to their complete scalar attribute sets.
 
 See {doc}`attributes` for the user-facing attribute catalog.
 

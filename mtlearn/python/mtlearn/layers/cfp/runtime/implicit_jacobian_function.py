@@ -1,4 +1,4 @@
-"""Compatibility autograd function for implicit CFP reconstruction."""
+"""Affine CFP autograd function using compact preorder reconstruction."""
 
 from __future__ import annotations
 
@@ -12,18 +12,19 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
 
     The forward reconstruction is mathematically equivalent to
     ``J.T @ filtered_residues`` where ``J`` is the dense node-to-pixel
-    Jacobian, but the implementation uses tree entry/exit times and a prefix
-    scan instead of materializing ``J``.
+    Jacobian, but the implementation uses compact preorder intervals and a
+    prefix scan instead of materializing ``J``.
     """
 
     @staticmethod
-    def forward_from_info(filtered_res, tpre, tpost, node_of_pixel, parent, order_forward=None):
+    def forward_from_info(filtered_res, tpre, tpost, node_of_pixel):
         """Reconstruct pixels from filtered residues without a dense Jacobian."""
-        return reconstruct_from_info(filtered_res, tpre, tpost, node_of_pixel, parent, order_forward)
+        return reconstruct_from_info(filtered_res, tpre, tpost, node_of_pixel)
 
-    def backward_from_info(grad_output, tpre, tpost, parent, node_of_pixel, order_pre=None):
+    @staticmethod
+    def backward_from_info(grad_output, tpre, tpost, node_of_pixel):
         """Propagate pixel gradients back to tree nodes without a dense matrix."""
-        return propagate_pixels_to_nodes(grad_output, tpre, tpost, parent, node_of_pixel, order_pre)
+        return propagate_pixels_to_nodes(grad_output, tpre, tpost, node_of_pixel)
 
     @staticmethod
     def forward(
@@ -33,7 +34,6 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         residues,
         tpre,
         tpost,
-        parent,
         node_of_pixel,
         attrs2d,
         num_rows: int,
@@ -41,8 +41,6 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         score_sharpness: float = 1.0,
         clamp_min=None,
         clamp_max=None,
-        order_forward=None,
-        order_backward=None,
     ):
         """Apply the connected filter using implicit reconstruction metadata."""
         logits = attrs2d @ weight.view(-1) + bias
@@ -66,31 +64,25 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
             tpre,
             tpost,
             node_of_pixel,
-            parent,
-            order_forward,
         )
         y_2d = y.reshape(num_rows, num_cols)
 
-        ctx.save_for_backward(attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, parent, node_of_pixel)
+        ctx.save_for_backward(attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, node_of_pixel)
         ctx.score_sharpness = score_sharpness
-        ctx.order_backward = order_backward
         return y_2d
 
     @staticmethod
     def backward(ctx, grad_output):
         """Compute gradients for the learnable criterion parameters."""
-        attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, parent, node_of_pixel = ctx.saved_tensors
+        attrs2d, residues, sigmoid, clamp_mask, tpre, tpost, node_of_pixel = ctx.saved_tensors
         score_sharpness = ctx.score_sharpness
-        order_backward = ctx.order_backward
         grad_output_flat = grad_output.flatten()
 
         grad_nodes = ConnectedFilterPreprocessingImplicitJacobianFunction.backward_from_info(
             grad_output_flat,
             tpre,
             tpost,
-            parent,
             node_of_pixel,
-            order_backward,
         )
 
         d_sigmoid = sigmoid * (1 - sigmoid)
@@ -100,20 +92,4 @@ class ConnectedFilterPreprocessingImplicitJacobianFunction(torch.autograd.Functi
         dW = attrs2d.T @ grad_s
         dB = grad_s.sum().view(1)
 
-        return (
-            dW,
-            dB,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        return dW, dB, None, None, None, None, None, None, None, None, None, None

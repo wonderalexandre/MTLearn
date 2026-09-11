@@ -11,10 +11,10 @@ For the full attribute list, see {doc}`../concepts/attributes`.
 | Intent | Candidate attributes |
 | --- | --- |
 | Remove small components | `AREA`, `VOLUME` |
-| Prefer contrast in the tree | `GRAY_HEIGHT`, `RELATIVE_VOLUME` |
+| Prefer contrast in the tree | `GRAY_LEVEL_HEIGHT`, `RELATIVE_VOLUME` |
 | Prefer elongated or compact shapes | `COMPACTNESS`, `ECCENTRICITY`, `RATIO_WH` |
-| Use bounding-box geometry | `BOX_WIDTH`, `BOX_HEIGHT`, `RECTANGULARITY` |
-| Use tree position | `DEPTH_NODE`, `HEIGHT_NODE`, `NUM_CHILDREN_NODE` |
+| Use bounding-box geometry | `BOX_WIDTH`, `BOUNDING_BOX_HEIGHT`, `RECTANGULARITY` |
+| Use tree position | `DEPTH_NODE`, `SUBTREE_HEIGHT`, `NUM_CHILDREN_NODE` |
 | Use contours | `CONTOUR_PERIMETER`, `CONTOUR_PIXELS` |
 
 Example:
@@ -25,7 +25,7 @@ from mtlearn.layers import ConnectedFilterPreprocessingLayer
 
 shape_and_contrast = [
     morphology.AttributeType.AREA,
-    morphology.AttributeType.GRAY_HEIGHT,
+    morphology.AttributeType.GRAY_LEVEL_HEIGHT,
     morphology.AttributeType.COMPACTNESS,
 ]
 ```
@@ -51,13 +51,15 @@ mixed_spec = {
 }
 ```
 
-The number of trainable weights for a spec equals the number of scalar
-attributes after expansion.
+For the default linear sigmoid model, a spec has one trainable weight per
+scalar attribute after expansion, plus one bias. For an MLP, the parameter
+count also depends on its hidden layers.
 
 ```python
 layer = ConnectedFilterPreprocessingLayer(
     in_channels=1,
     filter_specs=[mixed_spec],
+    scale_mode="none",
 )
 
 parameter_contract = layer.get_parameter_contract()
@@ -66,7 +68,7 @@ print(parameter_contract["weights"]["shape_plus_depth"])
 
 ## Naming Specs
 
-Use explicit names. They become keys in parameter contracts, exported
+Use explicit names. They become keys in parameter dictionaries, exported
 metadata, checkpoint contracts, and inspection output.
 
 ```python
@@ -76,18 +78,18 @@ filter_specs = [
         "tree_type": "max-tree",
         "attributes": [
             morphology.AttributeType.AREA,
-            morphology.AttributeType.GRAY_HEIGHT,
+            morphology.AttributeType.GRAY_LEVEL_HEIGHT,
         ],
     },
     {
-        "name": "min_area_tophat",
+        "name": "min_area",
         "tree_type": "min-tree",
         "attributes": morphology.AttributeType.AREA,
     },
 ]
 ```
 
-Avoid relying on generated names such as `filter_0` in long-running
+Avoid relying on generated names such as `spec_000` in long-running
 experiments because reordering specs changes the meaning of saved weights.
 
 ## Tree-of-Shapes Specs
@@ -100,7 +102,7 @@ experiments matters.
 tos_spec = {
     "name": "tos_shape",
     "tree_type": "tree-of-shapes",
-    "tos_interpolation": morphology.ToSInterpolation.SelfDual,
+    "tos_interpolation": morphology.ToSInterpolation.SELF_DUAL,
     "attributes": [
         morphology.AttributeType.AREA,
         morphology.AttributeType.COMPACTNESS,
@@ -108,9 +110,8 @@ tos_spec = {
 }
 ```
 
-The current CFP validation rejects scalar attributes that are undefined for
-tree-of-shapes. Broad groups may be expanded with unsupported members removed
-when the backend exposes a safe group-level fallback.
+Groups expand to their complete scalar attribute sets for trees of shapes.
+Distance-transform attributes, including `MAX_DIST`, are supported.
 
 ## Config Round Trip
 
@@ -123,8 +124,8 @@ restored = ConnectedFilterPreprocessingLayer.from_config(config)
 ```
 
 This is the same config shape used by checkpoint helpers. It records tree type,
-attributes, scoring model, constraints, regularizers, normalization mode, clamp
-bounds, and clipped z-score normalization constants.
+attributes, scoring model, score sharpness, constraints, regularizers,
+normalization mode, clamp bounds, and clipped z-score settings.
 
 ## Practical Checklist
 
@@ -132,5 +133,5 @@ bounds, and clipped z-score normalization constants.
 - Name every spec before training.
 - Keep max-tree and min-tree specs separate when polarity matters.
 - Use tree-of-shapes when polarity should not matter.
-- For `"dataset_clipped_zscore01"` normalization, build or load dataset stats before training.
-- Inspect one sample before large experiments to confirm attributes and gates.
+- For statistical normalization, fit or load training-set statistics before training.
+- Inspect one sample before large experiments to confirm attributes and scores.

@@ -250,6 +250,56 @@ def test_mlp_scorer_forward_backpropagates():
     assert all(torch.isfinite(gradient).all() for gradient in gradients)
 
 
+@pytest.mark.parametrize("hidden_units", [(), (8,), (8, 3)])
+@pytest.mark.parametrize("num_nodes", [1, 18])
+def test_mlp_mps_scores_and_gradients_match_cpu(hidden_units, num_nodes):
+    if not torch.backends.mps.is_available():
+        pytest.skip("MPS is not available")
+
+    cpu = cfp.MLPScorer(2, hidden_units=hidden_units, activation="tanh", score_sharpness=1.5)
+    with torch.no_grad():
+        for index, parameter in enumerate(cpu.parameters()):
+            parameter.copy_(torch.linspace(-0.2, 0.3, parameter.numel()).reshape_as(parameter) + 0.02 * index)
+    mps = cfp.MLPScorer(2, hidden_units=hidden_units, activation="tanh", score_sharpness=1.5)
+    mps.load_state_dict(cpu.state_dict())
+    mps.to("mps")
+    features = torch.linspace(-0.4, 0.6, num_nodes * 2).reshape(num_nodes, 2).requires_grad_()
+    mps_features = features.detach().to("mps").requires_grad_()
+    probe = torch.linspace(0.2, 0.8, num_nodes)
+
+    expected = cpu(features)
+    actual = mps(mps_features)
+    (expected * probe).sum().backward()
+    (actual * probe.to("mps")).sum().backward()
+
+    torch.testing.assert_close(actual.cpu(), expected, rtol=1e-4, atol=1e-5)
+    torch.testing.assert_close(mps_features.grad.cpu(), features.grad, rtol=1e-4, atol=1e-5)
+    assert mps.state_dict().keys() == cpu.state_dict().keys()
+    for name, parameter in mps.named_parameters():
+        expected_parameter = dict(cpu.named_parameters())[name]
+        torch.testing.assert_close(parameter.grad.cpu(), expected_parameter.grad, rtol=1e-4, atol=1e-5)
+
+
+def test_mlp_mps_autocast_preserves_logit_dtype_and_bias_gradient():
+    if not torch.backends.mps.is_available():
+        pytest.skip("MPS is not available")
+    if not hasattr(torch.amp, "is_autocast_available") or not torch.amp.is_autocast_available("mps"):
+        pytest.skip("MPS autocast is not available")
+
+    scorer = cfp.MLPScorer(2, hidden_units=(), device="mps")
+    with torch.no_grad():
+        scorer.network[0].weight.zero_()
+        scorer.network[0].bias.fill_(0.5)
+    features = torch.zeros((3, 2), device="mps")
+
+    with torch.autocast("mps", dtype=torch.float16):
+        logits = scorer.logits(features)
+    assert logits.dtype == torch.float16
+    torch.testing.assert_close(logits.cpu(), torch.full((3,), 0.5, dtype=torch.float16))
+    logits.sum().backward()
+    torch.testing.assert_close(scorer.network[0].bias.grad.cpu(), torch.tensor([3.0]))
+
+
 def test_mlp_scorer_initializes_close_to_identity_without_cutting_gradients():
     torch.manual_seed(0)
     scorer = cfp.MLPScorer(num_features=2, hidden_units=(3,), activation="tanh", score_sharpness=1.5)
@@ -530,7 +580,7 @@ def test_config_deserializer_resolves_serialized_layer_kwargs():
                     "name": "tos_mean",
                     "tree_type": "tree-of-shapes",
                     "attributes": ["BOUNDARY"],
-                    "tos_interpolation": "Min8cMax4c",
+                    "tos_interpolation": "MIN8_MAX4",
                     "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.25}],
                 }
             ],
@@ -544,7 +594,7 @@ def test_config_deserializer_resolves_serialized_layer_kwargs():
     assert kwargs["scale_mode"] == "none"
     assert spec["name"] == "tos_mean"
     assert spec["attributes"] == (morphology.AttributeGroup.BOUNDARY,)
-    assert spec["tos_interpolation"] == morphology.ToSInterpolation.Min8cMax4c
+    assert spec["tos_interpolation"] == morphology.ToSInterpolation.MIN8_MAX4
     assert spec["regularizers"] == [{"kind": "edge_score_monotonicity", "weight": 0.25}]
 
 
@@ -572,7 +622,7 @@ def test_filter_spec_normalizer_builds_internal_spec_contract():
                 "scoring": {"kind": "linear_sigmoid"},
                 "constraints": ["preserve_root"],
                 "regularizers": [{"kind": "edge_score_monotonicity", "weight": 0.25}],
-                "tos_interpolation": morphology.ToSInterpolation.Min8cMax4c,
+                "tos_interpolation": morphology.ToSInterpolation.MIN8_MAX4,
                 "tos_infinity_seed_row": 1,
                 "tos_infinity_seed_col": 2,
             }
@@ -587,7 +637,7 @@ def test_filter_spec_normalizer_builds_internal_spec_contract():
     assert spec.index == 0
     assert spec.key == "tos_boundary"
     assert spec.tree_type == "tree-of-shapes"
-    assert spec.tree_key == "tree-of-shapes|Min8cMax4c|1|2"
+    assert spec.tree_key == "tree-of-shapes|MIN8_MAX4|1|2"
     assert morphology.AttributeType.MAX_DIST not in spec.attributes
     assert isinstance(spec.scoring_model, cfp.LinearSigmoidScorer)
     assert spec.constraint_configs == ({"kind": "preserve_root"},)

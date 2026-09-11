@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-09-09T15:31:00.808526-03:00",
+  "dataset": "/Volumes/SSD/GitHub/Dennis/dataset_patches/205_SA_L3D14M3",
+  "inputs": 2048,
+  "targets": 2041,
+  "paired_count": 2041,
+  "first_paired_id": 0,
+  "last_paired_id": 2040,
+  "missing_targets": [
+    2041,
+    2042,
+    2043,
+    2044,
+    2045,
+    2046,
+    2047
+  ],
+  "missing_inputs": [],
+  "png_header_counts": {
+    "enhancement": {
+      "2748x2748;bit_depth=8;color_type=0": 2048
+    },
+    "frag_component": {
+      "2748x2748;bit_depth=8;color_type=0": 2041
+    }
+  },
+  "compressed_file_bytes": {
+    "enhancement": 7980248549,
+    "frag_component": 97962134
+  },
+  "method": "Names plus PNG IHDR headers, no full-dataset image decoding or cache construction."
+}

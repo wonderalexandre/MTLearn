@@ -1,0 +1,8 @@
+{"stage": "statistics_from_summaries", "seconds": 0.005449999938718975, "rss_end_bytes": 250757120, "available_end_bytes": 3930210304}
+{"stage": "read_image_0", "seconds": 0.057315667043440044, "rss_end_bytes": 314523648, "available_end_bytes": 3930882048}
+{"stage": "load_prepared_0", "seconds": 0.3428930409718305, "rss_end_bytes": 320094208, "available_end_bytes": 3930882048}
+{"stage": "linear_forward_0", "seconds": 0.2807020420441404, "rss_end_bytes": 294633472, "available_end_bytes": 3930882048, "mps_active_bytes": 328130816, "mps_driver_bytes": 1103855616}
+{"stage": "linear_backward_0", "seconds": 0.14855670800898224, "rss_end_bytes": 307642368, "available_end_bytes": 2947776512, "mps_active_bytes": 66907392, "mps_driver_bytes": 1141620736}
+{"stage": "mlp_forward_0", "seconds": 0.18448758299928159, "rss_end_bytes": 324943872, "available_end_bytes": 2906832896, "mps_active_bytes": 358401536, "mps_driver_bytes": 1145815040}
+{"stage": "mlp_backward_0", "seconds": 0.044719083001837134, "rss_end_bytes": 330317824, "available_end_bytes": 2906832896, "mps_active_bytes": 66972416, "mps_driver_bytes": 1143717888}
+P3_SSD_PASS

@@ -1,0 +1,274 @@
+{
+  "final_cancel": {
+    "monitor": {
+      "command": [
+        "/opt/anaconda3/bin/python",
+        "/Volumes/SSD/GitHub/mtlearn/scripts/benchmarks/cfp_cache_p3.py",
+        "--worker",
+        "--build-dir",
+        "build/cfp-cache-p0-release",
+        "--dataset",
+        "/Volumes/SSD/GitHub/Dennis/dataset_patches/205_SA_L3D14M3",
+        "--output",
+        "docs/cfp-cache/p3/runs/final_cancel",
+        "--cache-dir",
+        "build/cfp-cache-p3-validated",
+        "--phase",
+        "first",
+        "--device",
+        "cpu",
+        "--consume-count",
+        "3"
+      ],
+      "returncode": 0,
+      "stop_reason": null,
+      "elapsed_s": 22.53288924996741,
+      "rss_peak_bytes": 1187774464,
+      "available_min_bytes": 3167076352,
+      "sampling_interval_s": 0.1,
+      "limits": {
+        "max_rss_gib": 4.0,
+        "min_available_gib": 1.0,
+        "timeout_s": 600
+      }
+    },
+    "counts": {
+      "prepare": 1,
+      "summaries": 1,
+      "model_statistics_updates": 0
+    },
+    "contributions": 1,
+    "after": {
+      "max_bytes": 0,
+      "retained_bytes": 0,
+      "entries": 0,
+      "hits": 0,
+      "misses": 1,
+      "evictions": 0,
+      "oversized_entries": 1,
+      "active_entries": 0,
+      "active_bytes": 0,
+      "active_not_retained_bytes": 0,
+      "live_bytes": 0,
+      "ram_hits": 0,
+      "disk_hits": 0,
+      "writes": 1,
+      "invalid_entries": 0,
+      "disk_entries": 1,
+      "entry_states": {
+        "valid": 1
+      },
+      "disk_bytes": 267551633,
+      "manifest_bytes": 144016,
+      "max_disk_bytes": 1073741824,
+      "readonly": false
+    },
+    "statistics_match_p1": false,
+    "mps_active_stage_max": 0,
+    "mps_driver_stage_max": 0
+  },
+  "final_resume": {
+    "monitor": {
+      "command": [
+        "/opt/anaconda3/bin/python",
+        "/Volumes/SSD/GitHub/mtlearn/scripts/benchmarks/cfp_cache_p3.py",
+        "--worker",
+        "--build-dir",
+        "build/cfp-cache-p0-release",
+        "--dataset",
+        "/Volumes/SSD/GitHub/Dennis/dataset_patches/205_SA_L3D14M3",
+        "--output",
+        "docs/cfp-cache/p3/runs/final_resume",
+        "--cache-dir",
+        "build/cfp-cache-p3-validated",
+        "--phase",
+        "resume",
+        "--device",
+        "cpu",
+        "--consume-count",
+        "3"
+      ],
+      "returncode": 0,
+      "stop_reason": null,
+      "elapsed_s": 43.373032166971825,
+      "rss_peak_bytes": 1240711168,
+      "available_min_bytes": 3354820608,
+      "sampling_interval_s": 0.1,
+      "limits": {
+        "max_rss_gib": 4.0,
+        "min_available_gib": 1.0,
+        "timeout_s": 600
+      }
+    },
+    "counts": {
+      "prepare": 2,
+      "summaries": 2,
+      "model_statistics_updates": 0
+    },
+    "contributions": 3,
+    "after": {
+      "max_bytes": 0,
+      "retained_bytes": 0,
+      "entries": 0,
+      "hits": 1,
+      "misses": 2,
+      "evictions": 0,
+      "oversized_entries": 3,
+      "active_entries": 0,
+      "active_bytes": 0,
+      "active_not_retained_bytes": 0,
+      "live_bytes": 0,
+      "ram_hits": 0,
+      "disk_hits": 1,
+      "writes": 2,
+      "invalid_entries": 0,
+      "disk_entries": 3,
+      "entry_states": {
+        "valid": 3
+      },
+      "disk_bytes": 752414771,
+      "manifest_bytes": 189024,
+      "max_disk_bytes": 1073741824,
+      "readonly": false
+    },
+    "statistics_match_p1": true,
+    "mps_active_stage_max": 0,
+    "mps_driver_stage_max": 0
+  },
+  "final_read_cpu": {
+    "monitor": {
+      "command": [
+        "/opt/anaconda3/bin/python",
+        "/Volumes/SSD/GitHub/mtlearn/scripts/benchmarks/cfp_cache_p3.py",
+        "--worker",
+        "--build-dir",
+        "build/cfp-cache-p0-release",
+        "--dataset",
+        "/Volumes/SSD/GitHub/Dennis/dataset_patches/205_SA_L3D14M3",
+        "--output",
+        "docs/cfp-cache/p3/runs/final_read_cpu",
+        "--cache-dir",
+        "build/cfp-cache-p3-validated",
+        "--phase",
+        "consume",
+        "--device",
+        "cpu",
+        "--consume-count",
+        "3"
+      ],
+      "returncode": 0,
+      "stop_reason": null,
+      "elapsed_s": 3.9654786660103127,
+      "rss_peak_bytes": 1274560512,
+      "available_min_bytes": 3757146112,
+      "sampling_interval_s": 0.1,
+      "limits": {
+        "max_rss_gib": 4.0,
+        "min_available_gib": 1.0,
+        "timeout_s": 600
+      }
+    },
+    "counts": {
+      "prepare": 0,
+      "summaries": 0,
+      "model_statistics_updates": 0
+    },
+    "contributions": 3,
+    "after": {
+      "max_bytes": 0,
+      "retained_bytes": 0,
+      "entries": 0,
+      "hits": 3,
+      "misses": 0,
+      "evictions": 0,
+      "oversized_entries": 3,
+      "active_entries": 0,
+      "active_bytes": 0,
+      "active_not_retained_bytes": 0,
+      "live_bytes": 0,
+      "ram_hits": 0,
+      "disk_hits": 3,
+      "writes": 0,
+      "invalid_entries": 0,
+      "disk_entries": 3,
+      "entry_states": {
+        "valid": 3
+      },
+      "disk_bytes": 752414771,
+      "manifest_bytes": 106496,
+      "max_disk_bytes": null,
+      "readonly": true
+    },
+    "statistics_match_p1": true,
+    "mps_active_stage_max": 0,
+    "mps_driver_stage_max": 0
+  },
+  "final_read_mps": {
+    "monitor": {
+      "command": [
+        "/opt/anaconda3/bin/python",
+        "/Volumes/SSD/GitHub/mtlearn/scripts/benchmarks/cfp_cache_p3.py",
+        "--worker",
+        "--build-dir",
+        "build/cfp-cache-p0-release",
+        "--dataset",
+        "/Volumes/SSD/GitHub/Dennis/dataset_patches/205_SA_L3D14M3",
+        "--output",
+        "docs/cfp-cache/p3/runs/final_read_mps",
+        "--cache-dir",
+        "build/cfp-cache-p3-validated",
+        "--phase",
+        "consume",
+        "--device",
+        "mps",
+        "--consume-count",
+        "1"
+      ],
+      "returncode": 0,
+      "stop_reason": null,
+      "elapsed_s": 2.5657787079690024,
+      "rss_peak_bytes": 362430464,
+      "available_min_bytes": 2906832896,
+      "sampling_interval_s": 0.1,
+      "limits": {
+        "max_rss_gib": 4.0,
+        "min_available_gib": 1.0,
+        "timeout_s": 600
+      }
+    },
+    "counts": {
+      "prepare": 0,
+      "summaries": 0,
+      "model_statistics_updates": 0
+    },
+    "contributions": 3,
+    "after": {
+      "max_bytes": 0,
+      "retained_bytes": 0,
+      "entries": 0,
+      "hits": 1,
+      "misses": 0,
+      "evictions": 0,
+      "oversized_entries": 1,
+      "active_entries": 0,
+      "active_bytes": 0,
+      "active_not_retained_bytes": 0,
+      "live_bytes": 0,
+      "ram_hits": 0,
+      "disk_hits": 1,
+      "writes": 0,
+      "invalid_entries": 0,
+      "disk_entries": 3,
+      "entry_states": {
+        "valid": 3
+      },
+      "disk_bytes": 752414771,
+      "manifest_bytes": 106496,
+      "max_disk_bytes": null,
+      "readonly": true
+    },
+    "statistics_match_p1": true,
+    "mps_active_stage_max": 358401536,
+    "mps_driver_stage_max": 1145815040
+  }
+}

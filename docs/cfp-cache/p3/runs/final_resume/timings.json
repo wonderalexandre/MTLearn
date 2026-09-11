@@ -1,0 +1,50 @@
+[
+  {
+    "stage": "read_image_0",
+    "seconds": 0.06013487500604242,
+    "rss_end_bytes": 302907392,
+    "available_end_bytes": 3946725376
+  },
+  {
+    "stage": "read_image_1000",
+    "seconds": 0.07957670895848423,
+    "rss_end_bytes": 320176128,
+    "available_end_bytes": 3914563584
+  },
+  {
+    "stage": "prepare_1000",
+    "seconds": 19.659394707996398,
+    "rss_end_bytes": 920797184,
+    "available_end_bytes": 3588308992
+  },
+  {
+    "stage": "summarize_1000",
+    "seconds": 0.036232874961569905,
+    "rss_end_bytes": 991461376,
+    "available_end_bytes": 3588308992
+  },
+  {
+    "stage": "read_image_2040",
+    "seconds": 0.06306525005493313,
+    "rss_end_bytes": 995180544,
+    "available_end_bytes": 3511549952
+  },
+  {
+    "stage": "prepare_2040",
+    "seconds": 20.20993999997154,
+    "rss_end_bytes": 844021760,
+    "available_end_bytes": 3491479552
+  },
+  {
+    "stage": "summarize_2040",
+    "seconds": 0.05236445798072964,
+    "rss_end_bytes": 938590208,
+    "available_end_bytes": 3491479552
+  },
+  {
+    "stage": "resume_pass",
+    "seconds": 42.091971916961484,
+    "rss_end_bytes": 751616000,
+    "available_end_bytes": 3482550272
+  }
+]

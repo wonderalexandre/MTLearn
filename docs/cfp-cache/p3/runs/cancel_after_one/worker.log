@@ -1,0 +1,5 @@
+{"stage": "read_image_0", "seconds": 0.06397695897612721, "rss_end_bytes": 304513024, "available_end_bytes": 3782967296}
+{"stage": "prepare_0", "seconds": 19.265226874966174, "rss_end_bytes": 801865728, "available_end_bytes": 3556671488}
+{"stage": "summarize_0", "seconds": 0.05280095792841166, "rss_end_bytes": 890847232, "available_end_bytes": 3614375936}
+{"stage": "first_pass", "seconds": 20.280959667055868, "rss_end_bytes": 806993920, "available_end_bytes": 3715874816}
+P3_SSD_PASS

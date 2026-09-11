@@ -1,0 +1,78 @@
+* Getting build dependencies for sdist...
+* Building sdist...
+*** scikit-build-core 0.12.2 (sdist)
+* Building wheel from sdist
+* Getting build dependencies for wheel...
+* Building wheel...
+*** scikit-build-core 0.12.2 using CMake 4.3.3 (wheel)
+*** Configuring CMake...
+loading initial cache file /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/build/CMakeInit.txt
+-- The CXX compiler identification is AppleClang 21.0.0.21000101
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Internal API refactoring metadata not found; metadata-backed audit checks are disabled.
+-- mmcfilters defensive contract mode: CHECKED
+CMake Warning (dev) at /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/FindPythonLibsNew.cmake:101 (message):
+  Policy CMP0148 is not set: The FindPythonInterp and FindPythonLibs modules
+  are removed.  Run "cmake --help-policy CMP0148" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning, or
+  preferably upgrade to using FindPython, either by calling it explicitly
+  before pybind11, or by setting PYBIND11_FINDPYTHON ON before pybind11.
+Call Stack (most recent call first):
+  /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/pybind11Tools.cmake:44 (find_package)
+  /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:237 (include)
+  /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/pybind11Config.cmake:257 (include)
+  mtlearn/bindings/CMakeLists.txt:5 (find_package)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Deprecation Warning at /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/FindPythonLibsNew.cmake:110 (cmake_policy):
+  The OLD behavior for policy CMP0148 will be removed from a future version
+  of CMake.
+
+  The cmake-policies(7) manual explains that the OLD behaviors of all
+  policies are deprecated and that a policy should be set to OLD only under
+  specific short-term circumstances.  Projects should be ported to the NEW
+  behavior and not rely on setting a policy to OLD.
+Call Stack (most recent call first):
+  /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/pybind11Tools.cmake:44 (find_package)
+  /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:237 (include)
+  /opt/anaconda3/lib/python3.12/site-packages/pybind11/share/cmake/pybind11/pybind11Config.cmake:257 (include)
+  mtlearn/bindings/CMakeLists.txt:5 (find_package)
+
+
+-- Found PythonLibs: /opt/anaconda3/lib/libpython3.12.dylib
+-- Performing Test HAS_FLTO_THIN
+-- Performing Test HAS_FLTO_THIN - Success
+-- Performing Test HAS_FLTO
+-- Performing Test HAS_FLTO - Success
+CMake Warning at /opt/anaconda3/lib/python3.12/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:22 (message):
+  static library kineto_LIBRARY-NOTFOUND not found.
+Call Stack (most recent call first):
+  /opt/anaconda3/lib/python3.12/site-packages/torch/share/cmake/Torch/TorchConfig.cmake:125 (append_torchlib_if_found)
+  mtlearn/bindings/CMakeLists.txt:20 (find_package)
+
+
+-- Found Torch: /opt/anaconda3/lib/python3.12/site-packages/torch/lib/libtorch.dylib
+-- Configuring done (0.9s)
+-- Generating done (0.0s)
+-- Build files have been written to: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/build
+*** Building project with Ninja...
+[1/4] Building CXX object mtlearn/src/CMakeFiles/mtlearn_core.dir/mtlearn/morphology.cpp.o
+[2/4] Linking CXX static library mtlearn/src/libmtlearn_core.a
+[3/4] Building CXX object mtlearn/bindings/CMakeFiles/_mtlearn.dir/MtlearnModule.cpp.o
+[4/4] Linking CXX shared module mtlearn/bindings/_mtlearn.cpython-312-darwin.so
+*** Installing project into wheel...
+-- Install configuration: "Release"
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/lib/libmtlearn_core.a
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/include/mtlearn
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/include/mtlearn/morphology.hpp
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/mtlearn/_mtlearn.cpython-312-darwin.so
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/lib/cmake/mtlearn/mtlearnTargets.cmake
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/lib/cmake/mtlearn/mtlearnTargets-release.cmake
+-- Installing: /var/folders/33/bckvp5w94v58qwh5l_z21nn00000gn/T/tmpt9t2wu5h/wheel/platlib/lib/cmake/mtlearn/mtlearnConfig.cmake
+*** Making wheel...
+*** Created mtlearn-1.1.0.post5-cp312-cp312-macosx_26_0_arm64.whl
+Successfully built mtlearn-1.1.0.post5.tar.gz and mtlearn-1.1.0.post5-cp312-cp312-macosx_26_0_arm64.whl

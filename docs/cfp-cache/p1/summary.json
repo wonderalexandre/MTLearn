@@ -1,0 +1,57 @@
+{
+  "run": "runs/fit_cpu_3_validated",
+  "sample_count": 3,
+  "cached_sample_count": 0,
+  "all_preparations_released": true,
+  "statistics_tensor_bytes": 1512,
+  "rss_peak_bytes": 1192509440,
+  "available_min_bytes": 2503409664,
+  "seconds_by_stage": {
+    "read_image_0": 0.07209837494883686,
+    "prepare_image_0": 23.06368741695769,
+    "summarize_attribute": 0.21575786895118654,
+    "merge_summary": 0.022644247976131737,
+    "read_image_1000": 0.07631795795168728,
+    "prepare_image_1000": 20.158386915922165,
+    "read_image_2040": 0.06460174999665469,
+    "prepare_image_2040": 20.723453125101514,
+    "fit_stats_total": 64.77424854098354
+  },
+  "images": [
+    {
+      "image_id": 0,
+      "shape": [
+        2748,
+        2748
+      ],
+      "nodes": 699690,
+      "raw_bytes": 267520272,
+      "attributes": 63
+    },
+    {
+      "image_id": 1000,
+      "shape": [
+        2748,
+        2748
+      ],
+      "nodes": 627731,
+      "raw_bytes": 246220408,
+      "attributes": 63
+    },
+    {
+      "image_id": 2040,
+      "shape": [
+        2748,
+        2748
+      ],
+      "nodes": 601906,
+      "raw_bytes": 238576208,
+      "attributes": 63
+    }
+  ],
+  "counts": {
+    "summarize": 189,
+    "merge": 189
+  },
+  "measurement_limitations": "One CPU streaming fit of three full-resolution images; not full training, full-dataset caching, concurrency, or a statistically repeated performance comparison."
+}

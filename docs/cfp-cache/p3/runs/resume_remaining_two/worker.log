@@ -1,0 +1,9 @@
+{"stage": "read_image_0", "seconds": 0.061477000010199845, "rss_end_bytes": 310886400, "available_end_bytes": 3823403008}
+{"stage": "read_image_1000", "seconds": 0.07815979199949652, "rss_end_bytes": 319406080, "available_end_bytes": 3846766592}
+{"stage": "prepare_1000", "seconds": 19.541678832960315, "rss_end_bytes": 1141571584, "available_end_bytes": 3406446592}
+{"stage": "summarize_1000", "seconds": 0.047329624998383224, "rss_end_bytes": 1219297280, "available_end_bytes": 3406446592}
+{"stage": "read_image_2040", "seconds": 0.05757620802614838, "rss_end_bytes": 1164378112, "available_end_bytes": 3431153664}
+{"stage": "prepare_2040", "seconds": 19.725514707970433, "rss_end_bytes": 1015234560, "available_end_bytes": 3436429312}
+{"stage": "summarize_2040", "seconds": 0.05083083303179592, "rss_end_bytes": 1046298624, "available_end_bytes": 3436429312}
+{"stage": "resume_pass", "seconds": 41.47357804200146, "rss_end_bytes": 927858688, "available_end_bytes": 3744989184}
+P3_SSD_PASS
