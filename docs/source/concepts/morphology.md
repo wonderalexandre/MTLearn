@@ -5,17 +5,17 @@ layer documentation.
 
 ## Morphological Trees
 
-A morphological tree is a hierarchy of connected components derived from an
-image. Each node represents a component or shape, and parent-child relations
-encode inclusion in the hierarchy. `mtlearn` currently builds max-trees,
-min-trees, and trees of shapes through `mtlearn.morphology`.
+The library represents image hierarchies as rooted trees of connected subsets,
+referred to here as *morphological trees*. These trees serve as image models and
+share the same topology model. The currently supported tree types are *max-tree*,
+*min-tree*, and *tree of shapes*.
 
 ## Max-Tree and Min-Tree
 
-A max-tree organizes upper level sets of a gray-scale image. It is useful when
-bright components are the primary structures of interest. A min-tree organizes
-lower level sets and is useful when dark components are the primary
-structures.
+A max-tree organizes connected components of upper level sets of a gray-scale
+image. It is useful when bright components are the primary structures of
+interest. A min-tree organizes connected components of lower level sets and is
+useful when dark components are the primary structures of interest.
 
 Both tree types are component trees. Their construction accepts an adjacency
 radius, exposed as `radius` in the native tree constructors.
@@ -53,15 +53,4 @@ An attribute group is a named bundle of scalar attributes, such as
 `AttributeGroup.SHAPE` or `AttributeGroup.TREE_TOPOLOGY`. Groups are expanded
 before attribute computation or CFP parameter construction.
 
-Distance-transform attributes, including `MAX_DIST`, support trees of shapes.
-Groups expand to their complete scalar attribute sets.
-
 See {doc}`attributes` for the user-facing attribute catalog.
-
-## Dataset Statistics and Caching
-
-The primary CFP layer can cache tree metadata and raw attributes by stable
-dataset index. `build_dataloader_cached` wraps a DataLoader so each sample
-carries its index, then precomputes tree payloads and dataset-level
-normalization statistics. Once the prepass finishes, statistics are frozen and
-cached normalized attributes are refreshed.
