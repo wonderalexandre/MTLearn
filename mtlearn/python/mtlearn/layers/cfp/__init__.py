@@ -12,8 +12,10 @@ from .scoring import (
     MLPScorer,
     ScoringModel,
 )
-from .preparation import CFPPreprocessor, PreparedMorphology, PreparedBatch, PreparationResult, PreparedDataset, collate_prepared
+from .preparation import CFPPreprocessor, PreparedMorphology, PreparedBatch, PreparationResult, DiskPreparationResult, PreparedDataset, collate_prepared
 from .storage import NullStore, MemoryStore, DiskStore
+from .preparation import PreparedDataLoader, PreparedDataLoadingError, build_prepared_dataloader
+from .preparation import calibrate_disk_cache
 from .normalization.statistics_snapshot import StatisticsSnapshot
 from .specs import FeatureSpec, FilterSpec, SpecRegistry, TreeSpec
 from .component_registries import (
@@ -35,6 +37,11 @@ __all__ = [
     "MemoryStore",
     "DiskStore",
     "PreparationResult",
+    "DiskPreparationResult",
+    "PreparedDataLoader",
+    "PreparedDataLoadingError",
+    "build_prepared_dataloader",
+    "calibrate_disk_cache",
     "PreparedDataset",
     "collate_prepared",
     "StatisticsSnapshot",

@@ -1,0 +1,28 @@
+{
+  "created_at": "2026-09-11T12:05:12.078619-03:00",
+  "source_revision": "1e59bd58b2b8ca4f933f3a9a640c96aa273fe446",
+  "python": "/opt/anaconda3/bin/python",
+  "torch": "2.10.0",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "mtlearn": "/Volumes/SSD/GitHub/mtlearn/mtlearn/python/mtlearn/__init__.py",
+  "native": "/Volumes/SSD/GitHub/mtlearn/build/notebook-equivalence/20260910-pr383f27d/native/mtlearn/bindings/_mtlearn.cpython-312-darwin.so",
+  "native_sha256": "b3a1c1351d9de51fc452785bdca7f1c7c0dd4220ce3421780f30ac6fb11b1d31",
+  "capture_source_sha256": "952acec5a6b6fa5104165ce69847541513c769659166f61bb8babc1ff44dac66",
+  "repetitions": 3,
+  "cpu_repeats_exact": true,
+  "files": {
+    "memory_linear_sigmoid_max-tree.pt": "35aed93da78ab9a7d5febd547dd66c85ff8a92d50c4c7b9fba343b7f5d1b0e90",
+    "memory_linear_sigmoid_min-tree.pt": "713f1d775c538c627714231f88bec28acc2276aa9019612ede66591bb45de26e",
+    "memory_linear_sigmoid_tree-of-shapes.pt": "b9ba6e81b6454cd826bfddd2be1e7c8c2272e04c0d30043d818b101e517c868c",
+    "memory_mlp_max-tree.pt": "83a331879b7b8c825a9eeb9436692a888467e839822be1c328c71d622d496622",
+    "memory_mlp_min-tree.pt": "1b4cb074b2f14f7301b67d2f3ab932810391333a4be89ce2914dd2c88950ae4e",
+    "memory_mlp_tree-of-shapes.pt": "3650dbc138a3109d9cf631e8dc38dc774a970103035a571d4bdf6f9c47e76a10",
+    "legacy_linear_sigmoid_max-tree.pt": "a79e3adade0f5b812d57b99bcf8c22f070eba7669088bd8e478cc5749c73d751",
+    "legacy_linear_sigmoid_min-tree.pt": "0e142fe302a7a220ea416d4964a603206807c5c28278cd3a3bf67134a913b9e9",
+    "legacy_linear_sigmoid_tree-of-shapes.pt": "4c30268035287f9bcac37d2ba12739b3ce2d961a154f8830c14e633b724b9caa",
+    "legacy_mlp_max-tree.pt": "11b7b6423849004aeba4fe9416afa1b2a45418f8ab952dabdf048870a074a68e",
+    "legacy_mlp_min-tree.pt": "94828d2586938f41e8693d76245d6db49cd7d9b5174f098061449c1947fd2a4a",
+    "legacy_mlp_tree-of-shapes.pt": "8a1f7a6dea2ec01409ab69d3a7516b0532ca4d0a8a683315e67757e150d86d13"
+  },
+  "peak_rss_bytes": 292503552
+}

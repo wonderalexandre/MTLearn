@@ -12,6 +12,7 @@ from ..normalization.statistics_snapshot import StatisticsSnapshot
 from ..runtime.cache_input_contract import validate_cfp_cache_batch_x
 from ._identity import canonical_json, image_identity, identity_key, preprocessor_config, preprocessor_from_config
 from .preparation_result import PreparationResult
+from ._preparation_progress import emit
 
 
 def statistics_contract(preprocessor, options):
@@ -55,13 +56,7 @@ def image_bindings(preprocessor, image):
 
 
 def manifest_record(store, name, *, complete=True):
-    store._check()
-    row = store._db.execute("SELECT * FROM manifests WHERE name=?", (name,)).fetchone()
-    if row is None:
-        raise KeyError(f"Unknown prepared manifest {name!r}.")
-    if complete and row["state"] != "complete":
-        raise RuntimeError(f"Manifest {name!r} is {row['state']}; resume preparation before consumption.")
-    return row
+    return store._manifest_record(name, complete=complete)
 
 
 def _begin_manifest(store, name, preprocessor, count, source_version, preprocessing_version, split):
@@ -127,11 +122,14 @@ def statistics_identity(store, name, contract):
 
 def prepare_source(preprocessor, source, *, store=None, manifest=None, source_version=None,
                    preprocessing_version=None, split="train", sample_ids=None, collect_stats=None, cancel=None,
-                   num_workers=0, max_in_flight=None, worker_threads=1, max_sample_bytes=64 * 1024**2, max_retries=0):
+                   num_workers=0, max_in_flight=None, worker_threads=1, max_sample_bytes=64 * 1024**2, max_retries=0,
+                   progress=None):
     from ..storage import NullStore
     if not hasattr(source, "__len__") or not hasattr(source, "__getitem__"):
         raise TypeError("prepare requires a finite map-style dataset/sequence; use a Subset to select/order samples.")
     count = len(source)
+    if progress is not None and not callable(progress):
+        raise TypeError("progress must be callable or None.")
     if count <= 0:
         raise ValueError("prepare requires a nonempty source.")
     if split not in ("train", "evaluation"):
@@ -155,19 +153,22 @@ def prepare_source(preprocessor, source, *, store=None, manifest=None, source_ve
     normalizer = AttributeNormalizer(contract["scale_mode"]) if collect and not persistent else None
     completed = 0
     try:
+        emit(progress, manifest, 0, count)
         if num_workers:
             completed, cancelled = prepare_parallel(preprocessor, source, store, manifest, sample_ids, cancel,
                 num_workers=num_workers, max_in_flight=max_in_flight, worker_threads=worker_threads,
-                max_sample_bytes=max_sample_bytes, max_retries=max_retries)
+                max_sample_bytes=max_sample_bytes, max_retries=max_retries, progress=progress)
             if cancelled:
                 with store._db:
                     store._db.execute("UPDATE manifests SET state='cancelled' WHERE name=?", (manifest,))
+                emit(progress, manifest, completed, count, status="cancelled")
                 return PreparationResult(str(store.path), manifest, completed, "cancelled")
         for index in range(count) if not num_workers else ():
             if cancel is not None and (cancel() if callable(cancel) else cancel.is_set()):
                 if persistent:
                     with store._db:
                         store._db.execute("UPDATE manifests SET state='cancelled' WHERE name=?", (manifest,))
+                emit(progress, manifest, completed, count, status="cancelled")
                 return PreparationResult(str(store.path) if persistent else None, manifest, completed, "cancelled")
             sample_id = str(index) if sample_ids is None else (sample_ids(index) if callable(sample_ids) else sample_ids[index])
             if not isinstance(sample_id, str) or not sample_id:
@@ -191,6 +192,7 @@ def prepare_source(preprocessor, source, *, store=None, manifest=None, source_ve
                 del channel, prepared, values
             completed += 1
             del batch, image, target, item
+            emit(progress, manifest, completed, count, position=index, sample_id=sample_id)
         if persistent:
             with store._db:
                 store._db.execute("UPDATE manifests SET state='complete',error=NULL WHERE name=?", (manifest,))
@@ -199,6 +201,7 @@ def prepare_source(preprocessor, source, *, store=None, manifest=None, source_ve
         else:
             snapshot = StatisticsSnapshot(contract, normalizer.ds_stats, sample_count=count) if collect else None
             fingerprint = None
+        emit(progress, manifest, count, count, status="complete")
         return PreparationResult(str(store.path) if persistent else None, manifest, count, "complete", snapshot, fingerprint)
     except BaseException as exc:
         if persistent:

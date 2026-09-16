@@ -102,7 +102,8 @@ class CFPPreprocessor:
 
     def prepare(self, source, *, store=None, manifest=None, source_version=None,
                 preprocessing_version=None, split="train", sample_ids=None, collect_stats=None, cancel=None,
-                num_workers=0, max_in_flight=None, worker_threads=1, max_sample_bytes=64 * 1024**2, max_retries=0):
+                num_workers=0, max_in_flight=None, worker_threads=1, max_sample_bytes=64 * 1024**2, max_retries=0,
+                progress=None):
         """Prepare a finite map-style source, returning only progress/statistics.
 
         A persistent store requires named/versioned source and preprocessing
@@ -120,6 +121,20 @@ class CFPPreprocessor:
         return prepare_source(self, source, store=store, manifest=manifest,
             source_version=source_version, preprocessing_version=preprocessing_version,
             split=split, sample_ids=sample_ids, collect_stats=collect_stats, cancel=cancel,
+            num_workers=num_workers, max_in_flight=max_in_flight, worker_threads=worker_threads,
+            max_sample_bytes=max_sample_bytes, max_retries=max_retries, progress=progress)
+
+    def prepare_or_reuse(self, source=None, *, path, manifest, source_version, preprocessing_version,
+                         split="train", sample_ids=None, collect_stats=None, mode="reuse",
+                         max_disk_bytes=None, min_free_disk_bytes=0, pilot_samples=0,
+                         disk_safety_factor=1.2, cancel=None, progress=None, num_workers=0,
+                         max_in_flight=None, worker_threads=1, max_sample_bytes=64 * 1024**2, max_retries=0):
+        from ._disk_preparation import prepare_or_reuse
+        return prepare_or_reuse(self, source, path=path, manifest=manifest, source_version=source_version,
+            preprocessing_version=preprocessing_version, split=split, sample_ids=sample_ids,
+            collect_stats=collect_stats, mode=mode, max_disk_bytes=max_disk_bytes,
+            min_free_disk_bytes=min_free_disk_bytes, pilot_samples=pilot_samples,
+            disk_safety_factor=disk_safety_factor, cancel=cancel, progress=progress,
             num_workers=num_workers, max_in_flight=max_in_flight, worker_threads=worker_threads,
             max_sample_bytes=max_sample_bytes, max_retries=max_retries)
 
