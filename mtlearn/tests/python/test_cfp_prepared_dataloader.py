@@ -305,6 +305,11 @@ def test_previous_epoch_active_buffers_remain_counted(cache):
 @pytest.mark.parametrize("prefetch", [False, True])
 @pytest.mark.parametrize("validation", ["always", "session"])
 def test_snapshot_without_source_drop_last_and_session(cache, prefetch, validation):
+    if validation == "session" and os.name != "posix":
+        with pytest.raises(NotImplementedError, match="POSIX shared file locks"):
+            build_prepared_dataloader(cache[0], "train", validation=validation, immutable=True,
+                **loader_options(prefetch=prefetch))
+        return
     with build_prepared_dataloader(cache[0], "train", batch_size=2, drop_last=True,
             validation=validation, immutable=validation == "session",
             **loader_options(prefetch=prefetch)) as loader:

@@ -204,6 +204,9 @@ class DiskStore:
         path = self._entry_path(key)
         with path.open("rb") as handle:
             signature = file_signature(os.fstat(handle.fileno()))
+            path_signature = file_signature(path.stat())
+            if path_signature[:4] != signature[:4]:
+                raise ValueError("Prepared file changed during validation/loading; retry with an immutable entry.")
             if signature[2] != row["size_bytes"]:
                 raise ValueError("Persistent file checksum/size mismatch.")
             token = (signature, row["sha256"], row["identity"], row["summary"])
@@ -228,7 +231,7 @@ class DiskStore:
             else:
                 prepared = cached
             if (file_signature(os.fstat(handle.fileno())) != signature or
-                    file_signature(path.stat()) != signature):
+                    file_signature(path.stat()) != path_signature):
                 raise ValueError("Prepared file changed during validation/loading; retry with an immutable entry.")
             if self.validation == "session":
                 self._validation.remember(key, token)

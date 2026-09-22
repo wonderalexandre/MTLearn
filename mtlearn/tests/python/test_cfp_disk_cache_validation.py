@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import weakref
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -131,6 +132,51 @@ def test_always_policy_preserves_ram_hit_behavior(cache, ram_bytes, expected):
         for _ in range(3):
             store.get(cache[3][0])
         assert store.counters()["checksum_reads"] == expected
+
+
+@pytest.mark.parametrize("mmap", [False, True])
+@pytest.mark.parametrize("changed", [None, "path", "descriptor", "identity"])
+def test_read_checks_path_and_descriptor_signatures_independently(cache, monkeypatch, mmap, changed):
+    path, _, _, keys = cache
+    with DiskStore(path, readonly=True, mmap=mmap) as store:
+        entry = store._entry_path(keys[0])
+        original_stat = Path.stat
+        original_fstat = os.fstat
+        original_load = store._load_file
+        loaded = False
+
+        def adjusted(value, **kwargs):
+            attributes = {name: getattr(value, name) for name in dir(value) if name.startswith("st_")}
+            return SimpleNamespace(**(attributes | kwargs))
+
+        def path_stat(filename, *args, **kwargs):
+            value = original_stat(filename, *args, **kwargs)
+            if filename == entry:
+                return adjusted(value, st_ctime_ns=value.st_ctime_ns + 1000 + int(loaded and changed == "path"),
+                    st_ino=value.st_ino + int(changed == "identity"))
+            return value
+
+        def fstat(descriptor):
+            value = original_fstat(descriptor)
+            return adjusted(value, st_ctime_ns=value.st_ctime_ns + int(loaded and changed == "descriptor"))
+
+        def load(filename, **kwargs):
+            nonlocal loaded
+            prepared = original_load(filename, **kwargs)
+            loaded = True
+            return prepared
+
+        monkeypatch.setattr(Path, "stat", path_stat)
+        monkeypatch.setattr(disk_module, "os", SimpleNamespace(**(vars(os) | {"fstat": fstat})))
+        monkeypatch.setattr(disk_module, "descriptor_path", lambda handle: None)
+        monkeypatch.setattr(store, "_load_file", load)
+        if changed is None:
+            assert store.get(keys[0]) is not None
+            assert loaded
+        else:
+            with pytest.raises(ValueError, match="changed during"):
+                store.get(keys[0])
+            assert loaded == (changed != "identity")
 
 
 @pytest.mark.parametrize("capacity,expected", [(0, 4), (1, 3), (2, 2)])

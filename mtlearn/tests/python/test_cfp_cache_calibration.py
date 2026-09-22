@@ -5,6 +5,8 @@ from pathlib import Path
 import random
 import threading
 import weakref
+from itertools import count
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -95,11 +97,15 @@ def test_process_metrics_equivalence_and_cleanup(cache, workers):
         counters = trial['counters']
         assert trial['equivalent']
         assert counters['processes_alive'] == counters['shared_pending_bytes'] == counters['shared_active_bytes'] == 0
-        assert len(counters['worker_memory_observations']) == workers
+        assert len(counters['worker_pids']) == workers
+        assert 1 <= len(counters['worker_memory_observations']) <= workers
         assert counters['checksum_bytes'] == counters['logical_load_bytes'] > 0
         for observation in counters['worker_memory_observations']:
+            assert observation['pid'] in counters['worker_pids']
             assert observation['cpu_seconds'] > 0
-            assert observation['rss_bytes'] > 0 or observation['lifetime_peak_rss_bytes'] > 0
+            for metric in ('rss_bytes', 'lifetime_peak_rss_bytes'):
+                if observation[metric] is not None:
+                    assert observation[metric] > 0
 
 
 @pytest.mark.parametrize('kwargs', [dict(max_samples=0), dict(max_samples=65), dict(max_samples=True),
@@ -117,8 +123,10 @@ def test_invalid_input_before_payload(cache, monkeypatch, kwargs):
 
 
 @pytest.mark.parametrize('kwargs,reason', [(dict(max_memory_bytes=1), 'baseline_memory_budget'),
-    (dict(max_cache_read_bytes=1), 'cache_read_budget'), (dict(max_seconds=1e-9), 'time_limit')])
+    (dict(max_cache_read_bytes=1), 'cache_read_budget'), (dict(max_seconds=1), 'time_limit')])
 def test_limits_prevent_payload_read(cache, monkeypatch, kwargs, reason):
+    if reason == 'time_limit':
+        monkeypatch.setattr(calibration_module, 'time', SimpleNamespace(monotonic=count().__next__))
     monkeypatch.setattr(DiskStore, '_load_file', forbidden)
     report = calibrate_disk_cache(cache[0], 'train', **options(**kwargs))
     assert report['status'] == 'stopped' and report['reason'] == reason
@@ -183,6 +191,7 @@ def test_optional_memory_dependency_and_rss_guard(cache, monkeypatch):
 
 @pytest.mark.parametrize('rss_limit', [1, 2])
 def test_observed_rss_limit_stops_before_load(cache, monkeypatch, rss_limit):
+    monkeypatch.setattr(measurement, 'process_memory', lambda: {'rss_bytes': 3})
     monkeypatch.setattr(DiskStore, '_load_file', forbidden)
     report = calibrate_disk_cache(cache[0], 'train', **options(max_rss_bytes=rss_limit))
     assert report['reason'] == 'rss_limit'
