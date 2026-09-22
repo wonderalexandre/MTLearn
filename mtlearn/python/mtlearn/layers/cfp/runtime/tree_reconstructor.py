@@ -13,10 +13,6 @@ def reconstruct_from_info(node_signal, tpre, tpost, node_of_pixel):
     Native trees with inactive node slots use empty [0, 0) intervals; sizing
     by slot count also accommodates these trees without a device-to-CPU read.
     """
-    if node_signal.device.type == "mps":
-        return reconstruct_from_info(
-            node_signal.cpu(), tpre.cpu(), tpost.cpu(), node_of_pixel.cpu(),
-        ).to(node_signal.device)
     delta = node_signal.new_zeros(tpre.numel() + 1)
     delta.index_add_(0, tpre, node_signal)
     delta.index_add_(0, tpost, -node_signal)
@@ -32,10 +28,6 @@ def propagate_pixels_to_nodes(grad_output, tpre, tpost, node_of_pixel):
     exclusive prefix sums at each node's subtree endpoints. No traversal
     permutation or conversion from event times to ranks is needed.
     """
-    if grad_output.device.type == "mps":
-        return propagate_pixels_to_nodes(
-            grad_output.cpu(), tpre.cpu(), tpost.cpu(), node_of_pixel.cpu(),
-        ).to(grad_output.device)
     g_pix = grad_output.reshape(-1)
     proper_grad = g_pix.new_zeros(tpre.numel())
     pixel_pre = tpre[node_of_pixel.reshape(-1).to(torch.int64)]
