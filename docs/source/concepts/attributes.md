@@ -75,12 +75,6 @@ The catalog uses three contracts:
 | Topology/support | Uses node support, pixel coordinates, contours, or adjacency information. |
 | Tree topology | Reads only parent/child relations in the hierarchy. |
 
-Distance-transform attributes require a regular 2D image domain. They support
-max-trees, min-trees, and trees of shapes without requiring node altitudes or
-construction-adjacency metadata. Bitquad and filled-shape attributes require
-canonical 4- or 8-connectivity; trees of shapes also use node altitudes to
-select the applicable directional connectivity.
-
 ## Gray-Level Attributes
 
 | Attribute | Groups | Contract | Use |
@@ -91,13 +85,6 @@ select the applicable directional connectivity.
 | `GRAY_LEVEL_HEIGHT` | `GRAY_LEVEL` | Altitude-aware | Maximum absolute altitude difference between the node and any node in its subtree. |
 | `MEAN_GRAY_LEVEL` | `GRAY_LEVEL` | Altitude-aware | Arithmetic mean of the image values over the full node support: `sum(f(x), x in X) / card(X)`. |
 | `GRAY_LEVEL_VARIANCE` | `GRAY_LEVEL` | Altitude-aware | Population variance of the image values over the full node support, with denominator `card(X)`. |
-
-Use `morphology.AttributeType.GRAY_LEVEL` to request the node valuation and
-`morphology.AttributeGroup.GRAY_LEVEL` to request the full group. The existing
-`morphology.Attribute.GRAY_LEVEL` shorthand continues to refer to the group.
-The scalar is also available as `morphology.Attribute.Type.GRAY_LEVEL`.
-In Higra output space, its values match the altitudes from
-`tree.export_higra_hierarchy()`, including the exported pixel leaves.
 
 Gray-level attributes are good choices when the filter should depend on
 contrast, intensity, or altitude differences rather than pure geometry.
@@ -116,13 +103,6 @@ contrast, intensity, or altitude differences rather than pure geometry.
 | `BOX_COLUMN_MAX` | `SHAPE` | Topology/support | Maximum image column index covered by the node support. |
 | `BOX_ROW_MIN` | `SHAPE` | Topology/support | Minimum image row index covered by the node support. |
 | `BOX_ROW_MAX` | `SHAPE` | Topology/support | Maximum image row index covered by the node support. |
-
-`AREA` is the usual attribute for size filtering. A high `AREA` value means
-that the component represented by the node covers many pixels in the original
-image domain; it is not the number of children in the tree.
-
-These attributes are the most direct tools for area openings, size priors, and
-filters that should keep or remove elongated connected components.
 
 ## Distance-Transform Attributes
 
