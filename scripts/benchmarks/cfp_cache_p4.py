@@ -87,7 +87,7 @@ def coordinator(args):
         with timing.stage('cold_prepare'):
             result = prep.prepare(Source(), store=store, **options)
         assert result.status == 'complete' and result.sample_count == 3
-        expected = json.loads((reference.ROOT / 'docs/cfp-cache/p1/runs/fit_cpu_3_validated/result.json').read_text())
+        expected = json.loads((reference.ROOT / 'mtlearn/tests/python/fixtures/cfp_cache_p1/statistics.json').read_text())
         for key, values in expected['statistics'].items():
             for name, value in values.items():
                 actual = result.statistics.statistics[key][name]

@@ -83,7 +83,7 @@ def worker(args):
                 snapshot=store.statistics('train',contract)
             status='complete'
         if snapshot is not None:
-            fitted=json.loads((reference.ROOT/'docs/cfp-cache/p1/runs/fit_cpu_3_validated/result.json').read_text())
+            fitted=json.loads((reference.ROOT/'mtlearn/tests/python/fixtures/cfp_cache_p1/statistics.json').read_text())
             actual=snapshot.statistics
             assert snapshot.sample_count==3
             for key,values in fitted['statistics'].items():

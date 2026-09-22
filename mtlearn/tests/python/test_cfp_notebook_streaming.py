@@ -20,7 +20,7 @@ from mtlearn.layers.cfp import CFPPreprocessor, DiskStore, PreparedDataset, coll
 
 ROOT = Path(__file__).resolve().parents[3]
 NOTEBOOK = ROOT / 'notebooks/experiments/CFP_linear_vs_mlp_scoring_205_SA_L3D14M3_segmentation.ipynb'
-REFERENCE = ROOT / 'docs/cfp-cache/p5/reference/notebook_before_p5.json'
+REFERENCE = Path(__file__).parent / 'fixtures/cfp_cache_p5/notebook_before_p5.json'
 if not NOTEBOOK.exists() or not REFERENCE.exists():
     pytest.skip('Notebook regression requires the repository checkout and P5 reference', allow_module_level=True)
 BEFORE = json.loads(REFERENCE.read_text())

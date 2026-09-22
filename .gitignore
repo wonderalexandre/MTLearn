@@ -27,3 +27,6 @@ notebooks/paper/.ipynb_checkpoints/Modelos-checkpoint.ipynb
 notebooks/icpr/.DS_Store
 notebooks/icpr/.ipynb_checkpoints/Modelos-checkpoint.ipynb
 /notebooks/icpr/output_imgs
+/docs/cfp-cache/
+/docs/cfp-jacobian-intervals/
+/docs/cfp-cache-refactoring-plan.md

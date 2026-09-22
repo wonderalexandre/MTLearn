@@ -21,7 +21,7 @@ def worker(args):
     timing = reference.Timings(output)
     # Reuse the frozen train-only streaming fit measured in P1. No fitting in
     # this experiment, and no per-image preparations loaded from that report.
-    source = reference.ROOT / 'docs/cfp-cache/p1/runs/fit_cpu_3_validated/result.json'
+    source = reference.ROOT / 'mtlearn/tests/python/fixtures/cfp_cache_p1/statistics.json'
     fitted = json.loads(source.read_text())
     stats = {key: {name: torch.tensor(value, dtype=torch.int64 if name == 'count' else torch.float64)
                    for name, value in values.items()} for key, values in fitted['statistics'].items()}

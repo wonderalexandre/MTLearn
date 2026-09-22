@@ -1,9 +1,7 @@
 # Frozen CFP cache reference — P0
 
 Generated before the cache refactoring on 2026-09-09 using source revision
-`fd29ec8b39ff7bdb1cb30d4b89a02b9b37a2224d`. See the
-[P0 report](../../../../../docs/cfp-cache/p0/README.md) and its environment record
-for the native extension hash, compiler flags, imported paths and source hashes.
+`fd29ec8b39ff7bdb1cb30d4b89a02b9b37a2224d`.
 
 `baseline.pt` contains five synthetic float32 images, targets, fixed training/test
 indices and expected outputs, losses, gradients, statistics and public contracts
