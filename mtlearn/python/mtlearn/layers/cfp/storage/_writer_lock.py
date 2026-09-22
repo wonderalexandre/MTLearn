@@ -1,5 +1,6 @@
 """OS-owned single-coordinator lock, released automatically after process exit."""
 import os
+import shutil
 
 
 class _WriterLock:
@@ -39,14 +40,19 @@ def fsync_directory(path):
 
 
 class _QuotaWriter:
-    def __init__(self, handle, available):
+    def __init__(self, handle, available, *, min_free_disk_bytes=0, disk_path=None):
         self.handle, self.available = handle, available
+        self.min_free_disk_bytes, self.disk_path = min_free_disk_bytes, disk_path
         self.exceeded = False
+        self.reserve_exceeded = False
 
     def write(self, data):
         if self.handle.tell() + len(data) > self.available:
             self.exceeded = True
             raise OSError("DiskStore quota exceeded; completed entries remain reusable. Increase max_disk_bytes to resume.")
+        if self.min_free_disk_bytes and shutil.disk_usage(self.disk_path).free - len(data) < self.min_free_disk_bytes:
+            self.reserve_exceeded = True
+            raise OSError("DiskStore free-space reserve reached; free disk space and resume. Completed entries were preserved.")
         return self.handle.write(data)
 
     def flush(self):
