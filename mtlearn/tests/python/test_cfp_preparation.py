@@ -118,7 +118,7 @@ def test_prepared_schema_full_validation_and_scorer_independence(baseline, tree,
     with pytest.raises(TypeError):
         prepared.info["num_rows"] = 2
     with pytest.raises(ValueError, match="wrong length"):
-        replace(prepared, info={**prepared.info, "node_of_pixel": torch.zeros(image.numel()+1, dtype=torch.uint32)})
+        replace(prepared, info={**prepared.info, "node_of_pixel": torch.zeros(image.numel()+1, dtype=getattr(torch, "uint32", torch.int64))})
     with pytest.raises(ValueError, match="dtype"):
         replace(prepared, info={**prepared.info, "parent": prepared.info["parent"].int()})
     broken = replace(prepared, info={**prepared.info, "node_of_pixel": torch.full_like(prepared.info["node_of_pixel"], 2**32 - 1)})
@@ -348,3 +348,19 @@ def test_checkpoint_restores_parameterless_custom_scorer(baseline, monkeypatch, 
     restored, _ = load_checkpoint(path, layer, device=device)
     assert restored.device.type == device
     torch.testing.assert_close(restored(baseline["images"][:1]).cpu(), expected, **MANIFEST["cpu_mps_tolerance"])
+
+
+def test_prepared_pixel_map_without_unsigned_torch_dtype(monkeypatch):
+    layer = model(mode="none")
+    image = torch.arange(16, dtype=torch.float32).reshape(4, 4)
+    prepared = CFPPreprocessor.from_layer(layer).prepare_image(image)
+    info = dict(prepared.info)
+    info["node_of_pixel"] = info["node_of_pixel"].to(torch.int64)
+    monkeypatch.delattr(torch, "uint32", raising=False)
+    prepared = replace(prepared, info=info)
+    prepared.validate(full=True)
+    assert prepared.info["node_of_pixel"].dtype == torch.int64
+    bad = replace(prepared, info={**prepared.info, "node_of_pixel": torch.full_like(
+        prepared.info["node_of_pixel"], prepared.num_nodes)})
+    with pytest.raises(ValueError, match="invalid node"):
+        bad.validate(full=True)

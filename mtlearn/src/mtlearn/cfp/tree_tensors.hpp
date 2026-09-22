@@ -18,6 +18,7 @@
 #include <vector>
 
 #include <torch/torch.h>
+#include <torch/version.h>
 
 namespace mtlearn::cfp {
 
@@ -108,13 +109,18 @@ public:
         torch::Tensor tPreOrder = torch::zeros({numNodes}, opts_i64);
         torch::Tensor tPostOrder = torch::zeros({numNodes}, opts_i64);
         torch::Tensor tParent = torch::zeros({numNodes}, opts_i64);
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 3)
         torch::Tensor tNodeOfPixel = torch::zeros({numPixels}, torch::TensorOptions().dtype(torch::kUInt32).requires_grad(false));
+        uint32_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<uint32_t>();
+#else
+        torch::Tensor tNodeOfPixel = torch::zeros({numPixels}, opts_i64);
+        int64_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<int64_t>();
+#endif
 
         float* residuesPtr = tResiduos.data_ptr<float>();
         int64_t* preOrderPtr = tPreOrder.data_ptr<int64_t>();
         int64_t* postOrderPtr = tPostOrder.data_ptr<int64_t>();
         int64_t* parentPtr = tParent.data_ptr<int64_t>();
-        uint32_t* nodeOfPixelPtr = tNodeOfPixel.data_ptr<uint32_t>();
 
         // Count entries only: each subtree occupies [pre, post) in preorder.
         // Export CFP-specific indices in one O(T) traversal, leaving the

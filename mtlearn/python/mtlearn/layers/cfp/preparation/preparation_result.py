@@ -1,4 +1,5 @@
 """Small result handle for finite preparation passes."""
+from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..normalization.statistics_snapshot import StatisticsSnapshot

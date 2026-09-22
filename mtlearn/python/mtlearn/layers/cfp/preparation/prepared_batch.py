@@ -1,4 +1,5 @@
 """Dense batches of immutable, model-independent CPU morphology."""
+from __future__ import annotations
 from dataclasses import dataclass
 from types import MappingProxyType
 

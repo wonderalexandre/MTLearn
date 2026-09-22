@@ -80,7 +80,7 @@ class PreparedMorphology:
         for key in ("residues", *_INDEX_FIELDS):
             tensor = self.info[key]
             dtype = (torch.float32 if key == "residues" else
-                     torch.uint32 if key == "node_of_pixel" else torch.int64)
+                     getattr(torch, "uint32", torch.int64) if key == "node_of_pixel" else torch.int64)
             self._check_tensor(tensor, dtype=dtype, name=key)
             if tensor.ndim != 1:
                 raise ValueError(f"{key} must be one-dimensional.")
