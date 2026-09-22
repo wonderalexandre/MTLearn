@@ -485,3 +485,19 @@ except RuntimeError:
         assert writer().returncode == 23
     result = writer()
     assert result.returncode == 0, result.stderr.decode()
+
+
+@pytest.mark.parametrize("mmap", [False, True])
+def test_mmap_uses_filename_supported_by_older_torch(cache, monkeypatch, mmap):
+    original_load = torch.load
+
+    def load(path, **kwargs):
+        if kwargs.get("mmap") and not isinstance(path, str):
+            raise ValueError("f must be a string filename in order to use mmap argument")
+        return original_load(path, **kwargs)
+
+    monkeypatch.setattr(torch, "load", load)
+    with DiskStore(cache[0], readonly=True, mmap=mmap) as store:
+        prepared = store.get(cache[3][0])
+        prepared.validate(full=True)
+        assert prepared.image_shape == (6, 7)

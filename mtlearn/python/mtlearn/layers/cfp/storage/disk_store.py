@@ -143,7 +143,7 @@ class DiskStore:
         return self._files / f"{key}.pt"
 
     def _load_file(self, path, *, full=False):
-        data = torch.load(path, map_location="cpu", weights_only=True, mmap=self.mmap)
+        data = torch.load(str(path), map_location="cpu", weights_only=True, mmap=self.mmap)
         prepared, summary = unpack(data, full=full)
         return data["identity"], prepared, summary
 
