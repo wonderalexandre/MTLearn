@@ -2,7 +2,7 @@
 import json
 import sqlite3
 
-from ..preparation._identity import FORMAT_VERSION, canonical_json, implementation_identity
+from ..preparation._identity import FORMAT_VERSION, canonical_json, implementation_identity, compatible_implementation
 
 SCHEMA = """
 CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -55,7 +55,10 @@ def connect(path, *, readonly):
                 db.rollback()
                 raise
         row = db.execute("SELECT value FROM metadata WHERE key='contract'").fetchone()
-        if row is None or json.loads(row[0]) != expected:
+        contract = json.loads(row[0]) if row is not None else None
+        if (not isinstance(contract, dict) or set(contract) != set(expected)
+                or contract["format_version"] != FORMAT_VERSION
+                or not compatible_implementation(contract["implementation"])):
             raise ValueError("DiskStore format/backend is incompatible; use a separate store directory.")
     except BaseException:
         db.close()
