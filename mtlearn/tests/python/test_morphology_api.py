@@ -468,7 +468,7 @@ def test_attribute_enum_names_match_the_catalog_without_aliases():
     descriptions = morphology.describe_all_attributes()
     members = morphology.AttributeType.__members__
 
-    assert len(members) == len(descriptions) == 132
+    assert len(members) == len(descriptions) == 133
     assert set(members) == set(descriptions)
     for name, value in members.items():
         assert value.name == name

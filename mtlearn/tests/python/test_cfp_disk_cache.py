@@ -11,6 +11,8 @@ import weakref
 import numpy as np
 import pytest
 import torch
+
+from cfp_reference_names import canonical_reference_names
 from torch.utils.data import DataLoader, Subset, TensorDataset
 
 import mtlearn
@@ -32,7 +34,7 @@ QUOTA = 32 * 1024**2
 
 @pytest.fixture(scope="module")
 def baseline():
-    return torch.load(FIXTURES / "baseline.pt", map_location="cpu", weights_only=True)
+    return canonical_reference_names(torch.load(FIXTURES / "baseline.pt", map_location="cpu", weights_only=True))
 
 
 def model(*, mode="dataset_clipped_zscore01", scoring="linear_sigmoid", attrs=(AREA, HEIGHT), dtype=np.float32):

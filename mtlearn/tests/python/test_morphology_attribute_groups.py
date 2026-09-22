@@ -45,7 +45,7 @@ def test_distance_and_filled_shape_groups_match_scalar_attributes(
 def test_attribute_catalog_contains_all_distance_and_filled_shape_attributes():
     descriptions = morphology.describe_all_attributes()
     attributes = morphology.expand_attribute_group(morphology.AttributeGroup.ALL)
-    assert len(attributes) == len(set(attributes)) == len(descriptions) == 132
+    assert len(attributes) == len(set(attributes)) == len(descriptions) == 133
     names = set()
     for group_name, _ in GROUPS:
         names.update(attribute.name for attribute in morphology.expand_attribute_group(

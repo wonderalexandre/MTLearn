@@ -266,21 +266,21 @@ inline mmcfilters::AttributeGroup toBackend(morphology::AttributeGroup group)
 inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
 {
     switch (attribute) {
+    case morphology::Attribute::GrayLevel:
+        throw std::invalid_argument("GRAY_LEVEL is computed from the node valuation by mtlearn");
     case morphology::Attribute::Area:
         return mmcfilters::Attribute::Area;
     case morphology::Attribute::Volume:
         return mmcfilters::Attribute::Volume;
     case morphology::Attribute::RelativeVolume:
         return mmcfilters::Attribute::RelativeVolume;
-    // The backend dropped the plain node-altitude attribute, so the facade no
-    // longer publishes LEVEL/ALTITUDE either.
     case morphology::Attribute::GrayLevelHeight:
         return mmcfilters::Attribute::GrayLevelHeight;
     case morphology::Attribute::MeanGrayLevel:
         return mmcfilters::Attribute::MeanGrayLevel;
     case morphology::Attribute::GrayLevelVariance:
         return mmcfilters::Attribute::GrayLevelVariance;
-    case morphology::Attribute::BoxWidth:
+    case morphology::Attribute::BoundingBoxWidth:
         return mmcfilters::Attribute::BoxWidth;
     case morphology::Attribute::BoundingBoxHeight:
         return mmcfilters::Attribute::BoundingBoxHeight;
@@ -551,7 +551,7 @@ inline morphology::Attribute fromBackend(mmcfilters::Attribute attribute)
     MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelHeight, GrayLevelHeight);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(MeanGrayLevel, MeanGrayLevel);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelVariance, GrayLevelVariance);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxWidth, BoxWidth);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxWidth, BoundingBoxWidth);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(BoundingBoxHeight, BoundingBoxHeight);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(DiagonalLength, DiagonalLength);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(Rectangularity, Rectangularity);

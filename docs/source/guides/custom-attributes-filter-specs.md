@@ -10,10 +10,11 @@ For the full attribute list, see {doc}`../concepts/attributes`.
 
 | Intent | Candidate attributes |
 | --- | --- |
+| Use the gray level associated with each node | `GRAY_LEVEL` |
 | Remove small components | `AREA`, `VOLUME` |
 | Prefer contrast in the tree | `GRAY_LEVEL_HEIGHT`, `RELATIVE_VOLUME` |
 | Prefer elongated or compact shapes | `COMPACTNESS`, `ECCENTRICITY`, `RATIO_WH` |
-| Use bounding-box geometry | `BOX_WIDTH`, `BOUNDING_BOX_HEIGHT`, `RECTANGULARITY` |
+| Use bounding-box geometry | `BOUNDING_BOX_WIDTH`, `BOUNDING_BOX_HEIGHT`, `RECTANGULARITY` |
 | Use tree position | `DEPTH_NODE`, `SUBTREE_HEIGHT`, `NUM_CHILDREN_NODE` |
 | Use contours | `CONTOUR_PERIMETER`, `CONTOUR_PIXELS` |
 

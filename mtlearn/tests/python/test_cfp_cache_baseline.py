@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 import torch
 
+from cfp_reference_names import canonical_reference_names
+
 import mtlearn
 from mtlearn.layers import ConnectedFilterPreprocessingLayer, load_checkpoint
 
@@ -25,7 +27,7 @@ CASE_NAMES = MANIFEST['cases']
 
 @pytest.fixture(scope='module')
 def reference():
-    return torch.load(FIXTURES / 'baseline.pt', map_location='cpu', weights_only=True)
+    return canonical_reference_names(torch.load(FIXTURES / 'baseline.pt', map_location='cpu', weights_only=True))
 
 
 def assert_nested_close(actual, expected):
