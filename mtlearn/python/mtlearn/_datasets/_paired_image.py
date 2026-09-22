@@ -33,6 +33,26 @@ class PairedImageDataset(Dataset):
     input and target spatial shapes must already match.
     """
 
+    @classmethod
+    def from_pairs(cls, pairs, **kwargs):
+        from ._explicit_pairs import ExplicitPairedImageDataset
+        return ExplicitPairedImageDataset(pairs, **kwargs)
+
+    @classmethod
+    def from_folders(cls, input_dir, target_dir, *, ordering="textual", unmatched="error",
+                     extensions=DEFAULT_IMAGE_EXTENSIONS, **kwargs):
+        from ._explicit_pairs import ExplicitPairedImageDataset, folder_pairs
+        pairs, missing = folder_pairs(input_dir, target_dir, ordering=ordering,
+                                      unmatched=unmatched, extensions=extensions)
+        dataset = ExplicitPairedImageDataset(pairs, **kwargs)
+        from pathlib import Path
+        dataset._folder_config = dict(input_dir=str(Path(input_dir).expanduser().resolve()),
+            target_dir=str(Path(target_dir).expanduser().resolve()), ordering=ordering,
+            unmatched=unmatched, extensions=list(extensions))
+        dataset.missing_input_ids = tuple(missing["missing_input_ids"])
+        dataset.missing_target_ids = tuple(missing["missing_target_ids"])
+        return dataset
+
     def __init__(
         self,
         root_dir: str,

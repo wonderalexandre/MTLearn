@@ -1,5 +1,5 @@
 """Small result handle for finite preparation passes."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..normalization.statistics_snapshot import StatisticsSnapshot
 
@@ -13,3 +13,16 @@ class PreparationResult:
     status: str
     statistics: StatisticsSnapshot | None = None
     statistics_id: str | None = None
+
+
+@dataclass(frozen=True)
+class DiskPreparationResult(PreparationResult):
+    mode: str = "reuse"
+    total_samples: int = 0
+    reused_entries: int = 0
+    prepared_entries: int = 0
+    repaired_entries: int = 0
+    recovered_entries: int = 0
+    statistics_source: str | None = None
+    reason: str | None = None
+    resources: dict = field(default_factory=dict)

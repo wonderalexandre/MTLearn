@@ -492,7 +492,7 @@ def test_filter_spec_score_sharpness_controls_scoring_gain_and_roundtrips():
     assert restored.get_config() == layer.get_config()
 
 
-def test_layer_delegates_identity_initialization_to_scoring_models():
+def test_layer_delegates_identity_initialization_to_scoring_models(monkeypatch):
     layer = ConnectedFilterPreprocessingLayer(
         in_channels=1,
         filter_specs=[
@@ -516,7 +516,17 @@ def test_layer_delegates_identity_initialization_to_scoring_models():
     )
     features = torch.tensor([[0.0], [1.0]], dtype=torch.float32)
 
+    mlp = layer._scoring_models["mlp_area"]
+    original = mlp.init_identity
+    calls = []
+
+    def initialize(**kwargs):
+        calls.append(kwargs)
+        original(**kwargs, output_weight_scale=0.0)
+
+    monkeypatch.setattr(mlp, "init_identity", initialize)
     skipped = layer.init_identity(p0=0.8)
+    assert calls == [{"score_sharpness": 4.0, "p0": 0.8}]
     linear_scores = layer._scoring_models["linear_area"](
         features,
         weight=layer._weights["linear_area"],
@@ -527,7 +537,7 @@ def test_layer_delegates_identity_initialization_to_scoring_models():
 
     assert skipped == ()
     assert torch.allclose(linear_scores, torch.full((2,), 0.8))
-    assert torch.allclose(mlp_scores, torch.full((2,), 0.8), atol=1e-3)
+    assert torch.allclose(mlp_scores, torch.full((2,), 0.8))
 
 
 def test_layer_identity_initialization_reports_unsupported_custom_scorer():

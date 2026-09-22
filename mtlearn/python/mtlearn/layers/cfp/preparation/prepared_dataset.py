@@ -25,6 +25,8 @@ class PreparedDataset(Dataset):
         self.store, self.manifest, self.source = store, manifest, source
         self.preprocessor = preprocessor_from_config(json.loads(row["config"]))
         self._length = row["sample_count"]
+        self._manifest_contract = tuple(row[key] for key in
+            ("config", "source_version", "preprocessing_version", "split", "sample_count"))
         if source is not None and len(source) != self._length:
             raise ValueError("Source length does not match the prepared manifest.")
 
@@ -39,7 +41,11 @@ class PreparedDataset(Dataset):
             index += len(self)
         if index < 0 or index >= len(self):
             raise IndexError(index)
-        manifest_record(self.store, self.manifest)
+        generation = self.store._read_generation()
+        current = manifest_record(self.store, self.manifest)
+        if tuple(current[key] for key in
+                 ("config", "source_version", "preprocessing_version", "split", "sample_count")) != self._manifest_contract:
+            raise ValueError("Manifest contract changed; reopen PreparedDataset with the matching source.")
         row = self.store._db.execute("SELECT * FROM samples WHERE manifest=? AND position=?",
                                      (self.manifest, index)).fetchone()
         if row is None:
@@ -69,6 +75,14 @@ class PreparedDataset(Dataset):
             payloads.clear()
             payload = None
             batch = self.preprocessor.prepare_batch(image.unsqueeze(0), store=self.store, sample_ids=(row["sample_id"],))
+        if self.store._read_generation() != generation:
+            current = manifest_record(self.store, self.manifest)
+            latest = self.store._db.execute("SELECT * FROM samples WHERE manifest=? AND position=?",
+                                            (self.manifest, index)).fetchone()
+            if (tuple(current[key] for key in
+                      ("config", "source_version", "preprocessing_version", "split", "sample_count")) != self._manifest_contract
+                    or latest is None or tuple(latest) != tuple(row)):
+                raise ValueError("Manifest changed during sample loading; reopen PreparedDataset.")
         return batch if target is None else (batch, target)
 
 

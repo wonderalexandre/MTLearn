@@ -64,7 +64,10 @@ def assert_stats(actual, expected):
 @pytest.mark.parametrize("name", MANIFEST["cases"])
 @pytest.mark.parametrize("device", ["cpu", "mps"])
 @pytest.mark.parametrize("mmap", [True, False])
-def test_ssd_statistics_outputs_and_gradients_match_p0(baseline, tmp_path, name, device, mmap, monkeypatch):
+@pytest.mark.parametrize("validation", ["always", "session"])
+def test_ssd_statistics_outputs_and_gradients_match_p0(baseline, tmp_path, name, device, mmap, validation, monkeypatch):
+    if validation == "session" and sys.platform == "win32":
+        pytest.skip("Session validation requires POSIX shared locks")
     if device == "mps" and not torch.backends.mps.is_available():
         pytest.skip("MPS unavailable")
     case = baseline["cases"][name]
@@ -81,9 +84,16 @@ def test_ssd_statistics_outputs_and_gradients_match_p0(baseline, tmp_path, name,
         assert store.info()["retained_bytes"] == 0
     monkeypatch.setattr(CFPPreprocessor, "prepare_u8", forbid)
     monkeypatch.setattr(_disk_format, "summarize", forbid)
-    with DiskStore(tmp_path, readonly=True, mmap=mmap) as reopened:
+    with DiskStore(tmp_path, readonly=True, mmap=mmap, validation=validation,
+                   immutable=validation == "session") as reopened:
         dataset = PreparedDataset(reopened, "test", source(baseline, slice(3, None)))
+        if validation == "session":
+            for index in range(len(dataset)):
+                prepared_sample = dataset[index]
+                del prepared_sample
         batch, targets = next(iter(DataLoader(dataset, batch_size=2, collate_fn=collate_prepared)))
+        if validation == "session":
+            assert reopened.counters()["validation_hits"] == len(dataset)
         output = layer(batch)
         reference = weakref.ref(batch)
         del batch

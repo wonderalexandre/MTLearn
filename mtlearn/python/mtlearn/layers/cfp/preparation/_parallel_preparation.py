@@ -19,6 +19,7 @@ from ._identity import (canonical_json, digest_file, image_identity, identity_ke
 from ._persistent_preparation import _bind_sample, sample_image
 from ..storage._disk_format import pack
 from ..storage._writer_lock import _QuotaWriter, _WriterLock
+from ._preparation_progress import emit
 
 
 def validate_parallel_options(store, num_workers, max_in_flight, worker_threads, max_sample_bytes, max_retries):
@@ -69,7 +70,8 @@ def _write_entry(preprocessor, image, entry, budget, limit):
         writer = None
         try:
             with path.open("xb") as handle:
-                writer = _QuotaWriter(handle, limit - budget.value)
+                writer = _QuotaWriter(handle, limit - budget.value,
+                    min_free_disk_bytes=entry.get("min_free_disk_bytes", 0), disk_path=path.parent)
                 torch.save(data, writer)
                 handle.flush()
                 os.fsync(handle.fileno())
@@ -79,6 +81,8 @@ def _write_entry(preprocessor, image, entry, budget, limit):
             path.unlink(missing_ok=True)
             if writer is not None and writer.exceeded:
                 raise OSError("DiskStore quota exceeded; increase max_disk_bytes and resume. Completed entries were preserved.") from exc
+            if writer is not None and writer.reserve_exceeded:
+                raise OSError("DiskStore free-space reserve reached; free disk space and resume. Completed entries were preserved.") from exc
             raise
     return {"kind": "entry", "key": entry["key"], "temporary": str(path),
             "sha256": digest_file(path), "summary": data["summary"], "size_bytes": size}
@@ -107,7 +111,8 @@ def _worker_loop(connection, config, threads, budget, limit, lease_path):
                 connection.send({"kind": "done"})
             except Exception as exc:
                 connection.send({"kind": "error", "error": f"{type(exc).__name__}: {exc}",
-                                 "quota": isinstance(exc, OSError) and "quota exceeded" in str(exc)})
+                                 "quota": isinstance(exc, OSError) and any(text in str(exc) for text in
+                                     ("quota exceeded", "free-space reserve"))})
             finally:
                 for entry in task["entries"]:
                     Path(entry["temporary"]).unlink(missing_ok=True)
@@ -188,6 +193,7 @@ def _new_task(preprocessor, source, index, sample_ids, store, manifest, max_samp
             key = identity_key(identity)
             trees[tree_key] = key
             entries.setdefault(key, {"key": key, "identity": identity, "channel": channel, "tree_key": tree_key,
+                                    "min_free_disk_bytes": store.min_free_disk_bytes,
                                     "temporary": str(store._files / f".{key}.{uuid.uuid4().hex}.tmp")})
         bindings.append(trees)
     old = store._db.execute("SELECT * FROM samples WHERE manifest=? AND position=?", (manifest, index)).fetchone()
@@ -241,7 +247,7 @@ def _publish(store, task, message):
 
 
 def prepare_parallel(preprocessor, source, store, manifest, sample_ids, cancel, *,
-                     num_workers, max_in_flight, worker_threads, max_sample_bytes, max_retries):
+                     num_workers, max_in_flight, worker_threads, max_sample_bytes, max_retries, progress=None):
     """Return (completed count, cancelled); references and input queues are bounded."""
     workers, pending, next_index, completed = None, deque(), 0, 0
     try:
@@ -268,6 +274,7 @@ def prepare_parallel(preprocessor, source, store, manifest, sample_ids, cancel, 
                 if not task["remaining"]:
                     _bind_sample(store, manifest, task["index"], task["sample_id"], task["bindings"], task["shape"])
                     completed += 1
+                    emit(progress, manifest, completed, len(source), position=task["index"], sample_id=task["sample_id"])
                     del task
                     continue
                 if workers is None:
@@ -299,6 +306,7 @@ def prepare_parallel(preprocessor, source, store, manifest, sample_ids, cancel, 
                     _bind_sample(store, manifest, task["index"], task["sample_id"], task["bindings"], task["shape"])
                     completed += 1
                     slot["task"] = None
+                    emit(progress, manifest, completed, len(source), position=task["index"], sample_id=task["sample_id"])
                 elif message["kind"] == "error":
                     if message["quota"]:
                         raise OSError(message["error"])
