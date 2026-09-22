@@ -10,6 +10,8 @@ import numpy as np
 import pytest
 import torch
 
+from cfp_reference_names import canonical_reference_names
+
 import mtlearn
 from mtlearn import morphology
 from mtlearn.layers import ConnectedFilterPreprocessingLayer as Layer, load_checkpoint
@@ -27,7 +29,7 @@ AREA, HEIGHT = morphology.AttributeType.AREA, morphology.AttributeType.GRAY_LEVE
 
 @pytest.fixture(scope="module")
 def baseline():
-    return torch.load(FIXTURES / "baseline.pt", weights_only=True, map_location="cpu")
+    return canonical_reference_names(torch.load(FIXTURES / "baseline.pt", weights_only=True, map_location="cpu"))
 
 
 def model(*, channels=1, scoring="linear_sigmoid", mode="none", attrs=(AREA, HEIGHT), tree="max-tree", **kwargs):

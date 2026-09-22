@@ -7,6 +7,8 @@ import weakref
 
 import pytest
 import torch
+
+from cfp_reference_names import canonical_reference_names
 from torch.utils.data import DataLoader, TensorDataset
 
 import mtlearn
@@ -27,7 +29,7 @@ MANIFEST = json.loads((FIXTURES / "manifest.json").read_text())
 
 @pytest.fixture(scope="module")
 def baseline():
-    return torch.load(FIXTURES / "baseline.pt", weights_only=True, map_location="cpu")
+    return canonical_reference_names(torch.load(FIXTURES / "baseline.pt", weights_only=True, map_location="cpu"))
 
 
 def loader(images, *, batch_size=2, **kwargs):

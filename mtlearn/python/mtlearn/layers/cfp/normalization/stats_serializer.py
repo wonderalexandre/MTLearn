@@ -30,10 +30,15 @@ class StatsSerializer:
     ) -> dict[str, dict[str, Any]]:
         """Move serialized statistics to ``device`` for a CFP layer."""
         device = torch.device(device)
-        return {
-            str(key): {
+        result = {}
+        for key, stats in serialized.items():
+            key = str(key)
+            if key.endswith("::BOX_WIDTH"):
+                key = key.removesuffix("::BOX_WIDTH") + "::BOUNDING_BOX_WIDTH"
+            if key in result:
+                raise ValueError(f"duplicate dataset statistics for {key}")
+            result[key] = {
                 name: value.to(device) if torch.is_tensor(value) else value
                 for name, value in stats.items()
             }
-            for key, stats in serialized.items()
-        }
+        return result

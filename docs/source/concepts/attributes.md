@@ -2,7 +2,7 @@
 
 This catalog lists the scalar attributes exposed through
 `mtlearn.morphology.AttributeType` and the groups exposed through
-`mtlearn.morphology.AttributeGroup`: 132 scalar attributes and nine groups.
+`mtlearn.morphology.AttributeGroup`: 133 scalar attributes and nine groups.
 Names, groups, and definitions follow the
 [mmcfilters v5.2.0 attribute catalog](https://github.com/wonderalexandre/mmcfilters/blob/v5.2.0/docs/attribute-catalog.md).
 
@@ -49,7 +49,7 @@ below, with its group memberships. `ALL` includes every listed scalar.
 
 | Group | Meaning |
 | --- | --- |
-| `GRAY_LEVEL` | Gray-level mass, contrast, height, mean, and variance. |
+| `GRAY_LEVEL` | Node valuation, gray-level mass, contrast, height, mean, and variance. |
 | `SHAPE` | Size, bounding box, moment, bitquad, contour, and selected shape descriptors. |
 | `MOMENTS` | Central moments, Hu invariants, and moment-derived descriptors. |
 | `BOUNDARY` | Bitquad and contour descriptors. |
@@ -85,11 +85,19 @@ select the applicable directional connectivity.
 
 | Attribute | Groups | Contract | Use |
 | --- | --- | --- | --- |
+| `GRAY_LEVEL` | `GRAY_LEVEL` | Altitude-aware | Node valuation: the gray level associated with the node. |
 | `VOLUME` | `GRAY_LEVEL` | Altitude-aware | Sum of altitude-weighted support contributions over the node subtree. |
 | `RELATIVE_VOLUME` | `GRAY_LEVEL` | Altitude-aware | Recursive contrast volume `R(n) = area(n) + sum_c [R(c) + area(c) * abs(altitude(c) - altitude(n))]` over the direct children `c`. |
 | `GRAY_LEVEL_HEIGHT` | `GRAY_LEVEL` | Altitude-aware | Maximum absolute altitude difference between the node and any node in its subtree. |
 | `MEAN_GRAY_LEVEL` | `GRAY_LEVEL` | Altitude-aware | Arithmetic mean of the image values over the full node support: `sum(f(x), x in X) / card(X)`. |
 | `GRAY_LEVEL_VARIANCE` | `GRAY_LEVEL` | Altitude-aware | Population variance of the image values over the full node support, with denominator `card(X)`. |
+
+Use `morphology.AttributeType.GRAY_LEVEL` to request the node valuation and
+`morphology.AttributeGroup.GRAY_LEVEL` to request the full group. The existing
+`morphology.Attribute.GRAY_LEVEL` shorthand continues to refer to the group.
+The scalar is also available as `morphology.Attribute.Type.GRAY_LEVEL`.
+In Higra output space, its values match the altitudes from
+`tree.export_higra_hierarchy()`, including the exported pixel leaves.
 
 Gray-level attributes are good choices when the filter should depend on
 contrast, intensity, or altitude differences rather than pure geometry.
@@ -99,10 +107,10 @@ contrast, intensity, or altitude differences rather than pure geometry.
 | Attribute | Groups | Contract | Use |
 | --- | --- | --- | --- |
 | `AREA` | `SHAPE` | Topology/support | Number of pixels in the full node support. |
-| `BOX_WIDTH` | `SHAPE` | Topology/support | Width, in columns, of the smallest axis-aligned bounding box enclosing the node support. |
+| `BOUNDING_BOX_WIDTH` | `SHAPE` | Topology/support | Width, in columns, of the smallest axis-aligned bounding box enclosing the node support. |
 | `BOUNDING_BOX_HEIGHT` | `SHAPE` | Topology/support | Height, in rows, of the smallest axis-aligned bounding box enclosing the node support. |
 | `DIAGONAL_LENGTH` | `SHAPE` | Topology/support | Euclidean diagonal length of the bounding box, `sqrt(width^2 + height^2)`. |
-| `RECTANGULARITY` | `SHAPE` | Topology/support | Ratio `AREA / (BOX_WIDTH * BOUNDING_BOX_HEIGHT)`. |
+| `RECTANGULARITY` | `SHAPE` | Topology/support | Ratio `AREA / (BOUNDING_BOX_WIDTH * BOUNDING_BOX_HEIGHT)`. |
 | `RATIO_WH` | `SHAPE` | Topology/support | Bounding-box aspect ratio, `max(width, height) / min(width, height)` for non-degenerate boxes. |
 | `BOX_COLUMN_MIN` | `SHAPE` | Topology/support | Minimum image column index covered by the node support. |
 | `BOX_COLUMN_MAX` | `SHAPE` | Topology/support | Maximum image column index covered by the node support. |

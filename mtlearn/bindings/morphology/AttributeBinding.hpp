@@ -38,7 +38,7 @@ inline const std::vector<morphology::Attribute>& allAttributes()
         morphology::Attribute::GrayLevelHeight,
         morphology::Attribute::MeanGrayLevel,
         morphology::Attribute::GrayLevelVariance,
-        morphology::Attribute::BoxWidth,
+        morphology::Attribute::BoundingBoxWidth,
         morphology::Attribute::BoundingBoxHeight,
         morphology::Attribute::DiagonalLength,
         morphology::Attribute::Rectangularity,
@@ -164,6 +164,7 @@ inline const std::vector<morphology::Attribute>& allAttributes()
         morphology::Attribute::FilledCentroidDisplacementNormalized,
         morphology::Attribute::FilledCompactness,
         morphology::Attribute::FilledCircularity,
+        morphology::Attribute::GrayLevel,
     };
     return attributes;
 }
@@ -173,7 +174,18 @@ inline const std::vector<morphology::Attribute>& allAttributes()
 // facade is introduced.
 inline std::string describeAttribute(morphology::Attribute attribute)
 {
+    if (attribute == morphology::Attribute::GrayLevel) {
+        return "Gray level: Node valuation (the gray level associated with the node).";
+    }
     return mmcfilters::AttributeNames::describe(toBackend(attribute));
+}
+
+inline std::string attributeName(mmcfilters::Attribute attribute)
+{
+    if (fromBackend(attribute) == morphology::Attribute::BoundingBoxWidth) {
+        return "BOUNDING_BOX_WIDTH";
+    }
+    return mmcfilters::AttributeNames::toString(attribute);
 }
 
 // Return all descriptions keyed by backend/public attribute name. Keeping the
@@ -182,9 +194,9 @@ inline py::dict describeAllAttributes()
 {
     py::dict descriptions;
     for (const auto attribute : allAttributes()) {
-        const auto backendAttribute = toBackend(attribute);
-        descriptions[py::str(mmcfilters::AttributeNames::toString(backendAttribute))] =
-            py::str(mmcfilters::AttributeNames::describe(backendAttribute));
+        const auto name = attribute == morphology::Attribute::GrayLevel
+            ? std::string("GRAY_LEVEL") : attributeName(toBackend(attribute));
+        descriptions[py::str(name)] = py::str(describeAttribute(attribute));
     }
     return descriptions;
 }
@@ -203,6 +215,9 @@ inline std::vector<morphology::Attribute> expandAttributeGroup(morphology::Attri
     for (const auto attribute : it->second) {
         attributes.push_back(fromBackend(attribute));
     }
+    if (group == morphology::AttributeGroup::All || group == morphology::AttributeGroup::GrayLevel) {
+        attributes.push_back(morphology::Attribute::GrayLevel);
+    }
     return attributes;
 }
 
@@ -211,7 +226,11 @@ inline std::vector<morphology::Attribute> expandAttributeGroup(morphology::Attri
 // row count for the selected node-id space.
 inline int outputSize(const morphology::WeightedTree& tree, morphology::NodeIdSpace outputSpace)
 {
-    return morphology::detail::topology(tree).getNodeIdSpaceSize(toBackend(outputSpace));
+    const auto& topology = morphology::detail::topology(tree);
+    if (outputSpace == morphology::NodeIdSpace::Higra) {
+        return topology.numPixels() + topology.numNodes();
+    }
+    return topology.getNodeIdSpaceSize(toBackend(outputSpace));
 }
 
 // mmcfilters returns an attribute-name map that is not guaranteed to iterate in
@@ -225,7 +244,7 @@ inline py::dict sortedAttributeIndex(const mmcfilters::AttributeNames& attribute
     values.reserve(attributeNames.indexMap.size());
 
     for (const auto& item : attributeNames.indexMap) {
-        keys.push_back(attributeNames.toString(item.first));
+        keys.push_back(attributeName(item.first));
         values.push_back(item.second);
     }
 
@@ -243,6 +262,25 @@ inline py::dict sortedAttributeIndex(const mmcfilters::AttributeNames& attribute
 }
 
 template <std::floating_point Real>
+std::vector<Real> computeGrayLevel(const morphology::WeightedTree& tree, morphology::NodeIdSpace outputSpace)
+{
+    const auto& valuedTree = morphology::detail::backend(tree);
+    if (outputSpace == morphology::NodeIdSpace::Higra) {
+        const auto [parents, altitudes] = valuedTree.exportHigraHierarchy();
+        return std::vector<Real>(altitudes.begin(), altitudes.end());
+    }
+    if (outputSpace != morphology::NodeIdSpace::MorphologicalTree) {
+        throw std::invalid_argument("unknown NodeIdSpace");
+    }
+    const auto& topology = morphology::detail::topology(tree);
+    std::vector<Real> values(topology.numInternalNodeSlots(), Real{0});
+    for (const auto node : topology.aliveNodeIds()) {
+        values[node] = static_cast<Real>(valuedTree.nodeAltitude(node));
+    }
+    return values;
+}
+
+template <std::floating_point Real>
 std::pair<py::dict, py::array> computeAttributesTyped(
     morphology::WeightedTreePtr tree,
     const std::vector<morphology::AttributeOrGroup>& attributes,
@@ -252,16 +290,57 @@ std::pair<py::dict, py::array> computeAttributesTyped(
         throw py::value_error("invalid ValuedMorphologicalTree");
     }
 
-    const auto backendAttributes = toBackend(attributes);
-    auto [attributeNames, buffer] =
-        mmcfilters::AttributeComputation::computeAttributes<Real>(
-            morphology::detail::backend(*tree),
-            backendAttributes,
-            toBackend(outputSpace));
+    bool includeGrayLevel = false;
+    std::vector<mmcfilters::AttributeOrGroup> backendAttributes;
+    backendAttributes.reserve(attributes.size());
+    for (const auto& request : attributes) {
+        if (const auto* scalar = std::get_if<morphology::Attribute>(&request)) {
+            if (*scalar == morphology::Attribute::GrayLevel) {
+                includeGrayLevel = true;
+                continue;
+            }
+        } else {
+            const auto group = std::get<morphology::AttributeGroup>(request);
+            includeGrayLevel = includeGrayLevel || group == morphology::AttributeGroup::All
+                || group == morphology::AttributeGroup::GrayLevel;
+        }
+        backendAttributes.push_back(toBackend(request));
+    }
 
-    return {
-        sortedAttributeIndex(attributeNames),
-        vectorToNumpyOwned(std::move(buffer), outputSize(*tree, outputSpace), attributeNames.NUM_ATTRIBUTES)};
+    const int rows = outputSize(*tree, outputSpace);
+    py::dict layout;
+    std::vector<Real> buffer;
+    int columns = 0;
+    if (!backendAttributes.empty() || !includeGrayLevel) {
+        auto [attributeNames, values] =
+            mmcfilters::AttributeComputation::computeAttributes<Real>(
+                morphology::detail::backend(*tree), backendAttributes);
+        if (outputSpace == morphology::NodeIdSpace::Higra) {
+            values = mmcfilters::AttributeComputation::projectNodeValuesToExportedHigra<Real>(
+                morphology::detail::backend(*tree), attributeNames, values);
+        }
+        layout = sortedAttributeIndex(attributeNames);
+        columns = attributeNames.NUM_ATTRIBUTES;
+        buffer = std::move(values);
+    }
+    if (includeGrayLevel) {
+        auto grayLevel = computeGrayLevel<Real>(*tree, outputSpace);
+        layout["GRAY_LEVEL"] = columns;
+        if (columns == 0) {
+            buffer = std::move(grayLevel);
+        } else {
+            std::vector<Real> values(static_cast<std::size_t>(rows) * (columns + 1));
+            for (int row = 0; row < rows; ++row) {
+                const auto source = static_cast<std::size_t>(row) * columns;
+                const auto destination = static_cast<std::size_t>(row) * (columns + 1);
+                std::copy_n(buffer.begin() + source, columns, values.begin() + destination);
+                values[destination + columns] = grayLevel[row];
+            }
+            buffer = std::move(values);
+        }
+        ++columns;
+    }
+    return {std::move(layout), vectorToNumpyOwned(std::move(buffer), rows, columns)};
 }
 
 // Compute several attributes or attribute groups and return the pair used by
@@ -289,12 +368,18 @@ py::array computeSingleAttributeTyped(
         throw py::value_error("invalid ValuedMorphologicalTree");
     }
 
+    if (attribute == morphology::Attribute::GrayLevel) {
+        return vectorToNumpyOwned(computeGrayLevel<Real>(*tree, outputSpace), outputSize(*tree, outputSpace));
+    }
+
     auto [attributeNames, buffer] =
         mmcfilters::AttributeComputation::computeSingleAttribute<Real>(
             morphology::detail::backend(*tree),
-            toBackend(attribute),
-            toBackend(outputSpace));
-    (void)attributeNames;
+            toBackend(attribute));
+    if (outputSpace == morphology::NodeIdSpace::Higra) {
+        buffer = mmcfilters::AttributeComputation::projectNodeValuesToExportedHigra<Real>(
+            morphology::detail::backend(*tree), attributeNames, buffer);
+    }
 
     return vectorToNumpyOwned(std::move(buffer), outputSize(*tree, outputSpace));
 }
@@ -385,14 +470,14 @@ Returns:
         attribute,
         "Type",
         py::module_local(),
-        "Scalar morphology attributes supported by the current backend.")
+        "Scalar morphology attributes supported by mtlearn.")
         .value("AREA", morphology::Attribute::Area)
         .value("VOLUME", morphology::Attribute::Volume)
         .value("RELATIVE_VOLUME", morphology::Attribute::RelativeVolume)
         .value("GRAY_LEVEL_HEIGHT", morphology::Attribute::GrayLevelHeight)
         .value("MEAN_GRAY_LEVEL", morphology::Attribute::MeanGrayLevel)
         .value("GRAY_LEVEL_VARIANCE", morphology::Attribute::GrayLevelVariance)
-        .value("BOX_WIDTH", morphology::Attribute::BoxWidth)
+        .value("BOUNDING_BOX_WIDTH", morphology::Attribute::BoundingBoxWidth)
         .value("BOUNDING_BOX_HEIGHT", morphology::Attribute::BoundingBoxHeight)
         .value("RECTANGULARITY", morphology::Attribute::Rectangularity)
         .value("DIAGONAL_LENGTH", morphology::Attribute::DiagonalLength)
@@ -518,7 +603,13 @@ Returns:
         .value("FILLED_CENTROID_DISPLACEMENT_NORMALIZED", morphology::Attribute::FilledCentroidDisplacementNormalized)
         .value("FILLED_COMPACTNESS", morphology::Attribute::FilledCompactness)
         .value("FILLED_CIRCULARITY", morphology::Attribute::FilledCircularity)
+        .value("GRAY_LEVEL", morphology::Attribute::GrayLevel)
         .export_values();
+
+    attribute.attr("GRAY_LEVEL") = attribute.attr("Group").attr("GRAY_LEVEL");
+
+    attribute.attr("Type").attr("BOX_WIDTH") = attribute.attr("Type").attr("BOUNDING_BOX_WIDTH");
+    attribute.attr("BOX_WIDTH") = attribute.attr("BOUNDING_BOX_WIDTH");
 }
 
 } // namespace morphology_pybind

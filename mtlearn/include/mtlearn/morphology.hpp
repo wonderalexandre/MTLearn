@@ -61,7 +61,7 @@ enum class NodeIdSpace {
     Higra,              ///< Rows are indexed by exported Higra hierarchy ids.
 };
 
-/// Public attribute identifiers supported by the current morphology backend.
+/// Public attribute identifiers supported by the morphology facade.
 ///
 /// Keep this enum synchronized with the conversion table in
 /// `bindings/morphology/BindingSupport.hpp` and the Python exposure in
@@ -73,7 +73,8 @@ enum class Attribute {
     GrayLevelHeight,                  ///< Gray-level height.
     MeanGrayLevel,                   ///< Mean gray-level value.
     GrayLevelVariance,               ///< Gray-level variance.
-    BoxWidth,                    ///< Bounding-box width.
+    BoundingBoxWidth,            ///< Bounding-box width.
+    BoxWidth = BoundingBoxWidth,
     BoundingBoxHeight,                   ///< Bounding-box height.
     DiagonalLength,              ///< Bounding-box diagonal length.
     Rectangularity,               ///< Component rectangularity.
@@ -199,14 +200,15 @@ enum class Attribute {
     FilledCentroidDisplacementNormalized,
     FilledCompactness,
     FilledCircularity,
+    GrayLevel,                  ///< Node valuation (gray level).
 };
 
-/// Attribute groups expanded by the backend attribute computer.
+/// Attribute groups expanded by the morphology facade.
 ///
 /// Groups are part of the facade because Python notebooks and future C++
 /// consumers should not depend on backend attribute-group types directly.
 enum class AttributeGroup {
-    All,           ///< All public scalar attributes supported by the backend.
+    All,           ///< All public scalar attributes supported by the facade.
     GrayLevel,    ///< Gray-level attributes.
     Shape,         ///< Shape attributes.
     Moments,       ///< Moment-based attributes.
