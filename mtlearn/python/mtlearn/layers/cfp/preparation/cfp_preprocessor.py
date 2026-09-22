@@ -42,6 +42,15 @@ class CFPPreprocessor:
             attribute_dtype=layer.attribute_dtype,
         )
 
+    def get_config(self):
+        from ._identity import preprocessor_config
+        return preprocessor_config(self)
+
+    @classmethod
+    def from_config(cls, config):
+        from ._identity import preprocessor_from_config
+        return preprocessor_from_config(config)
+
     def prepare_image(self, image, tree_key=None, *, input_id=None):
         """Validate and prepare one 2D image using the existing uint8 conversion.
 

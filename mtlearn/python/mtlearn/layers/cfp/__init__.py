@@ -61,3 +61,12 @@ __all__ = [
     "SpecRegistry",
     "TreeSpec",
 ]
+
+from .preparation import DatasetSource, paired_source_from_config
+__all__ += ["DatasetSource", "paired_source_from_config"]
+
+from .preparation import DatasetCacheConfig, prepare_dataset_cache, open_dataset_cache
+__all__ += ["DatasetCacheConfig", "prepare_dataset_cache", "open_dataset_cache"]
+
+from .preparation import DatasetReaderConfig, inspect_dataset_cache
+__all__ += ["DatasetReaderConfig", "inspect_dataset_cache"]

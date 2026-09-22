@@ -11,3 +11,12 @@ __all__ += ["PreparedDataLoader", "PreparedDataLoadingError", "build_prepared_da
 
 from .calibration import calibrate_disk_cache
 __all__ += ["calibrate_disk_cache"]
+
+from .dataset_source import DatasetSource, paired_source_from_config
+__all__ += ["DatasetSource", "paired_source_from_config"]
+
+from .dataset_cache import DatasetCacheConfig, prepare_dataset_cache, open_dataset_cache
+__all__ += ["DatasetCacheConfig", "prepare_dataset_cache", "open_dataset_cache"]
+
+from .dataset_diagnostics import DatasetReaderConfig, inspect_dataset_cache
+__all__ += ["DatasetReaderConfig", "inspect_dataset_cache"]
