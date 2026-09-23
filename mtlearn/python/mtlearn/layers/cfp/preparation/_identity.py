@@ -1,11 +1,8 @@
 """Versioned, primitive-only identities for local persistent preparation."""
-from functools import lru_cache
 import hashlib
 import json
-from pathlib import Path
 
 from .... import morphology
-from ...._native import load_bindings
 from ..specs import FeatureSpec, TreeSpec
 
 FORMAT_VERSION = 4
@@ -24,12 +21,20 @@ def digest_file(path):
     return digest.hexdigest()
 
 
-@lru_cache(maxsize=1)
 def implementation_identity():
-    # Binary identity is deliberately conservative across backend builds. The
-    # semantic version must change when Python preparation/quantization changes.
-    return {"semantics": PREPARATION_SEMANTICS,
-            "native_sha256": digest_file(Path(load_bindings().__file__))}
+    return {"semantics": PREPARATION_SEMANTICS}
+
+
+def compatible_implementation(implementation):
+    return (isinstance(implementation, dict)
+            and set(implementation) in ({"semantics"}, {"semantics", "native_sha256"})
+            and implementation["semantics"] == PREPARATION_SEMANTICS)
+
+
+def compatibility_config(config):
+    if not isinstance(config, dict) or not compatible_implementation(config.get("implementation")):
+        raise ValueError("Incompatible persistent preparation implementation or format.")
+    return dict(config, implementation=implementation_identity())
 
 
 def tree_config(spec):
@@ -55,7 +60,8 @@ def preprocessor_config(preprocessor):
     from .cfp_preprocessor import CFPPreprocessor
     if type(preprocessor) is not CFPPreprocessor or preprocessor.morphology is not morphology:
         raise ValueError("Persistent preparation currently requires the standard CFPPreprocessor implementation.")
-    return {"format_version": FORMAT_VERSION, "implementation": dict(implementation_identity()),
+    implementation = getattr(preprocessor, "_implementation", implementation_identity())
+    return {"format_version": FORMAT_VERSION, "implementation": dict(implementation),
             "attribute_dtype": preprocessor.attribute_dtype.name,
             "trees": [{"tree": tree_config(spec),
                        "attributes": [a.name for a in preprocessor.features[key].attributes]}
@@ -64,14 +70,16 @@ def preprocessor_config(preprocessor):
 
 def preprocessor_from_config(config):
     from .cfp_preprocessor import CFPPreprocessor
-    if config["format_version"] != FORMAT_VERSION or config["implementation"] != implementation_identity():
+    if config["format_version"] != FORMAT_VERSION or not compatible_implementation(config["implementation"]):
         raise ValueError("Incompatible persistent preparation implementation or format.")
     trees, features = {}, {}
     for entry in config["trees"]:
         tree = tree_from_config(entry["tree"])
         trees[tree.cache_key()] = tree
         features[tree.cache_key()] = FeatureSpec(tuple(getattr(morphology.AttributeType, a) for a in entry["attributes"]))
-    return CFPPreprocessor(tree_specs=trees, features=features, attribute_dtype=config["attribute_dtype"])
+    preprocessor = CFPPreprocessor(tree_specs=trees, features=features, attribute_dtype=config["attribute_dtype"])
+    preprocessor._implementation = dict(config["implementation"])
+    return preprocessor
 
 
 def image_identity(preprocessor, image, tree_key, *, pixel_digest=None):
@@ -91,7 +99,7 @@ def validate_identity(identity):
     expected = {"format_version", "implementation", "pixels_sha256", "shape", "tree", "attributes", "attribute_dtype"}
     if set(identity) != expected or identity["format_version"] != FORMAT_VERSION:
         raise ValueError("Unsupported preparation identity format.")
-    if identity["implementation"] != implementation_identity():
+    if not compatible_implementation(identity["implementation"]):
         raise ValueError("Preparation backend/semantics do not match this runtime.")
     digest = identity["pixels_sha256"]
     if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):

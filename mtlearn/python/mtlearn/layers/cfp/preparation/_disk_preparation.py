@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 
 from ..storage import DiskStore
-from ._identity import canonical_json, preprocessor_config, validate_identity, tree_config
+from ._identity import canonical_json, compatibility_config, preprocessor_config, validate_identity, tree_config
 from ._persistent_preparation import statistics_contract, statistics_identity
 from .preparation_result import DiskPreparationResult
 
@@ -78,7 +78,9 @@ def _header(store, preprocessor, manifest, source_version, preprocessing_version
                 "preprocessing_version": preprocessing_version, "split": split}
     if count is not None:
         expected["sample_count"] = count
-    differences = [name for name, value in expected.items() if row[name] != value]
+    differences = [name for name, value in expected.items()
+                   if (compatibility_config(json.loads(row[name])) != compatibility_config(json.loads(value))
+                       if name == "config" else row[name] != value)]
     if differences:
         raise ValueError(f"Manifest {manifest!r} is incompatible: {', '.join(differences)} changed. "
                          "Use the matching contract or a new manifest name; cache metadata must not be rewritten.")

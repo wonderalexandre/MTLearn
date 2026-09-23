@@ -10,7 +10,7 @@ from ..._helpers import to_numpy_u8
 from ..normalization import AttributeNormalizer
 from ..normalization.statistics_snapshot import StatisticsSnapshot
 from ..runtime.cache_input_contract import validate_cfp_cache_batch_x
-from ._identity import canonical_json, image_identity, identity_key, preprocessor_config, preprocessor_from_config
+from ._identity import canonical_json, compatibility_config, image_identity, identity_key, preprocessor_config, preprocessor_from_config
 from .preparation_result import PreparationResult
 from ._preparation_progress import emit
 
@@ -63,13 +63,19 @@ def _begin_manifest(store, name, preprocessor, count, source_version, preprocess
     if any(not isinstance(v, str) or not v for v in (name, source_version, preprocessing_version)):
         raise ValueError("Persistent preparation requires manifest, source_version and preprocessing_version strings.")
     config = canonical_json(preprocessor_config(preprocessor))
-    values = (config, source_version, preprocessing_version, split, count)
     row = store._db.execute("SELECT * FROM manifests WHERE name=?", (name,)).fetchone()
+    if row is not None:
+        previous = json.loads(row["config"])
+        if compatibility_config(previous) == compatibility_config(json.loads(config)):
+            preprocessor = preprocessor_from_config(previous)
+            config = row["config"]
+    values = (config, source_version, preprocessing_version, split, count)
     if row is not None and tuple(row[k] for k in ("config", "source_version", "preprocessing_version", "split", "sample_count")) != values:
         raise ValueError("Manifest contract/source version changed; use a new manifest name to reuse compatible content safely.")
     with store._db:
         store._db.execute("""INSERT INTO manifests VALUES (?,?,?,?,?,?,'preparing',NULL)
             ON CONFLICT(name) DO UPDATE SET state='preparing',error=NULL""", (name, *values))
+    return preprocessor
 
 
 def _bind_sample(store, name, position, sample_id, bindings, shape):
@@ -146,7 +152,7 @@ def prepare_source(preprocessor, source, *, store=None, manifest=None, source_ve
     persistent = getattr(store, "persistent", False)
     if persistent:
         store._check(write=True)
-        _begin_manifest(store, manifest, preprocessor, count, source_version, preprocessing_version, split)
+        preprocessor = _begin_manifest(store, manifest, preprocessor, count, source_version, preprocessing_version, split)
         # A resumed pass must revalidate durable files, even if this process has
         # already borrowed valid CPU buffers from a now damaged/missing file.
         store.clear()
