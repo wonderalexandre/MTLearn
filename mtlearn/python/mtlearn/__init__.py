@@ -35,6 +35,8 @@ __all__ = [
     "datasets",
     "layers",
     "morphology",
+    "patches",
+    "training",
     "ConnectedFilterPreprocessingTreeTensors",
     "ConnectedFilterPreprocessingTreeTraversal",
 ]
@@ -43,7 +45,7 @@ __all__ = [
 def __getattr__(name: str):
     """Load optional public submodules only when users ask for them."""
 
-    if name in {"data", "datasets"}:
+    if name in {"data", "datasets", "patches", "training"}:
         module = import_module(f".{name}", __name__)
         globals()[name] = module
         return module
