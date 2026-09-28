@@ -35,12 +35,60 @@ class PairedImageDataset(Dataset):
 
     @classmethod
     def from_pairs(cls, pairs, **kwargs):
+        """Read explicit ``(sample_id, input_path, target_path)`` records.
+
+        IDs must be unique, nonempty strings. ``ordering="provided"`` preserves
+        record order; ``"textual"`` sorts strings. ``"numeric"`` sorts decimal
+        IDs numerically and normalizes them, so ``"01"`` and ``"1"`` collide.
+        Indexing checks file existence without decoding images.
+
+        Reader options shared with :meth:`from_folders` and :meth:`from_suffixes`:
+
+        * ``grayscale_in`` and ``grayscale_target`` default to True. False reads
+          RGB; ordinary reading converts to uint8 and discards alpha channels.
+        * ``strict_grayscale_uint8=True`` requires native 2D uint8 input and
+          target arrays, with both grayscale flags enabled.
+        * ``binary_target=True`` requires a native 2D uint8 target whose values
+          belong to either {0, 1} or {0, 255}. It maps positive values to one,
+          requires grayscale_target=True and rejects invert_target=True.
+        * ``invert_in`` and ``invert_target`` default to False and apply
+          ``255 - image`` before resizing.
+        * ``num_rows`` and ``num_cols`` default to None. Supply both to resize
+          inputs with area interpolation and targets with nearest interpolation.
+          Input and target spatial sizes must match before resizing.
+        * ``dtype`` defaults to torch.float32. ``scale_in`` and ``scale_out``
+          default to True and divide converted tensors by 255; binary targets
+          bypass scale_out. Integer tensors can promote to a floating dtype.
+
+        Return a PairedImageDataset with ``sample_ids``, immutable ``records``
+        (sample_id, input_path and target_path fields), and ``pairs`` containing
+        only input/target paths. Items are ``(input, target, sample_id)`` on CPU
+        with shapes ``(C, H, W)`` and ``(C_target, H, W)``. The returned reader
+        provides ``get_config()`` and ``get_preprocessing_contract()``. The latter
+        returns copied ``input`` and ``target`` mappings describing decoding,
+        channel order, alpha and orientation policies, inversion, resize,
+        interpolation, binarization and scaling. ``dtype`` records conversion;
+        ``output_dtype`` records the effective dtype after scaling. Native file
+        shape and dtype are recorded separately by :func:`audit_image_pairs`.
+        """
         from ._explicit_pairs import ExplicitPairedImageDataset
         return ExplicitPairedImageDataset(pairs, **kwargs)
 
     @classmethod
     def from_folders(cls, input_dir, target_dir, *, ordering="textual", unmatched="error",
                      extensions=DEFAULT_IMAGE_EXTENSIONS, **kwargs):
+        """Match direct files in two directories by filename stem.
+
+        ``ordering="textual"`` preserves textual IDs; ``"numeric"`` normalizes
+        decimal IDs. Duplicate IDs within a role always fail. ``unmatched`` is
+        error, warn or ignore and controls incomplete pairs. Missing counterparts
+        are reported in ``missing_input_ids`` and ``missing_target_ids``.
+        Extensions are case-normalized. Reader options follow :meth:`from_pairs`.
+
+        Configuration reconstruction rescans the directories and checks the
+        ordered ID digest. Use :meth:`from_manifest` for a saved selection that
+        must ignore unrelated new files.
+        """
         from ._explicit_pairs import ExplicitPairedImageDataset, folder_pairs
         pairs, missing = folder_pairs(input_dir, target_dir, ordering=ordering,
                                       unmatched=unmatched, extensions=extensions)
@@ -52,6 +100,52 @@ class PairedImageDataset(Dataset):
         dataset.missing_input_ids = tuple(missing["missing_input_ids"])
         dataset.missing_target_ids = tuple(missing["missing_target_ids"])
         return dataset
+
+    @classmethod
+    def from_suffixes(cls, root_dir, *, suffix_in="_in", suffix_target="_target",
+                      prefix_in="", prefix_target="", extensions=(".png", ".jpg", ".pgm"),
+                      ordering="textual", unmatched="error", **reader_options):
+        """Build strict pairs from literal filename prefixes and suffixes.
+
+        Index direct files in textual ID order without decoding. IDs are nonempty and
+        preserved exactly. Suffixes must be distinct and nonempty; a file matching both
+        roles or duplicate IDs within a role always fails. ``unmatched`` accepts error,
+        warn or ignore for incomplete pairs only. Report exclusions through
+        ``missing_input_ids`` and ``missing_target_ids``. Extensions are case-normalized.
+
+        Reader options follow :meth:`from_pairs`. Configuration roundtrips rescan this
+        source and check its ordered ID digest. To freeze a historical selection
+        against unrelated added files, use :meth:`from_manifest`.
+        """
+        from ._explicit_pairs import ExplicitPairedImageDataset
+        from ._suffix_pairs import suffix_pairs
+        pairs, missing, config = suffix_pairs(root_dir, suffix_in=suffix_in,
+            suffix_target=suffix_target, prefix_in=prefix_in, prefix_target=prefix_target,
+            extensions=extensions, ordering=ordering, unmatched=unmatched)
+        dataset = ExplicitPairedImageDataset(pairs, **reader_options)
+        dataset._suffix_config = config
+        dataset.missing_input_ids = tuple(missing["missing_input_ids"])
+        dataset.missing_target_ids = tuple(missing["missing_target_ids"])
+        return dataset
+
+    @classmethod
+    def from_manifest(cls, path, *, roots, split=None, expected_fingerprint=None):
+        """Reconstruct a nonempty saved selection with the manifest's exact reader.
+
+        Resolve only saved records, optionally in one split's order. The compact source
+        configuration stores the manifest path, expected manifest fingerprint, roots
+        and split rather than embedding every pair. Worker recreation rejects changed
+        manifest contracts. Root locations may be changed explicitly for relocation.
+
+        This loads metadata and checks source existence/containment, without decoding
+        or verifying source hashes. Call ``SplitManifest.validate_files`` explicitly
+        before execution. Use ``subsets_from_ids(..., allow_empty=True)`` when empty
+        views are needed. The dataset's effective reader must remain unchanged before
+        exporting its configuration.
+        """
+        from ._manifest_dataset import manifest_dataset
+        return manifest_dataset(path, roots=roots, split=split,
+                                expected_fingerprint=expected_fingerprint)
 
     def __init__(
         self,

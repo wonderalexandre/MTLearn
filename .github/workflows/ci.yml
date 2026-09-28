@@ -164,7 +164,11 @@ jobs:
               cd /tmp
               "${GITHUB_WORKSPACE}/${venv_python}" -m pytest -q \
                 "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_bindings.py" \
-                "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_cfp_deterministic.py"
+                "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_cfp_deterministic.py" \
+                "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_patch_geometry.py" \
+                "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_patch_reconstruction.py" \
+                "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_patch_backward.py" \
+                "${GITHUB_WORKSPACE}/mtlearn/tests/python/test_patch_cfp_integration.py"
             )
             tested_torch_versions+=("${torch_version}")
             echo "::endgroup::"

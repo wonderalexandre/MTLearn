@@ -11,7 +11,7 @@ import torch
 from ._paired_image import PairedImageDataset
 from ._image_ops import (
     DEFAULT_IMAGE_EXTENSIONS, normalize_extensions, normalize_resize_shape,
-    read_image, resize_image, to_channel_first_tensor, scale_tensor,
+    _read_image_file, read_image, resize_image, to_channel_first_tensor, scale_tensor,
 )
 
 
@@ -110,7 +110,7 @@ class ExplicitPairedImageDataset(PairedImageDataset):
     def _read(self, path, grayscale, sample_id, *, target=False):
         if not self.strict_grayscale_uint8 and not (self.binary_target and target):
             return read_image(path, grayscale=grayscale)
-        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        image = _read_image_file(path, cv2.IMREAD_UNCHANGED)
         if image is None:
             raise RuntimeError(f'Sample {sample_id!r}: could not read {path}')
         if image.ndim != 2 or image.dtype != np.uint8:
@@ -138,7 +138,24 @@ class ExplicitPairedImageDataset(PairedImageDataset):
              scale_tensor(to_channel_first_tensor(target, dtype=self.dtype), enabled=self.scale_out))
         return x, y, pair.sample_id
 
+    def get_preprocessing_contract(self):
+        """Describe this reader's effective operations separately for input and target.
+
+        Include decoding, channel order, alpha and orientation policies, inversion,
+        resize/interpolation, binarization, conversion/output dtypes and scaling.
+        ``dtype`` is the conversion dtype; ``output_dtype`` includes promotion by
+        scaling. Scaling an integer tensor follows the default floating dtype.
+        Native dtype is recorded by an explicit audit and can differ from the
+        ordinary reader's uint8 decoding. The returned mapping is a fresh copy
+        with no absolute paths or file hashes.
+        """
+        from ._dataset_contracts import _preprocessing, _reader_options
+        return _preprocessing(_reader_options(self))
+
     def get_config(self):
+        if hasattr(self, '_manifest_config'):
+            from ._manifest_dataset import manifest_config
+            return manifest_config(self)
         config = {'pairs': [(p.sample_id, p.input_path, p.target_path) for p in self.records],
                 'strict_grayscale_uint8': self.strict_grayscale_uint8, 'binary_target': self.binary_target,
                 'num_rows': self.num_rows, 'num_cols': self.num_cols, 'grayscale_in': self.grayscale_in,
@@ -150,12 +167,27 @@ class ExplicitPairedImageDataset(PairedImageDataset):
             config.pop('pairs')
             config['folders'] = dict(self._folder_config)
             config['sample_ids_sha256'] = hashlib.sha256(json.dumps(self.sample_ids).encode()).hexdigest()
+        if hasattr(self, '_suffix_config'):
+            config.pop('pairs')
+            config['suffixes'] = dict(self._suffix_config)
+            config['sample_ids_sha256'] = hashlib.sha256(json.dumps(self.sample_ids).encode()).hexdigest()
         return config
 
     @classmethod
     def from_config(cls, config):
         config = dict(config)
+        if 'manifest' in config:
+            if set(config) != {'manifest'}:
+                raise ValueError('Manifest source configuration has unexpected fields')
+            return PairedImageDataset.from_manifest(**config['manifest'])
         config['dtype'] = getattr(torch, config['dtype'])
+        if 'suffixes' in config:
+            suffixes = config.pop('suffixes')
+            digest = config.pop('sample_ids_sha256')
+            dataset = PairedImageDataset.from_suffixes(**suffixes, **config)
+            if hashlib.sha256(json.dumps(dataset.sample_ids).encode()).hexdigest() != digest:
+                raise ValueError('Paired suffix sample IDs changed since source configuration')
+            return dataset
         if 'folders' in config:
             folders = config.pop('folders')
             digest = config.pop('sample_ids_sha256')
