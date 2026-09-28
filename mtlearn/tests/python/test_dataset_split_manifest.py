@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 
+import cv2
 import numpy as np
 import pytest
 import torch
