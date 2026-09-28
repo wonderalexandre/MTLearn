@@ -11,7 +11,7 @@ import torch
 from ._paired_image import PairedImageDataset
 from ._image_ops import (
     DEFAULT_IMAGE_EXTENSIONS, normalize_extensions, normalize_resize_shape,
-    read_image, resize_image, to_channel_first_tensor, scale_tensor,
+    _read_image_file, read_image, resize_image, to_channel_first_tensor, scale_tensor,
 )
 
 
@@ -110,7 +110,7 @@ class ExplicitPairedImageDataset(PairedImageDataset):
     def _read(self, path, grayscale, sample_id, *, target=False):
         if not self.strict_grayscale_uint8 and not (self.binary_target and target):
             return read_image(path, grayscale=grayscale)
-        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        image = _read_image_file(path, cv2.IMREAD_UNCHANGED)
         if image is None:
             raise RuntimeError(f'Sample {sample_id!r}: could not read {path}')
         if image.ndim != 2 or image.dtype != np.uint8:

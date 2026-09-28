@@ -10,6 +10,7 @@ from ._dataset_contracts import (
     _hash_file, _json_copy, _portable_path, _preprocessing,
     _reader_options, _roots, _signature,
 )
+from ._image_ops import _read_image_file
 from ._sample_ids import _ids
 
 
@@ -103,7 +104,7 @@ def audit_image_pairs(dataset, roots, validate_sample=None):
             try:
                 signature = _signature(path)
                 digest = _hash_file(path)
-                array = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+                array = _read_image_file(str(path), cv2.IMREAD_UNCHANGED)
                 if array is None or array.ndim not in (2, 3) or not array.size:
                     raise ValueError('Could not decode a nonempty image')
             except (OSError, ValueError, RuntimeError) as exc:

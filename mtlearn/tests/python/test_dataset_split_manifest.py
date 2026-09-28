@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 import shutil
 
-import cv2
 import numpy as np
 import pytest
 import torch
@@ -15,7 +14,7 @@ from mtlearn.layers import ConnectedFilterPreprocessingLayer
 from mtlearn.layers.cfp import (CFPPreprocessor, DatasetCacheConfig, DatasetSource,
     open_dataset_cache, paired_source_from_config, prepare_dataset_cache)
 from mtlearn.layers.cfp.preparation._reader_process import factory_descriptor
-from test_dataset_pair_audit import audited_pairs
+from test_dataset_pair_audit import audited_pairs, save_image
 
 
 @pytest.fixture
@@ -111,7 +110,7 @@ def test_unknown_roots_and_external_symlinks(manifest, audited_pairs, tmp_path):
         manifest.validate_files(roots={'unknown': tmp_path})
     external = tmp_path / 'external'
     external.mkdir()
-    cv2.imwrite(str(external / 'image.png'), np.zeros((4, 6), dtype=np.uint8))
+    save_image(str(external / 'image.png'), np.zeros((4, 6), dtype=np.uint8))
     inside = tmp_path / 'inside'
     inside.mkdir()
     try:
@@ -146,7 +145,7 @@ def test_duplicate_json_keys_and_atomic_save(manifest, tmp_path, monkeypatch):
 def test_file_and_selection_fingerprints_have_independent_scopes(manifest, audited_pairs):
     dataset, roots = audited_pairs
     before_train = manifest.fingerprints(split='train')
-    cv2.imwrite(dataset.records[2].input_path, np.full((4, 6), 77, dtype=np.uint8))
+    save_image(dataset.records[2].input_path, np.full((4, 6), 77, dtype=np.uint8))
     changed = SplitManifest.from_audit(audit_image_pairs(dataset, roots), manifest.splits, groups=manifest.groups)
     assert changed.fingerprint('input') != manifest.fingerprint('input')
     assert changed.fingerprints(split='train') == before_train
@@ -170,8 +169,8 @@ def test_manifest_source_freezes_selection_and_detects_configuration_drift(manif
     restored = PairedImageDataset.from_manifest(path, roots=roots)
     source = DatasetSource.from_paired_dataset(Subset(Subset(restored, [2, 0, 1]), [2, 1, 2]))
     config = source.get_config()
-    cv2.imwrite(str(tmp_path / 'new_in.png'), np.zeros((4, 6), dtype=np.uint8))
-    cv2.imwrite(str(tmp_path / 'new_target.png'), np.zeros((4, 6), dtype=np.uint8))
+    save_image(str(tmp_path / 'new_in.png'), np.zeros((4, 6), dtype=np.uint8))
+    save_image(str(tmp_path / 'new_target.png'), np.zeros((4, 6), dtype=np.uint8))
     recreated = paired_source_from_config(config=config)
     assert recreated.sample_ids == ('1', '01', '1')
     for index in range(len(source)):
@@ -262,7 +261,7 @@ def test_manifest_cache_invalidation_separates_targets_training_and_pixels(audit
         assert result.status == 'complete'
         return manifest, source, config, result
     first, _, _, baseline = prepare('train')
-    cv2.imwrite(dataset.records[0].target_path, np.zeros((4, 6), dtype=np.uint8))
+    save_image(dataset.records[0].target_path, np.zeros((4, 6), dtype=np.uint8))
     masks, source, config, result = prepare('train')
     assert masks.fingerprint('target') != first.fingerprint('target')
     assert result.prepared_entries == 0
@@ -277,7 +276,7 @@ def test_manifest_cache_invalidation_separates_targets_training_and_pixels(audit
     assert result.prepared_entries == 0
     with open_dataset_cache(config, source) as loader:
         assert torch.all(list(loader)[1][1] == 1)
-    cv2.imwrite(dataset.records[2].input_path, np.full((4, 6), 77, dtype=np.uint8))
+    save_image(dataset.records[2].input_path, np.full((4, 6), 77, dtype=np.uint8))
     evaluation, _, _, result = prepare('train')
     assert evaluation.fingerprints(split='train') == inverted.fingerprints(split='train')
     assert result.prepared_entries == 0
@@ -287,7 +286,7 @@ def test_manifest_cache_invalidation_separates_targets_training_and_pixels(audit
     assert result.prepared_entries == 0
     with open_dataset_cache(config, source) as loader:
         assert [batch.sample_ids for batch, _ in loader] == [('01',), ('1',)]
-    cv2.imwrite(dataset.records[0].input_path, np.full((4, 6), 160, dtype=np.uint8))
+    save_image(dataset.records[0].input_path, np.full((4, 6), 160, dtype=np.uint8))
     pixels, _, _, result = prepare('changed-input')
     assert pixels.fingerprint('input', split='train') != first.fingerprint('input', split='train')
     assert result.prepared_entries > 0

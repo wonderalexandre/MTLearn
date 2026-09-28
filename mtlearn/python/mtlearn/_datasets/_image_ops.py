@@ -42,16 +42,32 @@ def normalize_resize_shape(
     return rows, cols
 
 
+def _needs_unicode_file_decode(filename):
+    return os.name == "nt" and not filename.isascii()
+
+
+def _read_image_file(path, flags):
+    filename = os.fspath(path)
+    if _needs_unicode_file_decode(filename):
+        try:
+            with open(filename, "rb") as stream:
+                encoded = np.frombuffer(stream.read(), dtype=np.uint8)
+        except OSError:
+            return None
+        return cv2.imdecode(encoded, flags) if encoded.size else None
+    return cv2.imread(filename, flags)
+
+
 def read_image(path: str, *, grayscale: bool) -> np.ndarray:
     """Read one image from disk as grayscale or RGB."""
 
     if grayscale:
-        image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        image = _read_image_file(path, cv2.IMREAD_GRAYSCALE)
         if image is None:
             raise RuntimeError(f"Failed to read grayscale image: {path}")
         return image
 
-    image = cv2.imread(path, cv2.IMREAD_COLOR)
+    image = _read_image_file(path, cv2.IMREAD_COLOR)
     if image is None:
         raise RuntimeError(f"Failed to read color image: {path}")
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

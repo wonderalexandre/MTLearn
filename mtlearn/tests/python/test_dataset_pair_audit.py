@@ -1,5 +1,6 @@
 import gc
 import weakref
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -9,13 +10,20 @@ import torch
 from mtlearn.datasets import PairedImageDataset, SplitManifest, audit_image_pairs
 
 
+def save_image(path, array):
+    path = Path(path)
+    valid, encoded = cv2.imencode(path.suffix.lower(), array)
+    assert valid
+    path.write_bytes(encoded.tobytes())
+
+
 @pytest.fixture
 def audited_pairs(tmp_path):
     for sample_id in ('01', '1', 'β'):
         image = np.arange(24, dtype=np.uint8).reshape(4, 6)
         target = np.where(image > 8, 255, 0).astype(np.uint8)
-        cv2.imwrite(str(tmp_path / f'{sample_id}_in.png'), image)
-        cv2.imwrite(str(tmp_path / f'{sample_id}_target.png'), target)
+        save_image(str(tmp_path / f'{sample_id}_in.png'), image)
+        save_image(str(tmp_path / f'{sample_id}_target.png'), target)
     dataset = PairedImageDataset.from_suffixes(tmp_path)
     roots = {'input': tmp_path, 'target': tmp_path}
     return dataset, roots
@@ -23,8 +31,8 @@ def audited_pairs(tmp_path):
 
 def test_native_metadata_and_effective_reader_are_distinct(tmp_path):
     image = np.array([[0, 256], [512, 65535]], dtype=np.uint16)
-    cv2.imwrite(str(tmp_path / 'a_in.png'), image)
-    cv2.imwrite(str(tmp_path / 'a_target.png'), image)
+    save_image(str(tmp_path / 'a_in.png'), image)
+    save_image(str(tmp_path / 'a_target.png'), image)
     dataset = PairedImageDataset.from_suffixes(tmp_path, scale_in=False)
     audit = audit_image_pairs(dataset, {'input': tmp_path, 'target': tmp_path})
     assert audit.sources['a']['input']['dtype'] == 'uint16'
@@ -36,12 +44,13 @@ def test_native_metadata_and_effective_reader_are_distinct(tmp_path):
 
 def test_callback_metadata_defensive_copies_and_one_pair_memory(audited_pairs, monkeypatch):
     dataset, roots = audited_pairs
-    imread = cv2.imread
+    from mtlearn._datasets import _pair_audit
+    read_image_file = _pair_audit._read_image_file
     references, live = [], []
     def read(*args):
         gc.collect()
         live.append(sum(ref() is not None for ref in references))
-        array = imread(*args)
+        array = read_image_file(*args)
         references.append(weakref.ref(array))
         return array
     metadata = {'mask_values': [0, 255], 'original_zero_fraction': 0.375}
@@ -49,7 +58,7 @@ def test_callback_metadata_defensive_copies_and_one_pair_memory(audited_pairs, m
         assert not image.flags.writeable and not target.flags.writeable
         assert record.sample_id in dataset.sample_ids
         return metadata
-    monkeypatch.setattr(cv2, 'imread', read)
+    monkeypatch.setattr(_pair_audit, '_read_image_file', read)
     audit = audit_image_pairs(dataset, roots, validate)
     assert live == [0, 1] * 3
     assert not any(ref() is not None for ref in references)
@@ -79,18 +88,18 @@ def test_audit_rejects_mutation_during_or_after_inspection(audited_pairs):
     dataset, roots = audited_pairs
     audit = audit_image_pairs(dataset, roots)
     filename = dataset.records[0].target_path
-    cv2.imwrite(filename, np.full((4, 6), 255, dtype=np.uint8))
+    save_image(filename, np.full((4, 6), 255, dtype=np.uint8))
     with pytest.raises(RuntimeError, match='changed'):
         SplitManifest.from_audit(audit, {'train': list(dataset.sample_ids)})
     def mutate(record, *_):
-        cv2.imwrite(record.input_path, np.zeros((4, 6), dtype=np.uint8))
+        save_image(record.input_path, np.zeros((4, 6), dtype=np.uint8))
     with pytest.raises(RuntimeError, match='changed'):
         audit_image_pairs(dataset, roots, mutate)
 
 
 def test_invalid_native_shape_and_unreadable_file(audited_pairs):
     dataset, roots = audited_pairs
-    cv2.imwrite(dataset.records[0].target_path, np.zeros((2, 3), dtype=np.uint8))
+    save_image(dataset.records[0].target_path, np.zeros((2, 3), dtype=np.uint8))
     with pytest.raises(ValueError, match='01.*spatial'):
         audit_image_pairs(dataset, roots)
     from pathlib import Path
@@ -148,3 +157,20 @@ def test_cpu_reader_contract_does_not_require_the_default_device(audited_pairs, 
         reopened = PairedImageDataset.from_manifest(path, roots=roots, split='train')
         assert reopened[0][0].device.type == 'cpu'
         assert restored.validate_preprocessing(reopened)['valid']
+
+
+def test_unicode_paths_decode_when_opencv_cannot_open_the_filename(audited_pairs, monkeypatch):
+    from mtlearn._datasets import _image_ops
+    dataset, roots = audited_pairs
+    monkeypatch.setattr(_image_ops, '_needs_unicode_file_decode',
+                        lambda filename: not filename.isascii())
+    ordinary_imread = cv2.imread
+    def ascii_only(path, flags):
+        if not str(path).isascii():
+            raise AssertionError('Native path-based decoding cannot open this filename')
+        return ordinary_imread(path, flags)
+    monkeypatch.setattr(cv2, 'imread', ascii_only)
+    assert dataset[2][2] == 'β'
+    audit = audit_image_pairs(dataset, roots)
+    assert audit.sample_ids == ('01', '1', 'β')
+    assert audit.sources['β']['input']['shape'] == [4, 6]
