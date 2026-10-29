@@ -22,19 +22,19 @@ def test_gray_level_matches_node_valuation(tree_type, dtype, output_space, const
     else:
         expected = [tree.node_altitude(node) for node in range(tree.num_internal_node_slots)]
     attribute = morphology.AttributeType.GRAY_LEVEL
-    actual = morphology.compute_single_attribute(tree, attribute, output_space=output_space, dtype=dtype)
+    actual = morphology.compute(tree, attribute, output_space=output_space, dtype=dtype)
     assert actual.dtype == np.dtype(dtype)
     np.testing.assert_array_equal(actual, expected)
     for request in [[attribute], [attribute, attribute],
                     [attribute, morphology.AttributeType.AREA],
                     [attribute, morphology.AttributeGroup.GRAY_LEVEL]]:
-        layout, values = morphology.compute_attributes(tree, request, output_space=output_space, dtype=dtype)
+        layout, values = morphology.compute(tree, request, output_space=output_space, dtype=dtype)
         assert values.dtype == np.dtype(dtype)
         assert list(layout.values()) == list(range(len(layout)))
         assert list(layout).count("GRAY_LEVEL") == 1
         np.testing.assert_array_equal(values[:, layout["GRAY_LEVEL"]], expected)
         if "AREA" in layout:
-            area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA,
+            area = morphology.compute(tree, morphology.AttributeType.AREA,
                 output_space=output_space, dtype=dtype)
             np.testing.assert_array_equal(values[:, layout["AREA"]], area)
 
@@ -48,8 +48,8 @@ def test_gray_level_catalog_and_groups():
     for group in [morphology.AttributeGroup.ALL, morphology.AttributeGroup.GRAY_LEVEL]:
         assert morphology.expand_attribute_group(group).count(attribute) == 1
     tree = morphology.build_tree(np.array([[10, 30], [10, 50]], dtype=np.uint8), "max-tree")
-    values = morphology.compute_single_attribute(tree, attribute)
-    means = morphology.compute_single_attribute(tree, morphology.AttributeType.MEAN_GRAY_LEVEL)
+    values = morphology.compute(tree, attribute)
+    means = morphology.compute(tree, morphology.AttributeType.MEAN_GRAY_LEVEL)
     assert values[tree.root] == 10
     assert means[tree.root] == 25
     assert values.dtype == np.float32

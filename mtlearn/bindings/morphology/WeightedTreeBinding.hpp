@@ -31,10 +31,8 @@ inline const char* treeKindName(mmcfilters::MorphologicalTreeKind kind)
         return "min-tree";
     case mmcfilters::MorphologicalTreeKind::TreeOfShapes:
         return "tree-of-shapes";
-    case mmcfilters::MorphologicalTreeKind::UnrestrictedResidualTree:
-        return "unrestricted-residual-tree";
-    case mmcfilters::MorphologicalTreeKind::SaturatedResidualTree:
-        return "saturated-residual-tree";
+    case mmcfilters::MorphologicalTreeKind::ExtremumResidualTree:
+        return "extremum-residual-tree";
     case mmcfilters::MorphologicalTreeKind::Generic:
         return "generic";
     }
@@ -293,11 +291,9 @@ inline void bindWeightedTree(py::module& m)
 {
     auto weightedTree = py::class_<morphology::WeightedTree, morphology::WeightedTreePtr>(
         m,
-        // Python-facing name: this is mtlearn's own API surface and stays put
-        // even though the backend type it wraps was renamed.
-        "WeightedMorphologicalTree",
+        "ValuedMorphologicalTree",
         py::module_local(),
-        R"pbdoc(Native weighted morphology-tree handle returned by ``mtlearn.morphology``.
+        R"pbdoc(Native valued morphological-tree handle returned by ``mtlearn.morphology``.
 
 Instances expose topology queries, node altitude/residue values, mutation
 operations, reconstruction, and hierarchy export. Prefer high-level factories

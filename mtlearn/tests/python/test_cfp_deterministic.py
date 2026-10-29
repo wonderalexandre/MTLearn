@@ -156,7 +156,7 @@ def test_implicit_forward_and_parameter_gradients_match_explicit_jacobian(tree_t
         mtlearn.ConnectedFilterPreprocessingTreeTensors.get_info_for_jacobian(tree)
     )
     residues = residues.double()
-    attributes = morphology.compute_attributes(tree, [morphology.AttributeType.AREA])[1]
+    attributes = morphology.compute(tree, [morphology.AttributeType.AREA])[1]
     attributes = torch.as_tensor(attributes, dtype=torch.float64).reshape(-1, 1)
     score_sharpness = 1.7
 

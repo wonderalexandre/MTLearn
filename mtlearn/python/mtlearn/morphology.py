@@ -1,14 +1,8 @@
-"""Stable morphology facade for mtlearn.
-
-The current backend is mtlearn's native ``_mtlearn`` extension. Keeping user
-code behind this module lets mtlearn swap morphology backends later without
-changing notebooks and high-level Python APIs.
-"""
+"""Morphology facade backed by the native ``_mtlearn`` extension."""
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterable
 
 from ._backends import _mtlearn as _backend
 
@@ -24,13 +18,12 @@ class TreeType(str, Enum):
         return self.value
 
 
-Tree = _backend.Tree
-WeightedTree = _backend.Tree
-WeightedMorphologicalTree = _backend.WeightedMorphologicalTree
+ValuedMorphologicalTree = _backend.ValuedMorphologicalTree
 Attribute = _backend.Attribute
 AttributeType = _backend.AttributeType
 AttributeGroup = _backend.AttributeGroup
 AttributeFilters = _backend.AttributeFilters
+ExtinctionSelectionPolicy = _backend.ExtinctionSelectionPolicy
 NodeIdSpace = _backend.NodeIdSpace
 ToSInterpolation = _backend.ToSInterpolation
 
@@ -42,7 +35,7 @@ def create_max_tree(image):
         image: Contiguous or convertible 2D uint8 image.
 
     Returns:
-        A ``WeightedMorphologicalTree`` facade backed by the native extension.
+        A ``ValuedMorphologicalTree`` facade backed by the native extension.
     """
     return _backend.create_max_tree(image)
 
@@ -54,7 +47,7 @@ def create_min_tree(image):
         image: Contiguous or convertible 2D uint8 image.
 
     Returns:
-        A ``WeightedMorphologicalTree`` facade backed by the native extension.
+        A ``ValuedMorphologicalTree`` facade backed by the native extension.
     """
     return _backend.create_min_tree(image)
 
@@ -76,7 +69,7 @@ def create_tree_of_shapes(
         infinity_seed_col: Boundary infinity seed column used by the backend.
 
     Returns:
-        A ``WeightedMorphologicalTree`` facade backed by the native extension.
+        A ``ValuedMorphologicalTree`` facade backed by the native extension.
     """
     return _backend.create_tree_of_shapes(
         image,
@@ -106,7 +99,7 @@ def build_tree(
         tos_infinity_seed_col: Boundary infinity seed column for tree of shapes.
 
     Returns:
-        A ``WeightedMorphologicalTree`` facade.
+        A ``ValuedMorphologicalTree`` facade.
 
     Raises:
         ValueError: If ``tree_type`` or tree-of-shapes interpolation is unknown.
@@ -137,63 +130,19 @@ def normalize_tos_interpolation(interpolation=None):
     return _backend.normalize_tos_interpolation(interpolation)
 
 
-def compute_attributes(
+def compute(
     tree,
-    attributes: Iterable,
+    attributes,
     *,
     output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
     dtype=None,
 ):
-    """Compute several scalar attributes or attribute groups for ``tree``.
+    """Compute a scalar as a 1D array, or a group or iterable as (layout, values).
 
-    Args:
-        tree: A tree returned by this module.
-        attributes: Iterable containing ``AttributeType`` values,
-            ``AttributeGroup`` values, or a mix of both.
-        output_space: Node-id space used by rows of the output buffer.
-        dtype: Optional NumPy-compatible floating dtype. Supported values are
-            ``np.float32`` and ``np.float64``. ``None`` keeps the historical
-            ``np.float32`` default.
-
-    Returns:
-        ``(attribute_index, values)`` where ``attribute_index`` maps attribute
-        names to output columns and ``values`` is a NumPy array with one
-        row per node slot in the selected node-id space.
+    Attributes and groups accept enum values or canonical symbolic names.
+    The default dtype is float32; float64 is also supported.
     """
-    return _backend.compute_attributes(
-        tree,
-        attributes,
-        output_space=output_space,
-        dtype=dtype,
-    )
-
-
-def compute_single_attribute(
-    tree,
-    attribute,
-    *,
-    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
-    dtype=None,
-):
-    """Compute one scalar attribute for ``tree``.
-
-    Args:
-        tree: A tree returned by this module.
-        attribute: One ``AttributeType`` value.
-        output_space: Node-id space used by rows of the output buffer.
-        dtype: Optional NumPy-compatible floating dtype. Supported values are
-            ``np.float32`` and ``np.float64``. ``None`` keeps the historical
-            ``np.float32`` default.
-
-    Returns:
-        A 1D NumPy array indexed by the selected node-id space.
-    """
-    return _backend.compute_single_attribute(
-        tree,
-        attribute,
-        output_space=output_space,
-        dtype=dtype,
-    )
+    return _backend.compute(tree, attributes, output_space=output_space, dtype=dtype)
 
 
 def describe_attribute(attribute):
@@ -222,14 +171,13 @@ def is_tree(value) -> bool:
 
 
 __all__ = [
-    "Tree",
     "TreeType",
-    "WeightedTree",
-    "WeightedMorphologicalTree",
+    "ValuedMorphologicalTree",
     "Attribute",
     "AttributeType",
     "AttributeGroup",
     "AttributeFilters",
+    "ExtinctionSelectionPolicy",
     "NodeIdSpace",
     "ToSInterpolation",
     "create_max_tree",
@@ -238,8 +186,7 @@ __all__ = [
     "build_tree",
     "normalize_tree_type",
     "normalize_tos_interpolation",
-    "compute_attributes",
-    "compute_single_attribute",
+    "compute",
     "describe_attribute",
     "describe_all_attributes",
     "expand_attribute_group",

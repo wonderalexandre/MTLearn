@@ -19,6 +19,8 @@ class ConfigDeserializer:
         """Resolve serialized attribute/group names to morphology enums."""
         if not isinstance(value, str):
             return value
+        if value == "BOX_WIDTH":
+            value = "BOUNDING_BOX_WIDTH"
         for enum_type in (morphology.AttributeType, morphology.AttributeGroup):
             try:
                 return getattr(enum_type, value)

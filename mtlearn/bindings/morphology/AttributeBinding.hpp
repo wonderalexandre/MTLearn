@@ -165,6 +165,9 @@ inline const std::vector<morphology::Attribute>& allAttributes()
         morphology::Attribute::FilledCompactness,
         morphology::Attribute::FilledCircularity,
         morphology::Attribute::GrayLevel,
+        morphology::Attribute::AxisOrientationSigned,
+        morphology::Attribute::FilledAxisOrientationSigned,
+        morphology::Attribute::RawInertia,
     };
     return attributes;
 }
@@ -398,6 +401,67 @@ inline py::array computeSingleAttribute(
     return computeSingleAttributeTyped<float>(std::move(tree), attribute, outputSpace);
 }
 
+inline morphology::AttributeOrGroup resolveAttributeOrGroup(py::handle request)
+{
+    if (py::isinstance<morphology::Attribute>(request)) {
+        return request.cast<morphology::Attribute>();
+    }
+    if (py::isinstance<morphology::AttributeGroup>(request)) {
+        return request.cast<morphology::AttributeGroup>();
+    }
+    if (!py::isinstance<py::str>(request)) {
+        throw py::type_error("Expected Attribute.Type, Attribute.Group, or a symbolic name.");
+    }
+    const auto name = request.cast<std::string>();
+    for (const auto attribute : allAttributes()) {
+        const auto candidate = attribute == morphology::Attribute::GrayLevel
+            ? std::string("GRAY_LEVEL") : attributeName(toBackend(attribute));
+        if (name == candidate) {
+            return attribute;
+        }
+    }
+    const std::pair<const char*, morphology::AttributeGroup> groups[] = {
+        {"ALL", morphology::AttributeGroup::All},
+        {"GRAY_LEVEL", morphology::AttributeGroup::GrayLevel},
+        {"SHAPE", morphology::AttributeGroup::Shape},
+        {"MOMENTS", morphology::AttributeGroup::Moments},
+        {"BOUNDARY", morphology::AttributeGroup::Boundary},
+        {"TREE_TOPOLOGY", morphology::AttributeGroup::TreeTopology},
+        {"DIST_TRANSF", morphology::AttributeGroup::DistTransf},
+        {"DIST_TRANSF_EXACT", morphology::AttributeGroup::DistTransfExact},
+        {"FILLED_SHAPE", morphology::AttributeGroup::FilledShape},
+    };
+    for (const auto& [candidate, group] : groups) {
+        if (name == candidate) {
+            return group;
+        }
+    }
+    throw py::value_error("Unknown attribute or group name '" + name + "'.");
+}
+
+inline py::object compute(
+    morphology::WeightedTreePtr tree,
+    const py::object& attributes,
+    morphology::NodeIdSpace outputSpace,
+    py::object dtype)
+{
+    const bool singleRequest = py::isinstance<py::str>(attributes)
+        || py::isinstance<morphology::Attribute>(attributes)
+        || py::isinstance<morphology::AttributeGroup>(attributes);
+    std::vector<morphology::AttributeOrGroup> requests;
+    if (singleRequest) {
+        requests.push_back(resolveAttributeOrGroup(attributes));
+        if (const auto* attribute = std::get_if<morphology::Attribute>(&requests.front())) {
+            return computeSingleAttribute(std::move(tree), *attribute, outputSpace, std::move(dtype));
+        }
+    } else {
+        for (const auto request : attributes) {
+            requests.push_back(resolveAttributeOrGroup(request));
+        }
+    }
+    return py::cast(computeAttributes(std::move(tree), requests, outputSpace, std::move(dtype)));
+}
+
 // Register Attribute static methods plus nested Group and Type enums. The
 // nested shape keeps attribute operations grouped under one Python namespace.
 inline void bindAttribute(py::module& m)
@@ -413,31 +477,23 @@ predefined groups. The high-level aliases in ``mtlearn.morphology`` expose the
 same objects as ``AttributeType`` and ``AttributeGroup``.
 )pbdoc")
         .def_static(
-            "compute_attributes",
-            &computeAttributes,
-            "tree"_a,
+            "compute",
+            &compute,
+            "tree"_a.none(false),
             "attributes"_a,
             "output_space"_a = morphology::NodeIdSpace::MorphologicalTree,
+            py::kw_only(),
             "dtype"_a = py::none(),
-            R"pbdoc(Compute several attributes or attribute groups for a tree.
-
-Returns:
-    ``(attribute_index, values)`` where ``attribute_index`` maps attribute names
-    to columns and ``values`` is a NumPy array. ``dtype`` accepts ``np.float32``
-    and ``np.float64``; the default is ``np.float32``. By default rows are
-    indexed by morphology-tree node slots.
-)pbdoc")
-        .def_static(
-            "compute_single_attribute",
-            &computeSingleAttribute,
-            "tree"_a,
-            "attribute"_a,
-            "output_space"_a = morphology::NodeIdSpace::MorphologicalTree,
-            "dtype"_a = py::none(),
-            "Compute one scalar attribute and return a 1D NumPy array.")
+            "Compute one attribute as a 1D array, or a group or iterable as (layout, values). Symbolic names are accepted.")
         .def_static(
             "describe",
-            &describeAttribute,
+            [](py::handle request) {
+                const auto resolved = resolveAttributeOrGroup(request);
+                if (const auto* scalar = std::get_if<morphology::Attribute>(&resolved)) {
+                    return describeAttribute(*scalar);
+                }
+                throw py::type_error("Expected a scalar attribute or its symbolic name.");
+            },
             "attribute"_a,
             "Return a user-facing description of one attribute.")
         .def_static(
@@ -604,12 +660,13 @@ Returns:
         .value("FILLED_COMPACTNESS", morphology::Attribute::FilledCompactness)
         .value("FILLED_CIRCULARITY", morphology::Attribute::FilledCircularity)
         .value("GRAY_LEVEL", morphology::Attribute::GrayLevel)
+        .value("AXIS_ORIENTATION_SIGNED", morphology::Attribute::AxisOrientationSigned)
+        .value("FILLED_AXIS_ORIENTATION_SIGNED", morphology::Attribute::FilledAxisOrientationSigned)
+        .value("RAW_INERTIA", morphology::Attribute::RawInertia)
         .export_values();
 
     attribute.attr("GRAY_LEVEL") = attribute.attr("Group").attr("GRAY_LEVEL");
 
-    attribute.attr("Type").attr("BOX_WIDTH") = attribute.attr("Type").attr("BOUNDING_BOX_WIDTH");
-    attribute.attr("BOX_WIDTH") = attribute.attr("BOUNDING_BOX_WIDTH");
 }
 
 } // namespace morphology_pybind
