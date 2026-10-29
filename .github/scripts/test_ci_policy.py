@@ -101,6 +101,41 @@ class CiPolicyTests(unittest.TestCase):
                 self.assertIn("validate-version", ancestors(name))
                 self.assertNotIn("always()", job.get("if", ""))
 
+    def test_release_publishing_requires_a_public_tag_push(self):
+        release = yaml.safe_load((WORKFLOWS / "release.yml").read_text())
+        triggers = release.get("on", release.get(True))
+        self.assertEqual(triggers["push"], {"tags": ["v*.*.*"]})
+        self.assertIn("workflow_dispatch", triggers)
+        for name in ("publish-pypi", "github-release"):
+            with self.subTest(job=name):
+                self.assertEqual(release["jobs"][name]["if"],
+                    "github.repository == 'wonderalexandre/MTLearn' && "
+                    "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')")
+
+    def test_pypi_requires_validated_release_artifacts(self):
+        jobs = yaml.safe_load((WORKFLOWS / "release.yml").read_text())["jobs"]
+        publish = jobs["publish-pypi"]
+        self.assertEqual(set(publish["needs"]), {"validate-version", "check-distributions"})
+        self.assertEqual(set(jobs["check-distributions"]["needs"]),
+                         {"build-sdist", "build-linux-wheels", "build-native-wheels"})
+        for name in publish["needs"]:
+            self.assertFalse(jobs[name].get("continue-on-error", False))
+        self.assertFalse(publish.get("continue-on-error", False))
+
+    def test_pypi_uses_oidc_and_only_the_prebuilt_release_artifacts(self):
+        publish = yaml.safe_load((WORKFLOWS / "release.yml").read_text())["jobs"]["publish-pypi"]
+        self.assertEqual(publish["permissions"], {"id-token": "write"})
+        self.assertEqual(publish["environment"],
+                         {"name": "pypi", "url": "https://pypi.org/project/mtlearn/"})
+        download, upload = publish["steps"]
+        self.assertEqual(download["uses"], "actions/download-artifact@v7")
+        self.assertEqual(download["with"],
+                         {"pattern": "release-*", "path": "dist", "merge-multiple": True})
+        self.assertEqual(upload["uses"], "pypa/gh-action-pypi-publish@release/v1")
+        self.assertEqual(upload["with"], {"packages-dir": "dist/"})
+        self.assertNotIn("env", publish)
+        self.assertNotIn("env", upload)
+
     def test_promotion_is_polled_and_dispatched_only_in_public(self):
         promote = yaml.safe_load((WORKFLOWS / "promote-public.yml").read_text())
         sync = yaml.safe_load((WORKFLOWS / "sync-private.yml").read_text())
