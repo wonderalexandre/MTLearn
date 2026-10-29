@@ -131,6 +131,26 @@ class CiPolicyTests(unittest.TestCase):
         self.assertEqual(promote["concurrency"], sync["concurrency"])
         self.assertFalse(promote["concurrency"]["cancel-in-progress"])
 
+    def test_privileged_tokens_are_limited_to_the_repository_pair(self):
+        for filename, name in (("promote-public.yml", "promote"),
+                               ("sync-private.yml", "synchronize")):
+            with self.subTest(workflow=filename):
+                workflow = yaml.safe_load((WORKFLOWS / filename).read_text())
+                self.assertEqual(workflow["permissions"], {"contents": "read"})
+                steps = workflow["jobs"][name]["steps"]
+                token = next(step for step in steps if step.get("id") == "app")
+                self.assertEqual(token["uses"],
+                    "actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510")
+                self.assertEqual(token["with"], {
+                    "client-id": "${{ vars.PROMOTION_APP_CLIENT_ID }}",
+                    "private-key": "${{ secrets.PROMOTION_APP_PRIVATE_KEY }}",
+                    "owner": "wonderalexandre",
+                    "repositories": "MTLearn\nMTLearn-dev\n",
+                    "permission-contents": "write",
+                    "permission-pull-requests": "write",
+                    "permission-workflows": "write",
+                })
+
     def test_aggregate_result_requires_every_job_to_succeed(self):
         gate = self.ci["ci-result"]
         script = gate["steps"][0]["run"]
