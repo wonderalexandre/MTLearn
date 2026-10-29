@@ -92,10 +92,14 @@ def test_new_preparation_matches_legacy_attributes_where_defined(reference):
         for tree_key, tree in sample[0].items():
             for attribute, values in tree.raw_attributes.items():
                 cached = expected[tree_key][attribute.name]
-                if attribute == morphology.AttributeType.FILLED_AXIS_ORIENTATION:
-                    # Equal principal moments leave the axis undefined. Roundoff in
-                    # long-double boundary moments can select different angles.
-                    defined = expected[tree_key]["FILLED_ECCENTRICITY"] != 1
+                if attribute.name in ("DIST_WEIGHTED_AXIS_ORIENTATION", "DIST_WEIGHTED_AXIS_ORIENTATION_EXACT"):
+                    # Equal principal moments leave the axis undefined. Incremental
+                    # distance moments can retain platform-dependent roundoff.
+                    suffix = "_EXACT" if attribute.name.endswith("_EXACT") else ""
+                    mu20, mu02, mu11 = (expected[tree_key][f"DIST_WEIGHTED_CENTRAL_MOMENT_{order}{suffix}"]
+                                       for order in ("20", "02", "11"))
+                    scale = torch.maximum(mu20.abs(), mu02.abs()).clamp_min(1)
+                    defined = torch.hypot(mu20 - mu02, 2 * mu11) > 64 * torch.finfo(cached.dtype).eps * scale
                     assert torch.isfinite(values).all()
                     assert ((values >= 0) & (values <= 90)).all()
                     values, cached = values[defined], cached[defined]
