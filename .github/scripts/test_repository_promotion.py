@@ -947,6 +947,128 @@ class PromotionTests(unittest.TestCase):
         self.assertEqual(self.github.pulls[PUBLIC], [])
         self.assertEqual(self.tip(PUBLIC), self.initial)
 
+    def private_merge(self):
+        base = self.tip(PRIVATE)
+        self.git.checkout("private-feature", base)
+        self.commit("value.txt", "feature\n", "First reviewed commit")
+        head = self.commit("feature.txt", "complete\n", "Second reviewed commit")
+        self.git.checkout("private-merge", base)
+        self.git.run("merge", "--no-ff", head, "-m", "Approved private merge")
+        source = self.git.text("rev-parse", "HEAD")
+        self.git.push(PRIVATE, "main", source, base)
+        row = dict(number=1, title="Reviewed feature", body="Private review notes",
+                   state="closed", merged_at="now", merge_commit_sha=source,
+                   head=dict(ref="feature", sha=head), base=dict(ref="main"))
+        self.github.pulls[PRIVATE].append(row)
+        return row, {source: (1, base, head)}
+
+    def test_allowlisted_merge_publishes_as_one_commit(self):
+        source_pr, recovery = self.private_merge()
+        source = source_pr["merge_commit_sha"]
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            self.assertIn("Publication pending", self.publish())
+        pull = self.github.pulls[PUBLIC][0]
+        record = metadata(pull)
+        self.assertEqual(record["source"], source)
+        self.assertEqual(len(self.git.parents(record["promotion_commit"])), 1)
+        self.assertEqual(self.git.tree(record["promotion_commit"]), self.git.tree(source))
+        self.assertIn("(cherry picked from commit " + source + ")",
+                      self.git.text("show", "-s", "--format=%B", record["promotion_commit"]))
+        self.assertEqual(self.tip(PRIVATE), source)
+        self.assertEqual(len(self.git.parents(source)), 2)
+
+    def test_allowlisted_merge_roundtrip_preserves_history_and_resumes_queue(self):
+        source_pr, recovery = self.private_merge()
+        source = source_pr["merge_commit_sha"]
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            self.publish()
+            public = self.merge_pull(PUBLIC, 1)
+            self.sync()
+            self.merge_pull(PRIVATE, self.github.pulls[PRIVATE][-1]["number"])
+            self.assertTrue(self.git.ancestor(source, self.tip(PRIVATE)))
+            self.assertTrue(self.git.ancestor(public, self.tip(PRIVATE)))
+            self.assertGreater(self.github.queue_resumes, 0)
+            self.assertIn("All merged", self.publish())
+            later = self.private_change("next\n", filename="next.txt")
+            self.assertIn("Publication pending", self.publish())
+            self.assertEqual(metadata(self.github.pulls[PUBLIC][-1])["source"],
+                             later["merge_commit_sha"])
+
+    def test_allowlisted_merge_keeps_public_review_corrections(self):
+        source_pr, recovery = self.private_merge()
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            self.publish()
+            self.correct_public_pr("corrected by public review\n")
+            self.merge_pull(PUBLIC, 1)
+            self.sync()
+            self.merge_pull(PRIVATE, self.github.pulls[PRIVATE][-1]["number"])
+            self.assertEqual(self.contents(self.tip(PRIVATE)), "corrected by public review")
+            self.assertEqual(self.contents(self.tip(PRIVATE), "feature.txt"), "complete")
+            self.assertTrue(self.git.ancestor(source_pr["merge_commit_sha"], self.tip(PRIVATE)))
+
+    def test_allowlisted_merge_can_record_and_revalidate_existing_publication(self):
+        source_pr, recovery = self.private_merge()
+        source = source_pr["merge_commit_sha"]
+        public = self.git.text("commit-tree", self.git.tree(source), "-p", self.tip(PUBLIC),
+                               "-m", "Previously reviewed public change")
+        self.git.push(PUBLIC, "main", public, self.tip(PUBLIC))
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            self.assertIn("All merged", self.publish())
+            self.assertIn("mtlearn-already-published", self.github.pulls[PRIVATE][0]["body"])
+            self.assertIn("All merged", self.publish())
+        self.assertFalse(self.github.pulls[PUBLIC])
+
+    def test_allowlisted_merge_recovery_is_idempotent(self):
+        source_pr, recovery = self.private_merge()
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            self.publish()
+            head = self.github.branch_tip(PUBLIC, PROMOTION_PREFIX + "1")
+            pushes = len(self.git.pushes)
+            self.publish()
+            self.assertEqual(self.github.branch_tip(PUBLIC, PROMOTION_PREFIX + "1"), head)
+            self.assertEqual(len(self.git.pushes), pushes)
+            self.assertEqual(len(self.github.pulls[PUBLIC]), 1)
+
+    def test_merge_recovery_rejects_wrong_private_pr_number(self):
+        source_pr, recovery = self.private_merge()
+        source_pr["number"] = 2
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            with self.assertRaisesRegex(PromotionError, "must use squash"):
+                self.publish()
+        self.assertFalse(self.github.pulls[PUBLIC])
+
+    def test_merge_recovery_rejects_wrong_parent_identity(self):
+        source_pr, recovery = self.private_merge()
+        source = source_pr["merge_commit_sha"]
+        recovery[source] = (1, self.initial, self.initial)
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            with self.assertRaisesRegex(PromotionError, "must use squash"):
+                self.publish()
+        self.assertFalse(self.github.pulls[PUBLIC])
+
+    def test_merge_recovery_rejects_unreviewed_merge_tree(self):
+        source_pr, recovery = self.private_merge()
+        source = source_pr["merge_commit_sha"]
+        extra = self.commit("unreviewed.txt", "not approved\n", "Unreviewed change")
+        _, base, head = recovery[source]
+        forged = self.git.commit_merge(base, head, self.git.tree(extra), "Forged merge")
+        self.git.push(PRIVATE, "main", forged, source)
+        source_pr["merge_commit_sha"] = forged
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES",
+                        {forged: (1, base, head)}, clear=True):
+            with self.assertRaisesRegex(PromotionError, "must use squash"):
+                self.publish()
+        self.assertFalse(self.github.pulls[PUBLIC])
+
+    def test_merge_roundtrip_requires_the_explicit_recovery(self):
+        source_pr, recovery = self.private_merge()
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", recovery, clear=True):
+            self.publish()
+            self.merge_pull(PUBLIC, 1)
+        with patch.dict("repository_promotion.APPROVED_MERGE_RECOVERIES", {}, clear=True):
+            with self.assertRaisesRegex(PromotionError, "does not match approved private history"):
+                self.sync()
+
     def test_non_squash_private_merge_requires_review(self):
         base = self.tip(PRIVATE)
         self.git.checkout("feature", base)
