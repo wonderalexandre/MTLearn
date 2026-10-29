@@ -35,6 +35,13 @@ SYNC_BRANCH = "sync/public-main"
 PROMOTION_PREFIX = "promotion/private-pr-"
 MARKER = re.compile(r"<!-- mtlearn-promotion: (\{[^\n]+\}) -->")
 PUBLISHED_MARKER = re.compile(r"<!-- mtlearn-already-published: (\{[^\n]+\}) -->")
+APPROVED_MERGE_RECOVERIES = {
+    "5fa238708ab0a903d1c4e8a9e80520ba1a91ade6": (
+        8,
+        "47e9d95b98e84034c3cda2dc34ea297144a01b7b",
+        "fa09ef45af13afee38c07512441d72d372ba3c28",
+    ),
+}
 
 
 class PromotionError(RuntimeError):
@@ -170,9 +177,12 @@ class Git:
     def checkout(self, branch, base):
         self.run("checkout", "-B", branch, base)
 
-    def replay(self, source, base):
+    def replay(self, source, base, *, mainline=None):
         self.checkout("automation-replay", base)
-        result = self.run("cherry-pick", "-x", source, check=False)
+        args = ["cherry-pick", "-x"]
+        if mainline is not None:
+            args += ["--mainline", str(mainline)]
+        result = self.run(*args, source, check=False)
         if result.returncode:
             self.run("cherry-pick", "--abort", check=False)
             raise PromotionError(
@@ -228,10 +238,24 @@ def merged(pull):
     return bool(pull.get("merged_at"))
 
 
+def approved_source_base(git, source, number):
+    parents = git.parents(source)
+    if len(parents) == 1:
+        return parents[0]
+    recovery = APPROVED_MERGE_RECOVERIES.get(source)
+    if len(parents) != 2 or recovery != (number, *parents):
+        return None
+    expected = git.merge_tree(parents[0], parents[1], context="Approved merge recovery")
+    return parents[0] if expected == git.tree(source) else None
+
+
 def promotion_origin(git, head, source, number, public_tip, record=None):
     """Validate or recover the original cherry-pick, including interrupted runs."""
     if record and (record["source"] != source or record["private_pr"] != number):
         raise PromotionError("The public PR refers to another private change.")
+    source_base = approved_source_base(git, source, number)
+    if source_base is None:
+        raise PromotionError("The publication source is not an approved private change.")
     public_history = set(git.text("rev-list", "--first-parent", public_tip).splitlines())
     candidates = ([record["promotion_commit"]] if record and "promotion_commit" in record
                   else git.text("rev-list", head, "--not", public_tip).splitlines())
@@ -246,7 +270,7 @@ def promotion_origin(git, head, source, number, public_tip, record=None):
         if record and (parents[0] != record["public_base"]
                        or git.tree(candidate) != record["tree"]):
             continue
-        expected = git.merge_tree(parents[0], source, base=git.parents(source)[0],
+        expected = git.merge_tree(parents[0], source, base=source_base,
                                   context="Promotion origin reconstruction")
         if git.tree(candidate) == expected:
             origins.append(dict(private_pr=number, source=source, public_base=parents[0],
@@ -265,11 +289,12 @@ def already_published(git, source_pr, public_tip):
                          {"private_pr", "source", "public_commit", "tree"})
     source = source_pr["merge_commit_sha"]
     public = record["public_commit"]
+    source_base = approved_source_base(git, source, source_pr["number"])
     if (record["private_pr"] != source_pr["number"] or record["source"] != source
             or public not in git.text("rev-list", "--first-parent", public_tip).splitlines()
-            or len(git.parents(source)) != 1
+            or source_base is None
             or record["tree"] != git.tree(public)
-            or git.merge_tree(public, source, base=git.parents(source)[0],
+            or git.merge_tree(public, source, base=source_base,
                               context="Already-published verification") != record["tree"]):
         raise PromotionError("Invalid already-published record on the private PR.")
     return True
@@ -346,7 +371,7 @@ def promote(git, github, private_tip, public_tip):
             if public_pr["state"] != "open":
                 raise PromotionError(f"Public PR #{public_pr['number']} was closed without merging. "
                                      "Reopen it to continue; publication cancellation is not supported.")
-        if len(git.parents(source)) != 1:
+        if approved_source_base(git, source, number) is None:
             raise PromotionError(f"Private PR #{number} must use squash merge.")
         if any(not git.ancestor(commit, private_tip) for commit in earlier_publications):
             github.request_sync()
@@ -373,7 +398,10 @@ def promote(git, github, private_tip, public_tip):
                                            default=len(public_history) - 1)
             base = publication_base(git, source, private_tip,
                                     public_history[:latest_publication_index + 1])
-            candidate = git.replay(source, base)
+            if len(git.parents(source)) == 1:
+                candidate = git.replay(source, base)
+            else:
+                candidate = git.replay(source, base, mainline=1)
             record = dict(private_pr=number, source=source, public_base=base,
                           tree=git.tree(candidate), promotion_commit=candidate)
         if candidate != previous:
@@ -425,12 +453,13 @@ def verify_published_change(git, github, commit, private_tip, pull, integrated_p
     record = metadata(pull)
     source_pr = github.pull(PRIVATE, record["private_pr"])
     source = record["source"]
+    source_base = approved_source_base(git, source, record["private_pr"])
     if (not merged(source_pr) or source_pr["base"]["ref"] != "main"
             or source_pr["head"]["ref"] == SYNC_BRANCH
             or source_pr["merge_commit_sha"] != source
             or pull["head"]["ref"] != PROMOTION_PREFIX + str(record["private_pr"])
             or len(git.parents(commit)) != 1
-            or len(git.parents(source)) != 1
+            or source_base is None
             or not git.ancestor(source, private_tip)
             or not git.ancestor(record["public_base"], integrated_public)
             or not git.ancestor(integrated_public, private_tip)
@@ -444,7 +473,7 @@ def verify_published_change(git, github, commit, private_tip, pull, integrated_p
     if published != git.tree(commit):
         raise PromotionError("The public squash content does not match the merged PR head.")
     try:
-        return git.merge_tree(integrated_public, source, base=git.parents(source)[0],
+        return git.merge_tree(integrated_public, source, base=source_base,
                               context="Expected promotion reconstruction")
     except MergeConflict as error:
         # Manual private synchronization can resolve the same conflict later
