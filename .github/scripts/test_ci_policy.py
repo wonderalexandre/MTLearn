@@ -151,6 +151,25 @@ class CiPolicyTests(unittest.TestCase):
                     "permission-workflows": "write",
                 })
 
+    def test_sync_triggers_and_controller_command_are_preserved(self):
+        sync = yaml.safe_load((WORKFLOWS / "sync-private.yml").read_text())
+        triggers = sync.get("on", sync.get(True))
+        self.assertEqual(triggers, {
+            "push": {"branches": ["main"]},
+            "repository_dispatch": {"types": ["sync-private"]},
+            "workflow_dispatch": None,
+        })
+        self.assertEqual(sync["concurrency"], {
+            "group": "repository-promotion-and-synchronization",
+            "cancel-in-progress": False,
+        })
+        job = sync["jobs"]["synchronize"]
+        self.assertEqual(job["timeout-minutes"], 15)
+        command = job["steps"][-1]
+        self.assertEqual(command["env"]["GH_TOKEN"], "${{ steps.app.outputs.token }}")
+        self.assertIn("python .github/scripts/repository_promotion.py sync",
+                      command["run"].splitlines())
+
     def test_aggregate_result_requires_every_job_to_succeed(self):
         gate = self.ci["ci-result"]
         script = gate["steps"][0]["run"]
