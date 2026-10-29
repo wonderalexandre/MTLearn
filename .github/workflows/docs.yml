@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   build-docs:
+    if: github.repository != 'wonderalexandre/MTLearn-dev'
     name: Build Sphinx documentation
     runs-on: ubuntu-latest
     steps:

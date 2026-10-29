@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   validate-version:
+    if: github.repository != 'wonderalexandre/MTLearn-dev'
     name: Validate release version
     runs-on: ubuntu-latest
     outputs:

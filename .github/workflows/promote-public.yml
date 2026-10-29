@@ -1,0 +1,67 @@
+name: Publish approved private PRs
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  repository_dispatch:
+    types: [resume-promotion]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-promotion-and-synchronization
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: >-
+      github.repository == 'wonderalexandre/MTLearn' &&
+      vars.PROMOTION_ENABLED == 'true' &&
+      (github.event_name != 'pull_request_target' ||
+       (github.event.pull_request.head.repo.full_name == github.repository &&
+        startsWith(github.event.pull_request.head.ref, 'promotion/private-pr-')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Create repository token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        with:
+          client-id: ${{ vars.PROMOTION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PROMOTION_APP_PRIVATE_KEY }}
+          owner: wonderalexandre
+          repositories: |
+            MTLearn
+            MTLearn-dev
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Check out trusted automation
+        # pull_request_target always executes the controller from public main.
+        # Never check out or run code from the event PR with the repository token.
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+          token: ${{ steps.app.outputs.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Publish the next approved change
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh auth setup-git
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python .github/scripts/repository_promotion.py promote

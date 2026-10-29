@@ -35,12 +35,11 @@ function(mtl_add_test TARGET_NAME)
 endfunction()
 
 if(_mtlearn_build_python_tests)
-    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED
+        OPTIONAL_COMPONENTS Development.Embed)
 endif()
 
 if(_mtlearn_build_python_tests)
-    find_package(Python3 COMPONENTS Development.Embed)
-
     if(NOT TARGET pybind11::embed)
         find_package(pybind11 CONFIG QUIET)
     endif()

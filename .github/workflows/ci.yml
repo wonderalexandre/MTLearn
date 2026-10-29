@@ -6,12 +6,37 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  repository-promotion:
+    name: Repository promotion tests
+    # Private development uses local tests; hosted validation runs in public.
+    if: &run_full_validation >-
+      github.repository != 'wonderalexandre/MTLearn-dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install workflow test dependencies
+        run: python -m pip install "PyYAML>=6,<7"
+
+      - name: Test workflow policy, publication and synchronization
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py' -v
+
   build-test:
+    if: *run_full_validation
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -90,6 +115,7 @@ jobs:
           git diff --check
 
   torch-runtime-compatibility:
+    if: *run_full_validation
     name: Torch runtime compatibility (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -183,3 +209,31 @@ jobs:
           done
 
           echo "Tested Torch versions: ${tested_torch_versions[*]}"
+
+  ci-result:
+    name: CI result
+    needs:
+      - repository-promotion
+      - build-test
+      - torch-runtime-compatibility
+    # Reject failed or cancelled validation while using no private runners.
+    if: >-
+      always() && (
+        github.repository != 'wonderalexandre/MTLearn-dev'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation job to succeed
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+
+          jobs = json.loads(os.environ["CI_NEEDS"])
+          if not jobs or any(job["result"] != "success" for job in jobs.values()):
+              raise SystemExit(f"Required CI jobs did not all succeed: {jobs}")
+          print("All required CI jobs succeeded.")
+          PYTHON
