@@ -319,9 +319,35 @@ jobs:
           PY
           python -m twine check dist/*
 
+  publish-pypi:
+    name: Publish to PyPI
+    if: github.repository == 'wonderalexandre/MTLearn' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - validate-version
+      - check-distributions
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mtlearn/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
   github-release:
     name: GitHub Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.repository == 'wonderalexandre/MTLearn' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs:
       - validate-version
       - check-distributions

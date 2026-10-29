@@ -206,7 +206,7 @@ python scripts/validate_notebooks.py --installed-package
 
 ## Release Process
 
-Releases are built by GitHub Actions, but PyPI publication is manual.
+Releases are built and published by GitHub Actions.
 
 For a production release:
 
@@ -217,8 +217,8 @@ For a production release:
 3. Create and push a semantic version tag matching the resolved package version,
    for example `v1.0.0`.
 4. The `Release` workflow builds the source distribution and supported platform
-   wheels, checks the package metadata, and attaches the artifacts to a GitHub
-   Release.
+   wheels, checks the package metadata, publishes the validated artifacts to
+   PyPI, and attaches them to a GitHub Release.
 
 The workflow rejects a tag when the tag version does not match the package
 version resolved by `scripts/resolve_package_version.py`.
@@ -234,16 +234,15 @@ through 3.14 on:
 macOS Intel wheels for Python 3.13 and 3.14 are not built because PyTorch does
 not publish stable `macosx_x86_64` wheels for those Python versions.
 
-PyPI upload is intentionally manual. Download the release artifacts from the
-GitHub Release or from the workflow run, then publish them with:
-
-```bash
-python -m pip install --upgrade twine
-python -m twine upload dist/*
-```
+PyPI publication uses OIDC Trusted Publishing without a stored API token. The
+`mtlearn` project on PyPI must register the GitHub owner `wonderalexandre`,
+repository `MTLearn`, workflow filename `release.yml`, and environment `pypi`.
+The public repository must also have a GitHub environment named `pypi`.
+Publication runs only for version tag pushes to `wonderalexandre/MTLearn`
+after the version and distribution checks pass.
 
 Manual runs of the `Release` workflow build downloadable artifacts without
-creating a GitHub Release.
+publishing to PyPI or creating a GitHub Release.
 
 Before publishing from the public repository, validate a clean clone:
 
