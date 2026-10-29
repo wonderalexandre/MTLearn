@@ -84,11 +84,20 @@ def test_real_v130_disk_cache_reuse_preserves_payloads_outputs_and_gradients(ref
         assert (tmp_path / name).read_bytes() == content
 
 
-def test_new_preparation_matches_all_legacy_cached_attributes(reference):
+def test_new_preparation_matches_legacy_attributes_where_defined(reference):
     preprocessor = CFPPreprocessor.from_config(reference["preprocessor_config"])
     batch = preprocessor.prepare_batch(reference["images"])
     tolerance = dict(rtol=1e-6, atol=1e-7) if preprocessor.attribute_dtype.name == "float32" else dict(rtol=1e-12, atol=1e-12)
     for sample, expected in zip(batch.samples, reference["attributes"]):
         for tree_key, tree in sample[0].items():
             for attribute, values in tree.raw_attributes.items():
-                torch.testing.assert_close(values, expected[tree_key][attribute.name], **tolerance)
+                cached = expected[tree_key][attribute.name]
+                if attribute == morphology.AttributeType.FILLED_AXIS_ORIENTATION:
+                    # Equal principal moments leave the axis undefined. Roundoff in
+                    # long-double boundary moments can select different angles.
+                    defined = expected[tree_key]["FILLED_ECCENTRICITY"] != 1
+                    assert torch.isfinite(values).all()
+                    assert ((values >= 0) & (values <= 90)).all()
+                    values, cached = values[defined], cached[defined]
+                torch.testing.assert_close(values, cached, **tolerance,
+                    msg=lambda message: f"{tree_key}/{attribute.name}: {message}")

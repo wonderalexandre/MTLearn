@@ -23,7 +23,7 @@ if not all(path.is_file() for path in (FILTERING, SEGMENTATION, LINEAR_MLP)):
 def notebook_cells(path):
     if path.is_symlink():
         pytest.skip("Notebook source has a local symlink override")
-    return ["".join(cell["source"]) for cell in json.loads(path.read_text())["cells"]
+    return ["".join(cell["source"]) for cell in json.loads(path.read_text(encoding="utf-8"))["cells"]
             if cell["cell_type"] == "code"]
 
 
