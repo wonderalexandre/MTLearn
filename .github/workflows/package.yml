@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   build-distributions:
+    if: github.repository != 'wonderalexandre/MTLearn-dev'
     name: Build Python distributions
     runs-on: ubuntu-latest
     timeout-minutes: 45
