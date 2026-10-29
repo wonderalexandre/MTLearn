@@ -18,7 +18,7 @@ dynamic = ["version"]
 name = "mtlearn"
 description = "Morphological tree learning utilities with a stable morphology facade"
 readme = "README.md"
-authors = [{ name = "Wonder Alexandre Luz Alves", email = "worderalexandre@gmail.com" }]
+authors = [{ name = "Wonder Alexandre Luz Alves", email = "wonderalexandre@gmail.com" }]
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 requires-python = ">=3.9"
