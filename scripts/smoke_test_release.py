@@ -94,7 +94,7 @@ def main() -> int:
 
     image = np.array([[1, 2], [3, 4]], dtype=np.uint8)
     tree = morphology.create_max_tree(image)
-    attr_index, attr_values = morphology.compute_attributes(
+    attr_index, attr_values = morphology.compute(
         tree,
         [morphology.AttributeType.AREA],
     )

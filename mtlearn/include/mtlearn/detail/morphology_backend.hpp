@@ -11,7 +11,6 @@
 #include "mtlearn/morphology.hpp"
 
 #include <mmcfilters/trees/MorphologicalTree.hpp>
-#include <mmcfilters/trees/detail/TreeTraversalDetail.hpp>
 #include <mmcfilters/trees/ValuedMorphologicalTree.hpp>
 #include <mmcfilters/utils/Common.hpp>
 
@@ -60,12 +59,12 @@ inline void traversePostOrder(
     MergeProcessing&& mergeProcessing,
     PostProcessing&& postProcessing)
 {
-    mmcfilters::detail::traversePostOrder(
-        tree,
-        rootNodeId,
-        std::forward<PreProcessing>(preProcessing),
-        std::forward<MergeProcessing>(mergeProcessing),
-        std::forward<PostProcessing>(postProcessing));
+    preProcessing(rootNodeId);
+    for (NodeId childNodeId : tree.children(rootNodeId)) {
+        traversePostOrder(tree, childNodeId, preProcessing, mergeProcessing, postProcessing);
+        mergeProcessing(rootNodeId, childNodeId);
+    }
+    postProcessing(rootNodeId);
 }
 
 } // namespace mtlearn::morphology::detail

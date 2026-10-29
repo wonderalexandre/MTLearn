@@ -281,7 +281,7 @@ inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
     case morphology::Attribute::GrayLevelVariance:
         return mmcfilters::Attribute::GrayLevelVariance;
     case morphology::Attribute::BoundingBoxWidth:
-        return mmcfilters::Attribute::BoxWidth;
+        return mmcfilters::Attribute::BoundingBoxWidth;
     case morphology::Attribute::BoundingBoxHeight:
         return mmcfilters::Attribute::BoundingBoxHeight;
     case morphology::Attribute::DiagonalLength:
@@ -532,6 +532,12 @@ inline mmcfilters::Attribute toBackend(morphology::Attribute attribute)
         return mmcfilters::Attribute::FilledCompactness;
     case morphology::Attribute::FilledCircularity:
         return mmcfilters::Attribute::FilledCircularity;
+    case morphology::Attribute::AxisOrientationSigned:
+        return mmcfilters::Attribute::AxisOrientationSigned;
+    case morphology::Attribute::FilledAxisOrientationSigned:
+        return mmcfilters::Attribute::FilledAxisOrientationSigned;
+    case morphology::Attribute::RawInertia:
+        return mmcfilters::Attribute::RawInertia;
     }
     throw std::invalid_argument("unknown Attribute");
 }
@@ -551,7 +557,7 @@ inline morphology::Attribute fromBackend(mmcfilters::Attribute attribute)
     MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelHeight, GrayLevelHeight);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(MeanGrayLevel, MeanGrayLevel);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(GrayLevelVariance, GrayLevelVariance);
-    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoxWidth, BoundingBoxWidth);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(BoundingBoxWidth, BoundingBoxWidth);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(BoundingBoxHeight, BoundingBoxHeight);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(DiagonalLength, DiagonalLength);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(Rectangularity, Rectangularity);
@@ -677,6 +683,9 @@ inline morphology::Attribute fromBackend(mmcfilters::Attribute attribute)
     MTLEARN_FROM_BACKEND_ATTRIBUTE(FilledCentroidDisplacementNormalized, FilledCentroidDisplacementNormalized);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(FilledCompactness, FilledCompactness);
     MTLEARN_FROM_BACKEND_ATTRIBUTE(FilledCircularity, FilledCircularity);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(AxisOrientationSigned, AxisOrientationSigned);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(FilledAxisOrientationSigned, FilledAxisOrientationSigned);
+    MTLEARN_FROM_BACKEND_ATTRIBUTE(RawInertia, RawInertia);
     }
 
 #undef MTLEARN_FROM_BACKEND_ATTRIBUTE

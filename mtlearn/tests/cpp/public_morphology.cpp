@@ -18,6 +18,12 @@
 static_assert(std::is_copy_constructible_v<mtlearn::morphology::WeightedTree>);
 static_assert(!std::is_default_constructible_v<mtlearn::morphology::WeightedTree>);
 
+static_assert(static_cast<int>(mtlearn::morphology::Attribute::BoundingBoxWidth) == 6);
+static_assert(static_cast<int>(mtlearn::morphology::Attribute::GrayLevel) == 132);
+static_assert(static_cast<int>(mtlearn::morphology::Attribute::AxisOrientationSigned) == 133);
+static_assert(static_cast<int>(mtlearn::morphology::Attribute::FilledAxisOrientationSigned) == 134);
+static_assert(static_cast<int>(mtlearn::morphology::Attribute::RawInertia) == 135);
+
 int main()
 {
     namespace morphology = mtlearn::morphology;

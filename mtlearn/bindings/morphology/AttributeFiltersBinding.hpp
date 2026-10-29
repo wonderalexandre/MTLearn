@@ -30,21 +30,28 @@ namespace morphology_pybind {
 // specific backend tree. The shared tree handle guarantees the topology remains
 // alive for the filter object's lifetime.
 class AttributeFiltersPybind {
-private:
-    enum class ExtinctionSelectionMode {
-        ExtremaToKeep,
-        MinExtinction,
-    };
-
-    struct ExtinctionSelection {
-        ExtinctionSelectionMode mode;
-        int extremaToKeep{0};
-        double minExtinction{0.0};
-    };
-
 public:
+    struct ExtinctionSelectionPolicy {
+        enum class Kind { TopK, MinimumExtinction };
+        Kind kind;
+        int extremaToKeep{0};
+        double threshold{0.0};
+
+        static ExtinctionSelectionPolicy byTopK(int extremaToKeep)
+        {
+            return {Kind::TopK, extremaToKeep, 0.0};
+        }
+
+        static ExtinctionSelectionPolicy byThreshold(double threshold)
+        {
+            return {Kind::MinimumExtinction, 0, threshold};
+        }
+    };
+
     explicit AttributeFiltersPybind(morphology::WeightedTreePtr tree)
-        : tree_(requireTree(std::move(tree))), filter_(morphology::detail::backend(*tree_))
+        : tree_(requireTree(std::move(tree))),
+          treeMutationVersion_(morphology::detail::topology(*tree_).getMutationVersion()),
+          filter_(morphology::detail::backend(*tree_))
     {
     }
 
@@ -53,68 +60,65 @@ public:
     // computation, but float64 buffers are accepted without downcasting.
     py::array_t<uint8_t> filteringMin(py::array attribute, double threshold)
     {
-        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+        if (parseFloatingArrayDType(attribute, "attribute") == FloatingDType::Float64) {
             return filteringMinTyped<double>(std::move(attribute), threshold);
         }
         return filteringMinTyped<float>(std::move(attribute), static_cast<float>(threshold));
     }
 
-    // Criterion-based filters consume one boolean decision per internal node
-    // slot, preserving the backend convention used by AttributeFilters.
-    py::array_t<uint8_t> filteringMin(std::vector<bool> criterion)
+    // Preservation masks contain one Boolean decision per internal node slot.
+    py::array_t<uint8_t> filteringMin(py::array nodePreservationMask)
     {
-        requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(filter_.filteringByPruningMin(mmcfilters::NodePreservationMask(std::move(criterion))));
+        auto decisions = requireNodePreservationMask(nodePreservationMask);
+        return imageToNumpy(filter_.filteringByPruningMin(std::move(decisions)));
     }
 
     py::array_t<uint8_t> filteringMax(py::array attribute, double threshold)
     {
-        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+        if (parseFloatingArrayDType(attribute, "attribute") == FloatingDType::Float64) {
             return filteringMaxTyped<double>(std::move(attribute), threshold);
         }
         return filteringMaxTyped<float>(std::move(attribute), static_cast<float>(threshold));
     }
 
-    py::array_t<uint8_t> filteringMax(std::vector<bool> criterion)
+    py::array_t<uint8_t> filteringMax(py::array nodePreservationMask)
     {
-        requireNodeCriterion(criterion, "criterion");
-        return imageToNumpy(filter_.filteringByPruningMax(mmcfilters::NodePreservationMask(std::move(criterion))));
+        auto decisions = requireNodePreservationMask(nodePreservationMask);
+        return imageToNumpy(filter_.filteringByPruningMax(std::move(decisions)));
     }
 
-    py::array_t<uint8_t> filteringDirectRule(std::vector<bool> criterion)
+    py::array_t<uint8_t> filteringDirectRule(py::array nodePreservationMask)
     {
-        requireNodeCriterion(criterion, "criterion");
+        auto decisions = requireNodePreservationMask(nodePreservationMask);
         return imageToNumpy(mmcfilters::applyDirectAttributeFilter(
             morphology::detail::backend(*tree_),
-            mmcfilters::NodePreservationMask(std::move(criterion))));
+            std::move(decisions)));
     }
 
     // The subtractive rule can produce residues outside the source range,
     // so the backend publishes them in the wider signed altitude-difference type
     // and mtlearn exposes that type unchanged rather than saturating it.
-    py::array_t<std::int64_t> filteringSubtractiveRule(std::vector<bool> criterion)
+    py::array_t<std::int64_t> filteringSubtractiveRule(py::array nodePreservationMask)
     {
-        requireNodeCriterion(criterion, "criterion");
+        auto decisions = requireNodePreservationMask(nodePreservationMask);
         return imageToNumpy(mmcfilters::applySubtractiveAttributeFilter(
             morphology::detail::backend(*tree_),
-            mmcfilters::NodePreservationMask(std::move(criterion))));
+            std::move(decisions)));
     }
 
-    py::array_t<float> filteringSubtractiveScoreRule(std::vector<float> scores)
+    py::array filteringSubtractiveScoreRule(py::array nodePreservationScores)
     {
-        requireNodeScores(scores, "scores");
-        return imageToNumpy(mmcfilters::applySoftSubtractiveAttributeFilter<std::uint8_t, float>(
-            morphology::detail::backend(*tree_),
-            std::span<const float>(scores)));
+        if (parseFloatingArrayDType(nodePreservationScores, "node_preservation_scores") == FloatingDType::Float64) {
+            return filteringSubtractiveScoreRuleTyped<double>(std::move(nodePreservationScores));
+        }
+        return filteringSubtractiveScoreRuleTyped<float>(std::move(nodePreservationScores));
     }
 
     py::array_t<uint8_t> filteringByExtinctionValue(
         py::array attribute,
-        py::object minExtinction,
-        py::object extremaToKeep)
+        const ExtinctionSelectionPolicy& selection)
     {
-        const ExtinctionSelection selection = parseExtinctionSelection(std::move(minExtinction), std::move(extremaToKeep));
-        if (parseFloatingArrayDType(attribute, "attr") == FloatingDType::Float64) {
+        if (parseFloatingArrayDType(attribute, "attribute") == FloatingDType::Float64) {
             return filteringByExtinctionValueTyped<double>(std::move(attribute), selection);
         }
         return filteringByExtinctionValueTyped<float>(std::move(attribute), selection);
@@ -133,9 +137,13 @@ private:
 
     // Keep all shape checks tied to the exact backend topology used by the
     // filter object.
-    const morphology::detail::TreeTopology& topology() const noexcept
+    const morphology::detail::TreeTopology& topology() const
     {
-        return morphology::detail::topology(*tree_);
+        const auto& topology = morphology::detail::topology(*tree_);
+        if (topology.getMutationVersion() != treeMutationVersion_) {
+            throw std::invalid_argument("AttributeFilters topology changed; create a new filter after tree mutation.");
+        }
+        return topology;
     }
 
     template <std::floating_point Real>
@@ -152,32 +160,25 @@ private:
     template <std::floating_point Real>
     py::array_t<uint8_t> filteringMinTyped(py::array attribute, Real threshold)
     {
-        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
+        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attribute");
         return imageToNumpy(filter_.filteringByPruningMin(floatingArrayView(typed), threshold));
     }
 
     template <std::floating_point Real>
     py::array_t<uint8_t> filteringMaxTyped(py::array attribute, Real threshold)
     {
-        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
+        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attribute");
         return imageToNumpy(filter_.filteringByPruningMax(floatingArrayView(typed), threshold));
     }
 
     template <std::floating_point Real>
     mmcfilters::ExtinctionValues<std::uint8_t, Real> makeExtinctionValues(py::array attribute)
     {
-        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attr");
+        auto typed = requireNodeAttributeArray<Real>(std::move(attribute), "attribute");
         requireFiniteNodeAttributeValues(typed);
         return mmcfilters::ExtinctionValues<std::uint8_t, Real>(
             morphology::detail::backend(*tree_),
             floatingArrayView(typed));
-    }
-
-    static void requireFiniteExtinctionThreshold(double minExtinction)
-    {
-        if (!std::isfinite(minExtinction)) {
-            throw std::invalid_argument("min_extinction must be finite");
-        }
     }
 
     template <std::floating_point Real>
@@ -187,116 +188,97 @@ private:
         const auto* values = static_cast<const Real*>(buffer.ptr);
         for (py::ssize_t i = 0; i < buffer.shape[0]; ++i) {
             if (!std::isfinite(static_cast<double>(values[i]))) {
-                throw std::invalid_argument("attr must contain only finite values");
+                throw std::invalid_argument("attribute must contain only finite values");
             }
         }
-    }
-
-    static ExtinctionSelection parseExtinctionSelection(py::object minExtinction, py::object extremaToKeep)
-    {
-        const bool hasMinExtinction = !minExtinction.is_none();
-        const bool hasExtremaToKeep = !extremaToKeep.is_none();
-        if (hasMinExtinction == hasExtremaToKeep) {
-            throw std::invalid_argument("pass exactly one of min_extinction or extrema_to_keep");
-        }
-
-        if (hasExtremaToKeep) {
-            return ExtinctionSelection{
-                ExtinctionSelectionMode::ExtremaToKeep,
-                extremaToKeep.cast<int>(),
-                0.0};
-        }
-
-        const double threshold = minExtinction.cast<double>();
-        requireFiniteExtinctionThreshold(threshold);
-        return ExtinctionSelection{
-            ExtinctionSelectionMode::MinExtinction,
-            0,
-            threshold};
     }
 
     // The backend selection policy carries both modes natively, so the facade no
     // longer walks the extrema to turn a minimum extinction into a count.
     template <std::floating_point Real>
-    static mmcfilters::ExtinctionSelectionPolicy<Real> toSelectionPolicy(const ExtinctionSelection& selection)
+    static mmcfilters::ExtinctionSelectionPolicy<Real> toSelectionPolicy(const ExtinctionSelectionPolicy& selection)
     {
-        if (selection.mode == ExtinctionSelectionMode::ExtremaToKeep) {
+        if (selection.kind == ExtinctionSelectionPolicy::Kind::TopK) {
             return mmcfilters::ExtinctionSelectionPolicy<Real>::byTopK(selection.extremaToKeep);
         }
-        return mmcfilters::ExtinctionSelectionPolicy<Real>::byThreshold(static_cast<Real>(selection.minExtinction));
+        return mmcfilters::ExtinctionSelectionPolicy<Real>::byThreshold(static_cast<Real>(selection.threshold));
     }
 
     template <std::floating_point Real>
-    py::array_t<uint8_t> filteringByExtinctionValueTyped(py::array attribute, const ExtinctionSelection& selection)
+    py::array_t<uint8_t> filteringByExtinctionValueTyped(py::array attribute, const ExtinctionSelectionPolicy& selection)
     {
         auto extinction = makeExtinctionValues<Real>(std::move(attribute));
         return imageToNumpy(extinction.filtering(toSelectionPolicy<Real>(selection)));
     }
 
-
-    void requireNodeCriterion(const std::vector<bool>& criterion, std::string_view argumentName) const
+    mmcfilters::NodePreservationMask requireNodePreservationMask(const py::array& nodePreservationMask) const
     {
-        requireVectorSize(criterion, static_cast<std::size_t>(topology().numInternalNodeSlots()), argumentName);
+        if (!nodePreservationMask.dtype().is(py::dtype::of<bool>())) {
+            throw py::type_error("node_preservation_mask must have dtype np.bool_");
+        }
+        const auto buffer = nodePreservationMask.request();
+        require1DArray(buffer, topology().numInternalNodeSlots(), "node_preservation_mask");
+        if (!(nodePreservationMask.flags() & py::array::c_style)) {
+            throw py::value_error("node_preservation_mask must be C-contiguous");
+        }
+        const auto* values = static_cast<const unsigned char*>(buffer.ptr);
+        std::vector<bool> decisions(static_cast<std::size_t>(buffer.size));
+        for (py::ssize_t index = 0; index < buffer.size; ++index) {
+            decisions[static_cast<std::size_t>(index)] = values[index] != 0;
+        }
+        return mmcfilters::NodePreservationMask(std::move(decisions));
     }
 
-    void requireNodeScores(const std::vector<float>& scores, std::string_view argumentName) const
+    template <std::floating_point Real>
+    py::array filteringSubtractiveScoreRuleTyped(py::array nodePreservationScores)
     {
-        requireVectorSize(scores, static_cast<std::size_t>(topology().numInternalNodeSlots()), argumentName);
+        auto typed = requireNodeAttributeArray<Real>(std::move(nodePreservationScores), "node_preservation_scores");
+        const auto buffer = typed.request();
+        const auto* values = static_cast<const Real*>(buffer.ptr);
+        return imageToNumpy(mmcfilters::applySoftSubtractiveAttributeFilter<std::uint8_t, Real>(
+            morphology::detail::backend(*tree_),
+            std::span<const Real>(values, static_cast<std::size_t>(buffer.size))));
     }
 
     morphology::WeightedTreePtr tree_;
+    std::uint64_t treeMutationVersion_;
     mmcfilters::AttributeFilters<std::uint8_t> filter_;
 };
 
 inline void bindAttributeFilters(py::module& m)
 {
-    py::class_<AttributeFiltersPybind>(
-        m,
-        "AttributeFilters",
-        py::module_local(),
-        R"pbdoc(Attribute-filter helper bound to one weighted morphology tree.
+    using Selection = AttributeFiltersPybind::ExtinctionSelectionPolicy;
+    py::class_<Selection>(m, "ExtinctionSelectionPolicy", py::module_local())
+        .def_static("by_top_k", &Selection::byTopK, "extrema_to_keep"_a)
+        .def_static("by_threshold", &Selection::byThreshold, "threshold"_a)
+        .def_readonly("extrema_to_keep", &Selection::extremaToKeep)
+        .def_readonly("threshold", &Selection::threshold);
 
-Filtering methods consume node-slot-sized attribute arrays, boolean criteria,
-or node scores and return reconstructed NumPy images. Create instances through
-``mtlearn.morphology.create_attribute_filter(tree)`` when possible.
-)pbdoc")
-        .def(py::init<morphology::WeightedTreePtr>(), "tree"_a, "Create filters bound to ``tree``.")
-        .def("filtering_by_pruning_min",
+    py::class_<AttributeFiltersPybind>(m, "AttributeFilters", py::module_local(),
+        "Filters over a valued morphological tree. Masks are contiguous 1D Boolean NumPy arrays; true preserves a node.")
+        .def(py::init<morphology::WeightedTreePtr>(), "tree"_a.none(false))
+        .def("filtering_by_pruning_min_rule",
             py::overload_cast<py::array, double>(&AttributeFiltersPybind::filteringMin),
-            "attr"_a,
-            "threshold"_a,
-            "Prune by a minimum-threshold rule over one node attribute array.")
-        .def("filtering_by_pruning_min",
-            py::overload_cast<std::vector<bool>>(&AttributeFiltersPybind::filteringMin),
-            "criterion"_a,
-            "Prune by a boolean minimum criterion with one value per node slot.")
-        .def("filtering_by_pruning_max",
+            "attribute"_a.noconvert(), "threshold"_a,
+            "Preserve nodes whose attribute is greater than or equal to threshold.")
+        .def("filtering_by_pruning_min_rule",
+            py::overload_cast<py::array>(&AttributeFiltersPybind::filteringMin),
+            "node_preservation_mask"_a.noconvert())
+        .def("filtering_by_pruning_max_rule",
             py::overload_cast<py::array, double>(&AttributeFiltersPybind::filteringMax),
-            "attr"_a,
-            "threshold"_a,
-            "Prune by a maximum-threshold rule over one node attribute array.")
-        .def("filtering_by_pruning_max",
-            py::overload_cast<std::vector<bool>>(&AttributeFiltersPybind::filteringMax),
-            "criterion"_a,
-            "Prune by a boolean maximum criterion with one value per node slot.")
-        .def("apply_direct_attribute_filter",
-            &AttributeFiltersPybind::filteringDirectRule,
-            "criterion"_a,
-            "Apply the backend direct-rule attribute filter.")
-        .def("apply_subtractive_attribute_filter",
-            &AttributeFiltersPybind::filteringSubtractiveRule,
-            "criterion"_a,
-            "Apply the backend subtractive-rule attribute filter.")
-        .def("apply_soft_subtractive_attribute_filter",
-            &AttributeFiltersPybind::filteringSubtractiveScoreRule,
-            "scores"_a,
-            "Apply the backend subtractive score rule and return a float image.")
-        .def("filtering_by_extinction",
-            &AttributeFiltersPybind::filteringByExtinctionValue,
-            "attr"_a,
-            "min_extinction"_a = py::none(),
-            "extrema_to_keep"_a = py::none(),
-            "Filter by keeping extrema selected either by ``min_extinction`` or ``extrema_to_keep``.");
+            "attribute"_a.noconvert(), "threshold"_a,
+            "Preserve nodes whose attribute is greater than or equal to threshold.")
+        .def("filtering_by_pruning_max_rule",
+            py::overload_cast<py::array>(&AttributeFiltersPybind::filteringMax),
+            "node_preservation_mask"_a.noconvert())
+        .def("filtering_by_direct_rule", &AttributeFiltersPybind::filteringDirectRule,
+            "node_preservation_mask"_a.noconvert())
+        .def("filtering_by_subtractive_rule", &AttributeFiltersPybind::filteringSubtractiveRule,
+            "node_preservation_mask"_a.noconvert())
+        .def("filtering_by_soft_subtractive_rule", &AttributeFiltersPybind::filteringSubtractiveScoreRule,
+            "node_preservation_scores"_a.noconvert())
+        .def("filtering_by_extinction_rule", &AttributeFiltersPybind::filteringByExtinctionValue,
+            "attribute"_a.noconvert(), "selection"_a);
 }
 
 } // namespace morphology_pybind

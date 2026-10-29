@@ -74,7 +74,6 @@ enum class Attribute {
     MeanGrayLevel,                   ///< Mean gray-level value.
     GrayLevelVariance,               ///< Gray-level variance.
     BoundingBoxWidth,            ///< Bounding-box width.
-    BoxWidth = BoundingBoxWidth,
     BoundingBoxHeight,                   ///< Bounding-box height.
     DiagonalLength,              ///< Bounding-box diagonal length.
     Rectangularity,               ///< Component rectangularity.
@@ -201,6 +200,9 @@ enum class Attribute {
     FilledCompactness,
     FilledCircularity,
     GrayLevel,                  ///< Node valuation (gray level).
+    AxisOrientationSigned,       ///< Signed principal column-axis orientation in degrees.
+    FilledAxisOrientationSigned, ///< Signed orientation of the filled region in degrees.
+    RawInertia,                  ///< Unnormalized polar second central moment mu20 + mu02.
 };
 
 /// Attribute groups expanded by the morphology facade.

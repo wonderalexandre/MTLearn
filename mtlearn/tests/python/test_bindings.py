@@ -21,9 +21,10 @@ pytestmark = pytest.mark.integration
 
 
 def test_morphology_facade_uses_native_backend():
-    assert morphology.Tree is mtlearn._bindings.WeightedMorphologicalTree
-    assert morphology.WeightedTree is mtlearn._bindings.WeightedMorphologicalTree
-    assert morphology.WeightedMorphologicalTree is mtlearn._bindings.WeightedMorphologicalTree
+    assert not hasattr(morphology, "Tree")
+    assert not hasattr(morphology, "WeightedTree")
+    assert not hasattr(mtlearn._bindings, "WeightedMorphologicalTree")
+    assert morphology.ValuedMorphologicalTree is mtlearn._bindings.ValuedMorphologicalTree
 
 
 def test_top_level_public_modules_are_exported():
@@ -274,23 +275,23 @@ def test_morphology_facade_computes_attributes_and_filters():
     assert morphology.AttributeType.CONTOUR_PERIMETER in boundary_attributes
     assert morphology.AttributeType.MAX_DIST not in boundary_attributes
 
-    attr_index, attr_values = morphology.compute_attributes(
+    attr_index, attr_values = morphology.compute(
         tree,
         [morphology.AttributeType.AREA, morphology.AttributeGroup.TREE_TOPOLOGY],
     )
-    single_attr = morphology.Attribute.compute_single_attribute(
+    single_attr = morphology.Attribute.compute(
         tree,
         morphology.AttributeType.AREA,
         morphology.NodeIdSpace.MORPHOLOGICAL_TREE,
     )
-    single_attr64 = morphology.Attribute.compute_single_attribute(
+    single_attr64 = morphology.Attribute.compute(
         tree,
         morphology.AttributeType.AREA,
         morphology.NodeIdSpace.MORPHOLOGICAL_TREE,
-        np.float64,
+        dtype=np.float64,
     )
     attribute_filter = morphology.create_attribute_filter(tree)
-    filtered = attribute_filter.apply_subtractive_attribute_filter(
+    filtered = attribute_filter.filtering_by_subtractive_rule(
         np.ones(attr_values.shape[0], dtype=bool)
     )
 

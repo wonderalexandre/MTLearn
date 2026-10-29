@@ -4,7 +4,7 @@ import pytest
 from mtlearn import morphology
 
 
-GROUPS = [("DIST_TRANSF", 29), ("DIST_TRANSF_EXACT", 29), ("FILLED_SHAPE", 12)]
+GROUPS = [("DIST_TRANSF", 29), ("DIST_TRANSF_EXACT", 29), ("FILLED_SHAPE", 13)]
 
 
 def _square_image(tree_type, *, hole=False):
@@ -28,7 +28,7 @@ def test_distance_and_filled_shape_groups_match_scalar_attributes(
     assert len(set(attributes)) == attribute_count
     assert set(attributes).issubset(morphology.expand_attribute_group(morphology.AttributeGroup.ALL))
 
-    layout, values = morphology.compute_attributes(tree, [group], dtype=dtype)
+    layout, values = morphology.compute(tree, [group], dtype=dtype)
     assert set(layout) == {attribute.name for attribute in attributes}
     assert list(layout.values()) == list(range(attribute_count))
     assert values.shape == (tree.num_internal_node_slots, attribute_count)
@@ -38,20 +38,20 @@ def test_distance_and_filled_shape_groups_match_scalar_attributes(
     for attribute in attributes:
         assert descriptions[attribute.name] == morphology.describe_attribute(attribute)
         assert descriptions[attribute.name]
-        single = morphology.compute_single_attribute(tree, attribute, dtype=dtype)
+        single = morphology.compute(tree, attribute, dtype=dtype)
         np.testing.assert_array_equal(single, values[:, layout[attribute.name]])
 
 
 def test_attribute_catalog_contains_all_distance_and_filled_shape_attributes():
     descriptions = morphology.describe_all_attributes()
     attributes = morphology.expand_attribute_group(morphology.AttributeGroup.ALL)
-    assert len(attributes) == len(set(attributes)) == len(descriptions) == 133
+    assert len(attributes) == len(set(attributes)) == len(descriptions) == 136
     names = set()
     for group_name, _ in GROUPS:
         names.update(attribute.name for attribute in morphology.expand_attribute_group(
             getattr(morphology.AttributeGroup, group_name)
         ))
-    assert len(names - {"MAX_DIST"}) == 69
+    assert len(names - {"MAX_DIST"}) == 70
     assert names.issubset(descriptions)
 
 
@@ -63,7 +63,7 @@ def test_distance_attributes_match_square_contour_distances(tree_type, dtype, ex
     node = tree.smallest_node(3 * 7 + 3)
     suffix = "_EXACT" if exact else ""
     group = getattr(morphology.AttributeGroup, "DIST_TRANSF" + suffix)
-    layout, values = morphology.compute_attributes(tree, [group], dtype=dtype)
+    layout, values = morphology.compute(tree, [group], dtype=dtype)
     distances = np.array([0] * 16 + [1] * 8 + [2], dtype=np.float64)
     squared = distances**2
     probabilities = np.array([16, 8, 1], dtype=np.float64) / 25
@@ -102,8 +102,8 @@ def test_distance_attributes_match_square_contour_distances(tree_type, dtype, ex
 def test_filled_shape_attributes_measure_enclosed_region_and_hole(tree_type, dtype):
     tree = morphology.build_tree(_square_image(tree_type, hole=True), tree_type)
     node = tree.smallest_node(1 * 7 + 1)
-    layout, values = morphology.compute_attributes(tree, [morphology.AttributeGroup.FILLED_SHAPE], dtype=dtype)
-    area = morphology.compute_single_attribute(tree, morphology.AttributeType.AREA, dtype=dtype)
+    layout, values = morphology.compute(tree, [morphology.AttributeGroup.FILLED_SHAPE], dtype=dtype)
+    area = morphology.compute(tree, morphology.AttributeType.AREA, dtype=dtype)
     assert area[node] == 24
     expected = {
         "FILLED_AREA": 25,
@@ -112,6 +112,7 @@ def test_filled_shape_attributes_measure_enclosed_region_and_hole(tree_type, dty
         "FILLED_LENGTH_MAJOR_AXIS": np.sqrt(8),
         "FILLED_LENGTH_MINOR_AXIS": np.sqrt(8),
         "FILLED_AXIS_ORIENTATION": 0,
+        "FILLED_AXIS_ORIENTATION_SIGNED": 0,
         "FILLED_ECCENTRICITY": 1,
         "FILLED_INERTIA": 4 / 25,
         "HOLE_AREA_FRACTION": 1 / 25,

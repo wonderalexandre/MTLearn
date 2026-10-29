@@ -176,6 +176,6 @@ class CFPPreprocessor:
         info = self.compute_tree_info(tree, spec)
         attrs = {}
         for attr_type in self.features[tree_key].attributes:
-            values = self.morphology.compute_attributes(tree, [attr_type], dtype=self.attribute_dtype)[1]
+            values = self.morphology.compute(tree, [attr_type], dtype=self.attribute_dtype)[1]
             attrs[attr_type] = torch.as_tensor(values, device="cpu").reshape(-1, 1)
         return PreparedMorphology(spec, self.features[tree_key], info, attrs, input_id=input_id)

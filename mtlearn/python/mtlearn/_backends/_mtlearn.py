@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
 from .._native import load_bindings
 
 
 _bindings = load_bindings()
 
 
-Tree = _bindings.WeightedMorphologicalTree
-WeightedMorphologicalTree = _bindings.WeightedMorphologicalTree
+ValuedMorphologicalTree = _bindings.ValuedMorphologicalTree
 Attribute = _bindings.Attribute
 AttributeType = _bindings.Attribute.Type
 AttributeGroup = _bindings.Attribute.Group
 AttributeFilters = _bindings.AttributeFilters
+ExtinctionSelectionPolicy = _bindings.ExtinctionSelectionPolicy
 NodeIdSpace = _bindings.NodeIdSpace
 ToSInterpolation = _bindings.ToSInterpolation
 
@@ -76,11 +74,11 @@ def normalize_tos_interpolation(interpolation=None):
 
 
 def create_max_tree(image):
-    return WeightedMorphologicalTree.create_max_tree(image)
+    return ValuedMorphologicalTree.create_max_tree(image)
 
 
 def create_min_tree(image):
-    return WeightedMorphologicalTree.create_min_tree(image)
+    return ValuedMorphologicalTree.create_min_tree(image)
 
 
 def create_tree_of_shapes(
@@ -89,7 +87,7 @@ def create_tree_of_shapes(
     infinity_seed_row: int = 0,
     infinity_seed_col: int = 0,
 ):
-    return WeightedMorphologicalTree.create_tree_of_shapes(
+    return ValuedMorphologicalTree.create_tree_of_shapes(
         image,
         normalize_tos_interpolation(interpolation),
         int(infinity_seed_row),
@@ -118,22 +116,8 @@ def build_tree(
     )
 
 
-def compute_attributes(
-    tree,
-    attributes: Iterable,
-    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
-    dtype=None,
-):
-    return Attribute.compute_attributes(tree, attributes, output_space, dtype)
-
-
-def compute_single_attribute(
-    tree,
-    attribute,
-    output_space=NodeIdSpace.MORPHOLOGICAL_TREE,
-    dtype=None,
-):
-    return Attribute.compute_single_attribute(tree, attribute, output_space, dtype)
+def compute(tree, attributes, output_space=NodeIdSpace.MORPHOLOGICAL_TREE, dtype=None):
+    return Attribute.compute(tree, attributes, output_space, dtype=dtype)
 
 
 def describe_attribute(attribute):
@@ -153,4 +137,4 @@ def create_attribute_filter(tree):
 
 
 def is_tree(value) -> bool:
-    return isinstance(value, Tree)
+    return isinstance(value, ValuedMorphologicalTree)

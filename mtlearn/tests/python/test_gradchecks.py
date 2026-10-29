@@ -35,7 +35,7 @@ def _small_gradcheck_case(dtype, tree_type="max-tree", tos_interpolation=None):
         tree_type,
         tos_interpolation=tos_interpolation,
     )
-    attributes = morphology.compute_attributes(
+    attributes = morphology.compute(
         tree,
         [morphology.AttributeType.AREA, morphology.AttributeType.COMPACTNESS],
     )[1]

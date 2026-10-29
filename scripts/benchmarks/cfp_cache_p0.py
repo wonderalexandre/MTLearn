@@ -250,15 +250,15 @@ def measure(args, build, extension):
     provider = model._tree_payload_provider
     normalizer = model._attribute_normalizer
     originals = (provider.build_tree, provider.compute_tree_info,
-                 morphology.compute_attributes, normalizer.update, normalizer.normalize)
+                 morphology.compute, normalizer.update, normalizer.normalize)
     provider.build_tree = timing.wrap('tree_construction', originals[0])
     provider.compute_tree_info = timing.wrap('tree_tensors', originals[1])
-    morphology.compute_attributes = timing.wrap('attribute_extraction', originals[2])
+    morphology.compute = timing.wrap('attribute_extraction', originals[2])
     normalizer.update = timing.wrap('statistics_update', originals[3])
     normalizer.normalize = timing.wrap('normalization', originals[4])
     with timing.stage('legacy_cpu_preparation_total'):
         model.build_dataloader_cached(DataLoader(TensorDataset(x, y), batch_size=1))
-    (provider.build_tree, provider.compute_tree_info, morphology.compute_attributes,
+    (provider.build_tree, provider.compute_tree_info, morphology.compute,
      normalizer.update, normalizer.normalize) = originals
     key = model.filter_specs[0].tree_key
     payload = model._tree_payload_cache.get('0_0', key)
